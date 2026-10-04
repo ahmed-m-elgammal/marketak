@@ -230,6 +230,19 @@ policies execute as the querying role; the pairing of `EXECUTE`-without-`USAGE` 
 The only numeric literal is the 366-day bound on a payout period, which is a safety bound rather than a
 money constant and is called out as such in the source.
 
+**One real finding from the 001–020 integrity sweep, and it is about `019`'s money invariant.** The ledger
+is append-only *even for `service_role`*, which genuinely holds `UPDATE`/`DELETE`/`TRUNCATE` — a trigger
+stops it, not a revoke, which is the strong form of the guarantee. But `wallets` carries only an owner check
+and `updated_at`: **nothing** enforces `balance = SUM(ledger_entries)`. `service_role` can therefore set a
+balance arbitrarily and desynchronise the books with no error. No client role can — both hold `SELECT` only
+on `wallets` — so this is not customer-facing, but it is reachable from a Worker or an admin script, which is
+the role people forget is trusted. It is **detected rather than prevented**: `get_wallet_balance_v1` returns
+`balance`, `ledger_balance` and `drift`, and a hand-provoked desync of 5000 against a ledger sum of 1000
+reported `drift = 4000`. Reporting beats a trigger recomputing `SUM` on every write, so this stays as designed
+and is documented instead — **the money invariant is enforced by grants and RPC discipline, not by the
+schema.** Also confirmed while testing it: `wallets_owner_type_check` admits only `vendor`/`rider`, so
+constitution's "no customer wallet" is impossible to violate by insert rather than merely conventional.
+
 ### Added - rider delivery (018)
 
 `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`,

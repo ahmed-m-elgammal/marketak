@@ -174,6 +174,93 @@ The residual risk is conditional but real, so it is kept as a standing assertion
 question: **if `private` ever gains `USAGE` for a client role, or joins the PostgREST exposed-schema
 list, constitution III.20 is violated.** A `REVOKE` would be the wrong fix — the policies need the grant.
 
+## Batch 3 — normalisation and structure (12 probes)
+
+| # | Probe | Detail | Verdict |
+|---|---|---|---|
+| 1 | every FK is the leading column(s) of an index | 5 unindexed | **accepted, see below** |
+| 2 | every table has a primary key | 0 without | pass |
+| 3 | RLS enabled on every table | 0 without RLS | pass |
+| 4 | every RLS table has at least one policy | 0 policyless | pass |
+| 5 | clients hold only `SELECT` on tables | 0 non-SELECT grants | pass |
+| 6 | `ledger_entries` has no `UPDATE`/`DELETE`/`TRUNCATE` grant | 3 grants | **my probe was wrong** |
+| 7 | `anon` holds no table grant at all | 0 | pass |
+| 8 | `updated_at` tables carry an `updated_at` trigger | 17 without | **known gap 3.23** |
+| 9 | no money column is a float type | 0 | pass |
+| 10 | no money value stored as text/varchar | 1 match | **my regex was wrong** |
+| 11 | jsonb columns, each a deliberate denormalisation | 33 | review |
+| 12 | partitioned tables | 2 | info |
+
+### The 5 unindexed FKs are deliberate, and worth writing down
+
+```
+carts.quote_address_id        order_items.selected_size_id
+cart_items.selected_size_id   event_daily_stats.city_id
+                              search_daily_stats.city_id
+```
+
+None is benign by accident — none is used as a lookup key or referenced by any RLS policy. `quote_address_id`
+is a transient checkout input read via `cart_id`; `selected_size_id` is a nullable option FK read through the
+parent line; the two `city_id` columns are on nightly admin-only rollup tables that are read whole or by date
+range. The cost is a sequential scan on parent delete/update, which is the right trade for columns that are
+never queried. Recorded because "we checked and decided" is different from "nobody looked".
+
+### Probe 6 was my error
+
+I asserted the ledger grants no `UPDATE`/`DELETE`/`TRUNCATE` and included `service_role` in the grantee list.
+The 3 grants were `service_role`'s, plus owner `postgres` holds all of them. The assertion that matters is
+about **client** roles, and it holds: `authenticated` has `SELECT` on `ledger_entries` and nothing else;
+`anon` has no grant on any table.
+
+### Probe 10 was my regex
+
+The single match is `orders.price_fingerprint`, which matched on the substring `price`. It is a hash of the
+priced inputs, not a money value. No money is stored as text.
+
+## Batch 4 — ledger and wallet immutability
+
+Run as `service_role`, the trusted server role that genuinely **does** hold `UPDATE`, `DELETE` and `TRUNCATE`.
+
+| Probe | Result |
+|---|---|
+| `service_role` UPDATE a ledger row | **BLOCKED** |
+| `service_role` DELETE a ledger row | **BLOCKED** |
+| `authenticated` INSERT a ledger row | BLOCKED (no grant) |
+| `CHECK (signed_amount <> 0)` | enforced |
+| `service_role` UPDATE `wallets.balance` directly | **MUTATED** |
+
+The ledger is append-only *even for the role that holds the write grants* — a trigger stops it, not a
+revoke. That is the strong version of the guarantee and it is correct.
+
+### Real finding: the wallet balance is not schema-enforced against the ledger
+
+`wallets` has only `trg_wallets_assert_owner` and `trg_wallets_updated_at`. **Nothing** recomputes or
+validates `balance` against `SUM(ledger_entries)`. So `service_role` can set a balance to an arbitrary
+value and the books desynchronise with no error.
+
+Severity, stated honestly:
+
+- **Not client-reachable.** `anon` and `authenticated` have no `UPDATE` on `wallets`. No customer, vendor or
+  rider can do this.
+- **Reachable by `service_role`**, i.e. the outbox Worker, an admin script, a support query or a migration.
+  That is the role people forget is trusted.
+- **Detected on demand.** `get_wallet_balance_v1` returns `balance`, `ledger_balance` and
+  **`drift = balance - ledger_balance`**. Provoked by hand: stored 5000 against a ledger sum of 1000, and
+  the RPC reported `drift = 4000`. `reconcile_day_v1` and `get_platform_float_v1` cover the day and platform
+  level.
+
+So the design is *report, don't prevent* — which is defensible, since a trigger recomputing `SUM` on every
+write is worse than the thing it prevents. But it should be written down, because the failure mode is an
+innocent-looking `update wallets set balance` in a Worker that silently breaks the central money invariant.
+**The invariant is enforced by grants and RPC discipline, not by the schema.**
+
+### Also confirmed: there is no customer wallet, and it is a CHECK
+
+`wallets_owner_type_check` restricts `owner_type` to `vendor`/`rider`, and
+`ledger_entries_account_required` pairs `vendor`/`rider` with a non-null `account_id` and
+`platform`/`platform_earnings` with a null one. Constitution's "the platform holds no customer money" is
+therefore impossible to violate by insert, not merely a convention.
+
 ## 5. Database state after the suite
 
 All fixtures rolled back. Every public table is empty except the three seeded by earlier migrations
@@ -181,9 +268,8 @@ All fixtures rolled back. Every public table is empty except the three seeded by
 
 ## Still to do
 
-- Normalisation sweep: every FK indexed, no unindexed FK, no `jsonb` where a column belongs, no orphaned
-  partitions.
-- Integrity sweep: `NOT NULL` and CHECK behaviour at `0`/negative/`int4` max, money bounds, state-machine
-  transitions refused from and to every illegal state.
-- Transaction sweep: forced mid-function failure leaves no partial write; ledger and wallet move together.
+- State machine: every illegal transition refused from and to every state, as the actor that owns it.
+- Integrity at boundaries: `0`, negative, and `int4` max on money columns; NULL in NOT NULL columns.
+- Transaction atomicity: force a mid-function failure and assert no partial write survives.
 - Reconcile idempotency across a day boundary.
+- Review the 33 jsonb columns for normalisation.
