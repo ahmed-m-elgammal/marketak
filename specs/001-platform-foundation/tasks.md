@@ -55,8 +55,8 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
       is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
       **Remaining: 019–022.** `013` shipped `events`, `014`/`014a` shipped RLS, `015` shipped search,
-      `016`/`020` shipped the profile and read RPCs in parallel, `017` shipped checkout and `018`
-      shipped rider delivery; `008` shipped
+      `016`/`020` shipped the profile and read RPCs in parallel, `017` shipped checkout, `018` shipped rider
+      delivery and `018a` fixed its revenue calculation; `008` shipped
       `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
       migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes

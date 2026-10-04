@@ -92,6 +92,52 @@ including no-op edits leaving `updated_at` alone.
   `users.email` not acquiring a use** that would make it sensitive — marketing consent or a breach list.
   The trigger to revisit is recorded, because that is the thing that would change the answer.
 
+### Fixed - rider revenue scaled by the fee, not by the basis points (018a)
+
+`private.resolve_pay` had two branches and they disagreed. The branch for a rider with a matching
+`rider_pay_rules` row computed launch revenue as a commission **on** the delivery fee; the branch for
+a rider with none returned `commission_rules.value` **unscaled**. That column is basis points, so the
+no-rule branch booked `2000` where the fee-based answer was `550` — overstating revenue by a factor of
+fee ÷ 10000, which is 3.6× on a 2750 fee.
+
+**This was not an edge case. It was the only behaviour available.** The seed ships a live
+`commission_rules` row for `scope=rider, applies_to=delivery_fee, value=2000` but ships **no**
+`rider_pay_rules` rows at all, because rider pay is per-rider configuration an admin adds later. On
+this project the broken branch was the branch every rider could reach, so every delivery would have
+booked 2000 revenue while paying the rider 0. The two errors point in opposite directions, so no
+reconciliation would have caught it.
+
+**Why it survived the first pass: my test checked two of the three outputs of the branch under test.**
+Every claim test in 018 seeded a pay rule, so the no-rule path was only ever reached by a rider id that
+could not exist — and in that run I asserted `has_rule = false` and pay `= 0` and said nothing about
+revenue. The hole was the assertion, not the code.
+
+`018` is already applied and committed, so this is a forward migration in the same spirit as `005a`,
+`007a`, `010a` and `014a`. Replaying `018` then `018a` on a fresh database produces byte-identical
+function bodies to the live project.
+
+Verified by direct SQL, 51 assertions in two batches plus 21 structural checks:
+
+| Suite | Assertions | Result |
+|---|---|---|
+| `resolve_pay` both branches, fee scaling, rounding, expiry, cross-table leakage | 27 | 26 pass, 1 bad expectation of mine (see below) |
+| full lifecycle: claim → collect → float → complete → replay → isolation → ledger immutability | 25 | pass |
+| AST markers present / known-bad patterns absent across all 9 functions | 21 | pass |
+
+Confirmed by execution: the no-rule branch now returns 20% of the actual fee and scales correctly in
+both directions (2500 → 500, 1000 → 200, 10000 → 2000, 0 → 0); rounding is half-away-from-zero
+(2750 × 1337 bps = 367.675 → 368); the with-rule branch is unchanged at pay 3334 / revenue 550; a
+rider-specific rule still beats the city default; an expired default correctly falls through to the
+no-rule branch; and a rule for `applies_to=subtotal` or `scope=vendor` does **not** leak into rider
+delivery revenue. End to end, the frozen figure and the `rider_cut` ledger entry are both 500 on a
+2500 fee rather than 2000.
+
+Two of my own test expectations were wrong and are recorded rather than quietly corrected. I asserted
+that a city with no commission rule returns 0 revenue, but the seed already provides the rider rule, so
+the correct way to test that branch is to deactivate the seeded row inside the transaction. And one
+assertion tried to print what the old code "would have" returned by recomputing the arithmetic, which
+produced the fixed value instead; the old value had already been proven directly.
+
 ### Added - rider delivery (018)
 
 `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`,

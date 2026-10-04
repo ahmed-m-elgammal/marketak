@@ -275,7 +275,11 @@ DELIVERY — customer picks one of:
 
 COLLECTION (rider confirms, app records)
   rider_pay     = resolved from rider_pay_rules for this rider at assignment time
-  platform_cut  = delivery_fee − rider_pay                    ← launch revenue, line 1
+  platform_cut  = commission_rules(scope=rider, applies_to=delivery_fee)
+                  x delivery_fee / 10000            ← launch revenue, line 1
+                  NOT delivery_fee − rider_pay. See open question 3.28: the subtraction is
+                  arithmetically impossible, since per_trip and bonus_per_leg are additive
+                  rider costs the platform bears from its own margin, and it can go negative.
   ledger_entry('cash_collected', platform, +total)           only on the cash path
   ledger_entry('rider_cut',     platform_earnings, +platform_cut)
   riders.cash_held += total                                    only on the cash path

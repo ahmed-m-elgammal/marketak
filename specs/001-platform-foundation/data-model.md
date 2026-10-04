@@ -1606,7 +1606,7 @@ create table delivery_assignments (
   rider_pay_distance integer,
   rider_pay_bonus  integer,
   rider_pay_total  integer,
-  platform_revenue integer,                 -- platform cut = delivery fee − rider pay
+  platform_revenue integer,                 -- commission_rules(rider, delivery_fee) × fee / 10000; NOT fee − rider pay, see open question 3.28
   collected_amount integer,
   collection_method  text check (collection_method in ('cash','wallet','none')),
   collection_channel text check (collection_channel in ('cod','vodafone_cash','instapay')),
@@ -2410,6 +2410,7 @@ and must not contain DDL.
 | 016 | `rpc_profile` | `get_profile_status_v1`, `complete_profile_v1`, `update_profile_v1` — **shipped**. `update_profile_v1` was missing from this row though `contracts.md` §1.3 requires it |
 | 017 | `rpc_core` | `quote_order_v1`, `place_order_v1`, `cancel_order_v1`, `transition_order_v1` — **shipped**. Also adds 8 quote columns to `carts`, `orders.idempotency_key`, a UNIQUE index on `orders.order_number` (which had none), 3 size-snapshot columns on `cart_items`/`order_items`, and 6 helper indexes. See open questions 3.23–3.26 |
 | 018 | `rpc_delivery` | `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`, `collect_wallet_v1`, `complete_delivery_v1` — **shipped**. Also adds `private.pay_rule_for`, `private.resolve_pay`, `private.trip_distance_km`, plus indexes on `delivery_assignments` (unclaimed offers), `ledger_entries(order_id)` and `platform_float(business_date)`. See open questions 3.27–3.29 |
+| 018a | `fix_pay_revenue` | Corrects `private.resolve_pay`, whose no-rule branch returned `commission_rules.value` unscaled and so booked basis points as an amount. **shipped**. Forward migration, not an edit to `018` |
 | 019 | `rpc_money` | `adjust_wallet_v1`, `get_wallet_balance_v1`, `run_payout_v1`, `reconcile_day_v1`, `get_platform_float_v1` |
 | 020 | `rpc_read` | `get_vendor_feed_v1`, `get_vendor_dashboard_v1`, `get_vendor_earnings_v1`, `get_rider_earnings_v1`, `get_admin_metrics_v1`, `get_flags_v1` — **shipped**. This row said one `get_earnings_v1`; `contracts.md` §1.6 and §1.7 name two separate functions, and **`contracts.md` wins** — same precedence rule applied at `012`, where this table also disagreed with the applied schema |
 | 021 | `cron` | All `pg_cron` jobs and pruning functions |

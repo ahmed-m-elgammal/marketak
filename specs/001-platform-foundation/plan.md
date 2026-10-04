@@ -145,7 +145,10 @@ ASSIGNMENT           the rider's pay is resolved ONCE from rider_pay_rules and
                        rider_pay_bonus    = bonus_per_leg × (vendor_count − 1)
                        rider_pay_total    = the above, capped at pct_of_delivery_fee_bps
                                              of the delivery fee
-                       platform_revenue   = delivery_fee − rider_pay_total
+                       platform_revenue   = commission_rules(rider, delivery_fee)
+                                              × delivery_fee / 10000
+                                            NOT delivery_fee − rider_pay_total;
+                                            see open question 3.28
 
 DELIVERY             customer picks, on the rider's screen or their own:
                        cash   → rider holds `total` physically
