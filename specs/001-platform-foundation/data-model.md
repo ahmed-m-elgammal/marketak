@@ -661,33 +661,53 @@ create index on menu_categories (vendor_id, display_order) where deleted_at is n
 
 ### `menu_items`
 
+`pricing_mode` makes the price/size relationship explicit and enforceable in a row-level `CHECK`:
+`'fixed'` requires `base_price`; `'sized'` takes its prices from `menu_item_sizes` and may leave
+`base_price` null, because the displayed price is the smallest available size and is derived.
+
 ```sql
 create table menu_items (
-  id                    uuid primary key default gen_random_uuid(),
-  category_id           uuid not null references menu_categories(id) on delete cascade,
-  vendor_id             uuid not null references vendors(id) on delete cascade,  -- denormalised
-  name                  text not null,
-  name_ar               text,
-  description           text,
-  description_ar        text,
-  base_price            integer not null check (base_price >= 0),
-  price_on_selection    boolean not null default false,
-  is_available          boolean not null default true,
-  stock_count           integer check (stock_count is null or stock_count >= 0), -- null = unlimited
+  id                      uuid primary key default gen_random_uuid(),
+  category_id             uuid not null references menu_categories(id) on delete cascade,
+  vendor_id               uuid not null references vendors(id) on delete cascade,  -- denormalised
+  name                    text not null,
+  name_ar                 text,
+  description             text,
+  description_ar          text,
+
+  pricing_mode            text not null default 'fixed'
+                            check (pricing_mode in ('fixed','sized')),
+  base_price              integer check (base_price is null or base_price >= 0),
+  is_available            boolean not null default true,
+  stock_count             integer check (stock_count is null or stock_count >= 0), -- null = unlimited
+
   preparation_time_minutes integer,
-  image_path            text,
-  display_order         integer not null default 0,
-  nutritional_info      jsonb,
-  allergens             jsonb,
-  is_spicy              boolean not null default false,
-  is_vegetarian         boolean not null default false,
-  is_featured           boolean not null default false,
-  created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now(),
-  deleted_at            timestamptz
+  image_path              text,
+  display_order           integer not null default 0,
+
+  -- metadata. Structured columns for anything filtered or sorted on; jsonb only for shapes
+  -- that are always read whole (constitution rule 13).
+  nutritional_info        jsonb,      -- {calories, protein_g, carbs_g, fat_g, sodium_mg}
+  allergens               jsonb,      -- ["gluten","dairy",...]
+  ingredients             jsonb,
+  tags                    text[] not null default '{}',
+  calories                integer,
+  is_spicy                boolean not null default false,
+  is_vegetarian           boolean not null default false,
+  is_featured             boolean not null default false,
+  is_new                  boolean not null default false,
+
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz not null default now(),
+  deleted_at              timestamptz,
+
+  -- row-level, so a CHECK can enforce it. The reverse direction is cross-table and needs a trigger.
+  constraint fixed_item_has_price
+    check (pricing_mode <> 'fixed' or base_price is not null)
 );
 create index on menu_items (vendor_id, is_available, display_order) where deleted_at is null;
 create index on menu_items (category_id, display_order) where deleted_at is null;
+create index on menu_items using gin (tags) where deleted_at is null;
 ```
 
 `vendor_id` is duplicated from the category for two reasons: RLS policies need to filter items by
@@ -695,17 +715,127 @@ vendor without a join, and the cart and quote RPCs need `vendor_id` on the item 
 basket. A trigger keeps it consistent:
 
 ```sql
-create or replace function public.sync_menu_item_vendor() returns trigger
-language plpgsql as $$
+create or replace function public.sync_menu_item_vendor()
+returns trigger language plpgsql set search_path = '' as $$
 begin
-  new.vendor_id := (select vendor_id from menu_categories where id = new.category_id);
+  new.vendor_id := (select c.vendor_id from public.menu_categories c where c.id = new.category_id);
   return new;
 end $$;
+
 create trigger trg_menu_item_vendor before insert or update of category_id on menu_items
 for each row execute function public.sync_menu_item_vendor();
 ```
 
-### `item_options`
+Name search is **not** indexed here. Migration 015 adds normalised generated columns plus trigram
+indexes, because Arabic search needs diacritic and alef normalisation first, and an index on raw
+`lower(name)` would never be used by that query.
+
+### `menu_item_sizes`
+
+**Sizes are not options.** A size is intrinsic to the item and carries a real price, so it is a row
+here rather than an `item_options` entry with a `price_modifier`. The distinction matters in three
+places: the kitchen ticket must print the size, price filtering needs a real price rather than
+base + modifier, and reporting must separate "they chose a large" from "they added extra cheese".
+
+```sql
+create table menu_item_sizes (
+  id            uuid primary key default gen_random_uuid(),
+  item_id       uuid not null references menu_items(id) on delete cascade,
+  name          text not null,
+  name_ar       text,
+  price         integer not null check (price >= 0),
+  is_default    boolean not null default false,
+  is_available  boolean not null default true,
+  calories      integer,
+  display_order integer not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index on menu_item_sizes (item_id, display_order);
+
+-- One default size per item.
+create unique index menu_item_sizes_one_default on menu_item_sizes (item_id) where is_default;
+```
+
+### Sizing integrity — two rules a `CHECK` cannot express
+
+Both cross tables, so neither is a row-level constraint.
+
+| Rule | Mechanism | Behaviour |
+|---|---|---|
+| An item with `pricing_mode = 'sized'` must have at least one size | `deferrable initially deferred` constraint trigger | **Rejects** at COMMIT, so an item and its sizes can be inserted in one transaction in any order |
+| Deleting the last size of a `'sized'` item would leave it unsellable | `after delete` trigger | **Repairs** — flips the item to `'fixed'` |
+
+The asymmetry is deliberate. An incomplete transaction should fail loudly. A vendor deleting a size
+mid-edit should not lose the item.
+
+```sql
+create or replace function public.assert_item_has_sizes()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.pricing_mode = 'sized'
+     and not exists (select 1 from public.menu_item_sizes where item_id = new.id) then
+    raise exception 'ITEM_SIZED_BUT_NO_SIZES: %', new.id using errcode = 'P0001';
+  end if;
+  return null;
+end $$;
+
+create constraint trigger trg_item_has_sizes
+  after insert or update on menu_items
+  deferrable initially deferred
+  for each row execute function public.assert_item_has_sizes();
+```
+
+### Snapshot invalidation
+
+Any catalog write bumps `vendors.menu_version`, which changes the R2 snapshot URL and tells every
+device its cached menu is stale. One function, five triggers, one code path — so it cannot be
+forgotten on a new catalog table.
+
+```sql
+create or replace function public.bump_menu_version()
+returns trigger language plpgsql set search_path = '' as $$
+declare
+  v_rec    jsonb;
+  v_item   uuid;
+  v_vendor uuid;
+begin
+  -- Read the row as jsonb, NOT as NEW.item_id. PL/pgSQL resolves record fields at RUNTIME, so a
+  -- function referencing new.item_id creates fine and then fails the first time a category is
+  -- inserted. This exact bug shipped in 005 and was fixed in 005a. A jsonb lookup returns NULL for
+  -- an absent key instead of raising, so one function is safe across all five tables.
+  v_rec := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
+
+  if tg_table_name = 'menu_categories' then
+    update public.vendors set menu_version = menu_version + 1, updated_at = now()
+     where id = (v_rec ->> 'vendor_id')::uuid;
+    return null;
+  end if;
+
+  v_item := case when tg_table_name = 'menu_items' then (v_rec ->> 'id')::uuid
+                 else (v_rec ->> 'item_id')::uuid end;
+
+  if tg_table_name = 'option_choices' then
+    v_item := (select o.item_id from public.item_options o
+                where o.id = (v_rec ->> 'option_id')::uuid);
+  end if;
+
+  select mi.vendor_id into v_vendor from public.menu_items mi where mi.id = v_item;
+  if v_vendor is not null then
+    update public.vendors set menu_version = menu_version + 1, updated_at = now() where id = v_vendor;
+  end if;
+  return null;
+end $$;
+```
+
+Attach to `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` and
+`menu_categories`.
+
+### `item_options` — add-ons, **not** sizes
+
+An option is a choice layered on top of the item: extra cheese, spice level, add a side. It carries
+a `price_modifier`, not a price. `min`/`max` selections allow "choose exactly 1" and "choose up
+to 3". Size selection is `menu_item_sizes`, never an option.
 
 ```sql
 create table item_options (
@@ -1994,6 +2124,9 @@ Every deviation, and why.
 | `orders.vendor_id` | Removed; split into `orders` + `sub_orders` | Multi-vendor checkout is the core requirement |
 | `order_items.order_id` only | Added mandatory `sub_order_id` | Per-vendor item status and payouts |
 | `users.id default auth.users(id)` | **Illegal, removed.** `id` references `auth.users(id)` with no default, populated by an `on_auth_user_created` trigger | Postgres rejects a column reference in a `DEFAULT` expression. Found by applying migration 003 to the live project |
+| `menu_items.price_on_selection` | **Removed**, replaced by `pricing_mode` + a dedicated `menu_item_sizes` table | A size carries a real price. As an option with a `price_modifier`, "Large" is indistinguishable from "extra cheese" on the kitchen ticket and in revenue reporting |
+| 6 verticals (food, grocery, pharmacy, flowers, bakery, others) | **Kept**, gated by `settings.supported_verticals = ["food"]` | v1 is restaurant-only. A pharmacy needs dosage, batch and expiry; a grocery needs weight units, bin locations and shelf stock. None of that is modelled, deliberately. Opening another vertical is an admin toggle, not a migration |
+| Item "metadata" as unspecified columns | `nutritional_info`, `allergens`, `ingredients`, `tags`, `calories`, `is_spicy`, `is_vegetarian`, `is_featured`, `is_new` | Structured columns for anything filtered or sorted; jsonb only for shapes always read whole (constitution rule 13) |
 | `vendors.area_ids` JSON | Removed; `vendor_areas` join table | JSON arrays cannot be indexed; forces a scan on every availability check |
 | `vendors.cuisine_types` JSON | Removed; `vendor_cuisines` + `cuisines` | Same, plus filterability |
 | `vendors.estimated_delivery_time_min/max` | Removed; derived | A stored number is wrong at lunch, which is when it matters |
@@ -2035,6 +2168,14 @@ All are fixed here; the requirements are in §13.2, §13.3 and §14.
 | 4 | No `private` schema, no `revoke execute` | `private.vendor_ids_for()` and friends, with `EXECUTE` revoked from `public, anon, authenticated` |
 | 5 | No `revoke all on schema public from public` | §13.3. Least-privilege grants per role, no `DELETE` for `authenticated` |
 | 6 | Prune targets were plain `DELETE` on an unpartitioned table | §14.1. `events`, `notifications`, `rider_location_pings`, `audit_log` partition by month so retention is `DROP TABLE`. Deliberately **not** applied to `ledger_entries`, which must stay one relation forever |
+
+Two further defects were found by *executing* migrations 005 and 005a rather than reading them, and
+are recorded here because both are invisible in review:
+
+| # | Finding | Fix |
+|---|---|---|
+| 7 | `bump_menu_version()` referenced `new.item_id`, but `menu_categories` has no such column. PL/pgSQL resolves record fields at **runtime**, so the function and all five `CREATE TRIGGER` statements succeeded, and it only failed when a category was inserted | Rewritten to read the row via `to_jsonb(new)`, where an absent key yields `NULL` instead of raising. One function is then safe across all five catalog tables. Shipped as **005a**, not as an edit to 005, because 005 had already been applied |
+| 8 | The sizing rules need one row-level `CHECK` (`fixed` requires a price) and one cross-table guarantee (`sized` requires at least one size). The cross-table rule cannot be a `CHECK` | `CHECK` for the row-level case; a `deferrable initially deferred` constraint trigger for the cross-table case so an item and its sizes can be inserted in one transaction in any order; and an `after delete` trigger that *repairs* rather than rejects when the last size is deleted |
 
 Also confirmed correct as written, so not changed:
 
