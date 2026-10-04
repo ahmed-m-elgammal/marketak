@@ -937,7 +937,8 @@ create table carts (
 create unique index carts_one_active on carts (user_id) where is_active;
 ```
 
-One active cart per user. A second device shares it.
+One active cart per user. A second device shares it. The index is **partial**: a user may keep many
+abandoned carts, and including the inactive rows would cap them at one historical cart.
 
 ### `cart_items`
 
@@ -945,21 +946,56 @@ One active cart per user. A second device shares it.
 create table cart_items (
   id                  uuid primary key default gen_random_uuid(),
   cart_id             uuid not null references carts(id) on delete cascade,
-  vendor_id           uuid not null references vendors(id) on delete cascade,
+  vendor_id           uuid not null references vendors(id) on delete cascade,  -- DERIVED, below
   menu_item_id        uuid not null references menu_items(id) on delete cascade,
-  quantity            integer not null check (quantity > 0),
-  selected_options    jsonb not null default '[]'::jsonb,
+  quantity            integer not null check (quantity > 0 and quantity <= 99),
+  selected_options    jsonb not null default '[]'::jsonb
+                        check (jsonb_typeof(selected_options) = 'array'),
   special_instructions text,
   display_snapshot    jsonb,               -- {name, name_ar, base_price} frozen for display
-  cached_price        integer,             -- display estimate only, never authoritative
+  cached_price        integer check (cached_price is null or cached_price >= 0),
   cached_at           timestamptz,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );
-create index on cart_items (cart_id);
-create index on cart_items (vendor_id);
-create index on cart_items (menu_item_id);
 ```
+
+**Line identity.** Two lines are the same line when they are the same item with the same options, so
+"add 2, then add 1 more" merges instead of creating two single-quantity rows. jsonb has no default
+btree opclass, so identity is a hash of the canonical text form. `md5` is `IMMUTABLE` and therefore
+legal inside an index:
+
+```sql
+create unique index cart_items_line_identity
+  on cart_items (cart_id, menu_item_id, md5(selected_options::text));
+```
+
+A hash collision would merge two genuinely different option sets. Acceptable here: a merged line is
+recoverable by the customer, a lost line is not, and the alternative — a surrogate key the client
+must keep in sync — is worse.
+
+**`vendor_id` is derived, never trusted.** `BEFORE INSERT OR UPDATE`, with no column list for the
+reason in §13 finding 10:
+
+```sql
+create or replace function public.sync_cart_item_vendor()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  new.vendor_id := (select mi.vendor_id from public.menu_items mi where mi.id = new.menu_item_id);
+  if new.vendor_id is null then
+    raise exception 'CART_ITEM_UNKNOWN_MENU_ITEM: %', new.menu_item_id using errcode = 'P0001';
+  end if;
+  return new;
+end $$;
+```
+
+Without this, a client could write a cart line claiming vendor B while the item belongs to vendor A,
+and a vendor dashboard reading by `vendor_id` would show a competitor's dish. `menu_items.vendor_id`
+is itself trigger-maintained, so the chain is safe.
+
+**Availability is checked at COMMIT** by a deferred constraint trigger, so a basket can be written
+before an availability flag is settled. Soft-deleted items are rejected rather than tolerated: a
+vendor retiring a dish must fail visibly, not leave a phantom line behind.
 
 `cached_price` exists so the cart can render offline. It is never read by a quote or an order.
 `display_snapshot` keeps the cart readable even after a vendor deletes a menu item, which is
