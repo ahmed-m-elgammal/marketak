@@ -49,6 +49,7 @@ Status: ⬜ open · 🟡 in progress · ✅ resolved (move to `decisions.md`)
 | 3.6 | Lunch capacity: what happens when a vendor is over `capacity_per_slot`? | ⬜ | Hide the vendor, or accept with a longer ETA? Affects revenue and customer trust differently |
 | 3.7 | Should a partially-rejected order auto-remove the vendor, or always ask? | ⬜ | Auto-removing loses basket value silently. Always asking adds friction at the worst moment |
 | 3.8 | Minimum order across the whole cart, or per vendor only? | ⬜ | Per-vendor only is implemented. A cart-wide minimum would raise the average basket but add a failure mode |
+| 3.9 | **Styling: plain `StyleSheet` + a `src/theme/` token module, or NativeWind?** | ⬜ | **Blocks Checklist A4 and C3 in `AGENTS.md`** — neither can pass until this is decided. Task T0.1d. Lean StyleSheet: one fewer dependency, no build step, and the token module satisfies "zero inline styling" on its own. NativeWind if the team is faster with Tailwind syntax and accepts the Babel step |
 
 ---
 

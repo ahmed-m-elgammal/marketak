@@ -55,6 +55,25 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       (customer + rider, one binary, role-switched), `apps/admin-web`, `apps/vendor-web`,
       `packages/shared`
       (types, error codes, money helpers), `packages/ui`
+- [ ] **T0.1b** Create `FEATURES.md` ✅ **done in this commit** and `CHANGELOG.md` ✅ **done in
+      this commit**. Keep them updated per Checklist A6 / B6 / C6 — a deliverable without a
+      `CHANGELOG` line is an undocumented deliverable
+- [ ] **T0.1c** Create the verification toolchain, or **no checklist in `AGENTS.md` can be signed
+      off and an agent must say so instead of claiming verification passed**:
+      - [ ] root `package.json` with workspaces
+      - [ ] `npm run typecheck` → `tsc --noEmit`, `"strict": true`
+      - [ ] `npm run lint` → ESLint flat config with `@typescript-eslint`
+      - [ ] `npm test` → Jest, with a `pgtap` runner for the SQL tests
+      - [ ] `npm run verify` → typecheck + lint + test + test-integrity
+      - [ ] `scripts/check-test-integrity.mjs` → fails on `.skip` / `.only` / `.xit`, on
+            tautological assertions (`expect(x).toBe(x)`, empty `it` bodies), and on coverage
+            regressions below the floor. This is the only enforcement of rule 4
+- [ ] **T0.1d** Decide the styling approach (open question 3.9): plain `StyleSheet` against a
+      `src/theme/` token module, or NativeWind. **Blocks Checklist A4 and C3.** Default to plain
+      StyleSheet + tokens unless there is a reason not to
+- [ ] **T0.1e** `scripts/precommit.sh` — refuse a commit that stages a secret, by scanning the
+      index for `*.p8 *.pem *.key *.cer *.p12 *.mobileprovision .env*`. Belt and braces: the
+      ignore list already missed an Apple key once
 - [ ] **T0.2** Migration 001: `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`. Verify `postgis`
       availability in the dashboard; do not depend on it
 - [ ] **T0.3** Migration 002: `cities`, `areas`, `delivery_zones`, `delivery_fee_tiers`, `settings`.
