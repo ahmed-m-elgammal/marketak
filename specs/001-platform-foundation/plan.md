@@ -339,10 +339,10 @@ have. If a gateway is ever added it becomes a *third* `payment_channel` alongsid
 
 | Thing | Value | Note |
 |---|---|---|
-| Supabase project name | `markatek` | Display name **Markatek / ماركتك** |
+| Supabase project name | `Marketak` | Display name **Marketak / ماركتك** |
 | Supabase region | `eu-central-1` (Frankfurt) | Chosen over `ap-south-1` despite the longer distance. Data residency and a single stable region beat ~50 ms of latency for a 900 ms p95 checkout target |
 | Cloudflare account | `8ae79d52c8b84a170bcb5c4c0485f34c` | `ahmedmelgammal6@gmail.com` |
-| R2 buckets | `markatek-public`, `markatek-private` | Prefixed so they cannot collide with another project's buckets |
+| R2 buckets | `Marketak-public`, `Marketak-private` | Prefixed so they cannot collide with another project's buckets |
 | Firebase project | created after Supabase | FCM + Crashlytics + Analytics only |
 
 Frankfurt is roughly 7,500 km from Egypt, which is a real cost: expect ~100–130 ms to the database.

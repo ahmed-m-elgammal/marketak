@@ -12,10 +12,10 @@ Status: ⬜ open · 🟡 in progress · ✅ resolved (move to `decisions.md`)
 
 | # | Item | Status | Note |
 |---|---|---|---|
-| 1.1 | Supabase project `markatek` | ⬜ | Not created. Region decided: `eu-central-1`. Needs `create_project` via MCP |
+| 1.1 | Supabase project `Marketak` | ⬜ | Not created. Region decided: `eu-central-1`. Needs `create_project` via MCP |
 | 1.2 | Supabase project_ref | ⬜ | Blocks scoping the MCP to one project (`?project_ref=`) |
 | 1.3 | Firebase project | ⬜ | Needed before the Android and iOS apps can register |
-| 1.4 | R2 buckets | ⬜ | `markatek-public` (CDN-fronted), `markatek-private` (signed URLs only) |
+| 1.4 | R2 buckets | ⬜ | `Marketak-public` (CDN-fronted), `Marketak-private` (signed URLs only) |
 | 1.5 | Cloudflare custom domain | ⬜ | Required for `cdn.` and `track.` hosts. **Blocked on a domain purchase** |
 | 1.6 | Does R2 require a payment method at signup? | ⬜ | If yes, the image decision needs a different home. Check at signup |
 

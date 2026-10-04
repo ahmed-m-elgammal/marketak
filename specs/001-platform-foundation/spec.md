@@ -1,11 +1,11 @@
-# Spec 001 — Markatek — Delivery Platform Foundation
+# Spec 001 — Marketak — Delivery Platform Foundation
 
-**Brand:** Markatek · ماركتك
+**Brand:** Marketak · ماركتك
 **Status:** Draft for review
 **Stack:** Supabase (Postgres + Auth + RLS + pg_cron) · Cloudflare (R2, Workers, Durable Objects, Pages) · Firebase (FCM, Crashlytics, Analytics)
 **Apps:** React Native (Expo) customer / rider / vendor, plus admin + vendor web dashboards on Cloudflare Pages
 **Market:** Egypt. Arabic and English. **One city at a time**, **lunch service first**
-**Infrastructure:** Supabase project `markatek`, region **eu-central-1 (Frankfurt)**. Cloudflare account `8ae79d52c8b84a170bcb5c4c0485f34c`. R2 buckets `markatek-public` / `markatek-private`
+**Infrastructure:** Supabase project `Marketak`, region **eu-central-1 (Frankfurt)**. Cloudflare account `8ae79d52c8b84a170bcb5c4c0485f34c`. R2 buckets `Marketak-public` / `Marketak-private`
 **Auth:** Google and Apple only. No email, no password. Phone is collected at profile completion
 **Payments in v1:** cash, or the customer transfers to the rider directly by Vodafone Cash /
 Instapay. **The platform never holds customer money and there is no customer wallet.**

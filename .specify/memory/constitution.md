@@ -1,4 +1,4 @@
-# Constitution — Markatek — Delivery Platform
+# Constitution — Marketak — Delivery Platform
 
 Non-negotiable principles. Every spec, plan and task must comply. Changing a principle
 requires a numbered entry in `specs/001-platform-foundation/decisions.md` and a dated amendment below.

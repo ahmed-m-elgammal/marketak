@@ -1,7 +1,7 @@
-# Markatek — Delivery Platform
+# Marketak — Delivery Platform
 
 Delivery platform for one city at a time, lunch service first. Arabic and English.
-Brand: **Markatek · ماركتك**
+Brand: **Marketak · ماركتك**
 
 ---
 

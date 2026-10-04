@@ -191,7 +191,7 @@ Seeded keys. Nothing here is hardcoded in an app; every one is admin-editable at
 
 | Key | Seed value | Meaning |
 |---|---|---|
-| `platform_name` | `"Markatek"` | English brand. Shown in the app, in order emails and on the receipt |
+| `platform_name` | `"Marketak"` | English brand. Shown in the app, in order emails and on the receipt |
 | `platform_name_ar` | `"ماركتك"` | Arabic brand |
 | `order_number_prefix` | `"MK"` | Order numbers read `MK-261004-7F3K9` |
 | `default_country_code` | `"EG"` | |

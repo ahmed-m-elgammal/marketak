@@ -9,7 +9,7 @@ cost time if you hit them cold.
 
 | Service | Account | Identifier |
 |---|---|---|
-| Supabase | `ahmedmelgammal6@gmail.com` | project `markatek` — **not yet created** |
+| Supabase | `ahmedmelgammal6@gmail.com` | project `Marketak` — **not yet created** |
 | Cloudflare | `ahmedmelgammal6@gmail.com` | `8ae79d52c8b84a170bcb5c4c0485f34c` |
 | Firebase | `ahmedmelgammal6@gmail.com` | project — **not yet created** |
 
@@ -19,9 +19,9 @@ cost time if you hit them cold.
 
 | Thing | Value | Why |
 |---|---|---|
-| Supabase project name | `markatek` | Display name **Markatek / ماركتك** |
+| Supabase project name | `Marketak` | Display name **Marketak / ماركتك** |
 | Supabase region | `eu-central-1` (Frankfurt) | ADR 10. ~100–130 ms from Egypt; accepted against a 900 ms p95 target |
-| R2 buckets | `markatek-public`, `markatek-private` | Prefixed to avoid collisions across projects |
+| R2 buckets | `Marketak-public`, `Marketak-private` | Prefixed to avoid collisions across projects |
 | Firebase products used | FCM, Crashlytics, Analytics | Auth, Firestore, Storage, Functions, Hosting, Remote Config are all **excluded by design** |
 | SQLCipher keys | Android Keystore, non-exportable | No backup key — a recoverable key defeats the purpose |
 
