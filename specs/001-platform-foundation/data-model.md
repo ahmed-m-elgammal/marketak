@@ -2061,8 +2061,12 @@ an admin-only row. See ADR 17.
 
 **`rider_pay_rules` is admin-and-own-rider, not "Read" for everyone.** §13.1 originally lumped it in
 with `fee_tiers` under "Read", which would publish every rider's per-trip and per-km pay rate to
-every signed-in user and hand a competitor the wage bill. Delivery fee tiers *are* public — the
-customer is quoted from them. Recorded in open question 3.18.
+every signed-in user and hand a competitor the wage bill. Shipped as
+`rider_id is null or own rider or admin`. The `rider_id is null` clause is deliberate and not a
+loophole: a **city default is public by necessity**, because a rider with no personal override must
+still be able to find out what they are owed for the three-step resolution above to work. Named
+per-rider overrides stay private. Delivery fee tiers *are* public — the customer is quoted from them,
+so hiding them would break checkout. Resolved in open question 3.18.
 
 **`riders` is not in this matrix because no client can read it.** `public.riders_public` is the
 projection a customer reads. See ADR 20.
