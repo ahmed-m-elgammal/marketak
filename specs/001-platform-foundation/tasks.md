@@ -68,6 +68,10 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       - [ ] `scripts/check-test-integrity.mjs` → fails on `.skip` / `.only` / `.xit`, on
             tautological assertions (`expect(x).toBe(x)`, empty `it` bodies), and on coverage
             regressions below the floor. This is the only enforcement of rule 4
+      - [ ] `scripts/check-policies.mjs` → fails on a bare `auth.uid()` inside a policy, on
+            `set search_path = public` in a `security definer` function, and on an unindexed
+            foreign key (runs the `pg_constraint` query in `data-model.md` §14.2 against the
+            database). Enforces `data-model.md` §13.2 and §14.2 mechanically
 - [ ] **T0.1d** Decide the styling approach (open question 3.9): plain `StyleSheet` against a
       `src/theme/` token module, or NativeWind. **Blocks Checklist A4 and C3.** Default to plain
       StyleSheet + tokens unless there is a reason not to
@@ -76,6 +80,16 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       ignore list already missed an Apple key once
 - [ ] **T0.2** Migration 001: `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`. Verify `postgis`
       availability in the dashboard; do not depend on it
+- [ ] **T0.2a** Create the `private` schema and revoke public access:
+      `revoke all on schema public from public`, plus `alter default privileges`. See
+      `data-model.md` §13.3
+- [ ] **T0.2b** Migration 014 must satisfy `data-model.md` §13.2: every policy uses
+      `(select auth.uid())`, every `security definer` function uses `set search_path = ''` with
+      fully-qualified names, and membership checks go through `private.*` helpers with `EXECUTE`
+      revoked. **Migration 022 fails the build on a bare `auth.uid()` in a policy**
+- [ ] **T0.2c** Partition `events`, `notifications`, `rider_location_pings` and `audit_log` by month
+      (`data-model.md` §14.1). `pg_partman` 5.3.1 is available. Do **not** partition
+      `ledger_entries`
 - [ ] **T0.3** Migration 002: `cities`, `areas`, `delivery_zones`, `delivery_fee_tiers`, `settings`.
       Seed the operating city (not hardcoded) plus ~20 areas with real geohash prefixes, and the
       1/2/3-vendor tiers at 10000/11000/12000 bps

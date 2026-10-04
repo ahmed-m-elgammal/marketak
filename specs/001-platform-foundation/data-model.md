@@ -11,7 +11,7 @@ every table in `public`.
 | Natural key | `order_number`, `voucher.code`, `users.phone_number` | Indexed, human-reachable |
 | Money | `integer` piastres + `currency char(3)` | No float drift. 1 EGP = 100 piastres |
 | Quantity | `integer` with `check (quantity > 0)` | No fractional items in v1 |
-| Timestamps | `timestamptz`, UTC. Display conversion uses `cities.timezone` | Egypt has no DST; still one rule |
+| Timestamps | `timestamptz`, UTC. Display conversion uses `cities.timezone` | No hardcoded region. One rule everywhere |
 | Translatable text | `jsonb`, `{"ar": "...", "en": "..."}` | A third language needs no migration |
 | Soft delete | `deleted_at timestamptz` on every business table | Archive, snapshot invalidation, incremental export |
 | Change tracking | `updated_at timestamptz` maintained by trigger | Sync cursor, snapshot versioning |
@@ -321,7 +321,7 @@ create table addresses (
   building              text,
   floor                 text,
   apartment             text,
-  landmark              text,                            -- Egypt: the address is rarely enough
+  landmark              text,                            -- often the only navigable part of an address here
   delivery_instructions text,
   is_default            boolean not null default false,
   last_used_at          timestamptz,
@@ -331,6 +331,7 @@ create table addresses (
 );
 create index on addresses (user_id, last_used_at desc) where deleted_at is null;
 create index on addresses (geohash_prefix);
+create index on addresses (area_id);
 create unique index addresses_one_default on addresses (user_id)
   where is_default and deleted_at is null;
 ```
@@ -390,15 +391,15 @@ Evaluation happens in SQL so one query returns the caller's resolved flags:
 ```sql
 create or replace function public.get_flags_v1(p_app_role text, p_app_version text)
 returns table (flag_key text, value jsonb)
-language sql security definer set search_path = public as $$
+language sql security definer set search_path = '' as $$
   select f.flag_key, f.value
-  from feature_flags f
+  from public.feature_flags f
   where f.is_active
     and (f.targeting_rules->'roles' is null
          or p_app_role = any(array(select jsonb_array_elements_text(f.targeting_rules->'roles'))))
     and (f.targeting_rules->'min_app_version' is null
-         or coalesce((f.targeting_rules->'min_app_version'->>p_app_version::text), '') = ''
-         or p_app_version::text is null);
+         or coalesce((f.targeting_rules->'min_app_version'->>p_app_version), '') = ''
+         or p_app_version is null);
 $$;
 ```
 
@@ -480,6 +481,7 @@ create index on vendors (city_id, is_open, deleted_at);
 create index on vendors (geohash_prefix) where is_active;
 create index on vendors (area_id, vertical_type) where is_active and is_approved;
 create index on vendors (rating_avg desc) where is_active and is_approved;
+create index on vendors (brand_id) where brand_id is not null;
 ```
 
 `delivery_radius_km`, `estimated_delivery_time_min`/`_max`, `is_busy`, `area_ids`,
@@ -773,6 +775,7 @@ create table cart_items (
 );
 create index on cart_items (cart_id);
 create index on cart_items (vendor_id);
+create index on cart_items (menu_item_id);
 ```
 
 `cached_price` exists so the cart can render offline. It is never read by a quote or an order.
@@ -860,6 +863,8 @@ create index on orders (user_id, placed_at desc);
 create index on orders (status, placed_at desc);
 create index on orders (placed_at desc);                -- analytics / retention sweeps
 create index on orders (delivery_geohash_prefix, status);
+create index on orders (area_id);
+create index on orders (address_id);
 ```
 
 `orders` has **no `vendor_id` and no `restaurant_id`.** That is the point of the whole redesign.
@@ -910,6 +915,7 @@ create index on sub_orders (order_id);
 create index on sub_orders (vendor_id, created_at desc);
 create index on sub_orders (vendor_id, status) where status in ('pending','accepted','preparing','ready');
 create index on sub_orders (settlement_status) where settlement_status = 'payable';
+create index on sub_orders (payout_id) where payout_id is not null;
 create index on sub_orders (status, created_at) where status in ('pending','accepted');
 ```
 
@@ -941,6 +947,8 @@ create table order_items (
 );
 create index on order_items (sub_order_id);
 create index on order_items (order_id);
+create index on order_items (vendor_id);
+create index on order_items (menu_item_id) where menu_item_id is not null;
 ```
 
 `menu_item_id` is `on delete set null`: deleting a menu item must never damage order history.
@@ -986,6 +994,8 @@ create table order_modifications (
   created_at          timestamptz not null default now()
 );
 create index on order_modifications (order_id);
+create index on order_modifications (sub_order_id);
+create index on order_modifications (order_item_id);
 ```
 
 ### Delivery-time projection
@@ -1000,6 +1010,7 @@ create table order_eta_snapshots (
   computed_at  timestamptz not null default now()
 );
 create index on order_eta_snapshots (order_id, computed_at desc);
+create index on order_eta_snapshots (sub_order_id) where sub_order_id is not null;
 ```
 
 Used to measure whether quoted ETAs were honest. Without it, "were we late?" becomes an argument
@@ -1162,6 +1173,7 @@ create table payouts (
 );
 create index on payouts (payout_type, status, period_end desc);
 create index on payouts (account_id, created_at desc);
+create index on payouts (account_id, created_at desc);
 
 create table payout_lines (
   id            uuid primary key default gen_random_uuid(),
@@ -1263,10 +1275,10 @@ report all agree:
 
 ```sql
 create or replace function public.effective_cash_limit_v1(p_rider_id uuid)
-returns integer language sql stable security definer set search_path = public as $$
+returns integer language sql stable security definer set search_path = '' as $$
   select coalesce(
-    (select max_cash_held from riders where id = p_rider_id),
-    (select (value #>> '{}')::int from settings where key = 'rider_max_cash_held_default'),
+    (select max_cash_held from public.riders where id = p_rider_id),
+    (select (value #>> '{}')::int from public.settings where key = 'rider_max_cash_held_default'),
     0
   );
 $$;
@@ -1339,16 +1351,17 @@ create unique index delivery_assignments_one_active on delivery_assignments (ord
 create index delivery_assignments_open on delivery_assignments (rider_id, status)
   where status in ('assigned','at_first_vendor','picking_up','picked_up','delivering','arrived');
 create index delivery_assignments_rider_history on delivery_assignments (rider_id, assigned_at desc);
+create index on delivery_assignments (sub_order_id) where sub_order_id is not null;
 ```
 
 The unique partial index is what makes an atomic claim possible:
 
 ```sql
 create or replace function public.claim_order_v1(p_assignment_id uuid, p_rider_id uuid)
-returns uuid language plpgsql security definer set search_path = public as $$
+returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_order uuid;
 begin
-  update delivery_assignments
+  update public.delivery_assignments
      set rider_id = p_rider_id, status = 'assigned', assigned_at = now(), assigned_by = 'rider_claim'
    where id = p_assignment_id and rider_id is null and status = 'unassigned'
   returning order_id into v_order;
@@ -1376,6 +1389,7 @@ create table rider_location_pings (
 );
 create index on rider_location_pings (recorded_at);
 create index on rider_location_pings (order_id, recorded_at desc);
+create index on rider_location_pings (rider_id, recorded_at desc);
 ```
 
 `bigserial` + `recorded_at` index is deliberate: this is the highest-volume table in the database
@@ -1455,6 +1469,7 @@ create table voucher_redemptions (
 create unique index voucher_redemption_order on voucher_redemptions (voucher_id, order_id)
   where order_id is not null;
 create index on voucher_redemptions (voucher_id, user_id);
+create index on voucher_redemptions (sub_order_id) where sub_order_id is not null;
 ```
 
 The unique index is what stops a double-submit from consuming two redemptions.
@@ -1504,6 +1519,9 @@ create table reviews (
   unique (order_id, vendor_id)
 );
 create index on reviews (vendor_id, created_at desc) where not is_hidden;
+create index on reviews (user_id, created_at desc);
+create index on reviews (rider_id) where rider_id is not null;
+create index on reviews (sub_order_id) where sub_order_id is not null;
 ```
 
 Vendor and rider ratings are two independent numbers about one delivery. Conflating them makes both
@@ -1544,6 +1562,8 @@ create table notifications (
 );
 create index on notifications (user_id, created_at desc);
 create index on notifications (created_at);    -- retention sweep
+create index on notifications (order_id) where order_id is not null;
+create index on notifications (sub_order_id) where sub_order_id is not null;
 
 create table notification_templates (
   id        uuid primary key default gen_random_uuid(),
@@ -1687,7 +1707,9 @@ cross-cutting: commission_rules · ledger_entries · settings · feature_flags �
 
 ---
 
-## 13. Row-Level Security summary
+## 13. Row-Level Security and privilege model
+
+### 13.1 Who sees what
 
 | Table | Customer | Rider | Vendor staff | Admin |
 |---|---|---|---|---|
@@ -1722,9 +1744,160 @@ Three invariants the policies must enforce absolutely:
    raises `PROFILE_INCOMPLETE` when `users.profile_completed_at is null`. The profile gate has to
    hold at the data layer, not only in the app.
 
+### 13.2 Mandatory RLS patterns
+
+These are **not optional style**. They are the difference between an RLS layer that costs a
+millisecond and one that costs a table scan on the hottest query in the product.
+
+**Wrap every `auth.uid()` call in a scalar subquery.** An unwrapped call is evaluated once per row
+scanned. On `orders` at 100,000 rows that is 100,000 JWT reads to return one customer's order.
+
+```sql
+-- WRONG: evaluated per row
+create policy orders_read on orders for select using (auth.uid() = user_id);
+
+-- RIGHT: planned once, then treated as a constant
+create policy orders_read on orders for select using ((select auth.uid()) = user_id);
+```
+
+Every policy in migration 014 uses `(select auth.uid())`. A lint check in migration 022 fails the
+build on a bare `auth.uid()` inside a policy.
+
+**Put membership checks in a `security definer` helper in a `private` schema.** A policy that
+subqueries another table per row is a sequential scan per row. `auth.uid()` also cannot be called
+inside a security-definer function without an explicit argument, which is precisely the guard that
+stops the function being used to answer "is user X a member of team Y" for an arbitrary X.
+
+```sql
+create schema if not exists private;
+
+create or replace function private.vendor_ids_for(p_user uuid)
+returns setof uuid
+language sql stable security definer set search_path = ''
+as $$
+  select vs.vendor_id from public.vendor_staff vs where vs.user_id = p_user;
+$$;
+
+revoke execute on function private.vendor_ids_for(uuid) from public, anon, authenticated;
+
+-- Policy becomes a single indexed membership test
+create policy sub_orders_vendor_read on sub_orders for select
+  using (vendor_id in (select private.vendor_ids_for((select auth.uid()))));
+```
+
+Note the shape: the caller supplies the uid, the function re-derives nothing and trusts nothing
+except its argument, and `EXECUTE` is revoked from every role that does not need it.
+
+**`set search_path = ''`, never `set search_path = public`.** Pinning to `public` still lets a
+malicious object in `public` shadow a built-in. Pinning to the empty string forces every name to be
+schema-qualified, which is the whole point. Every `security definer` function in this schema uses
+`set search_path = ''` with fully-qualified names.
+
+**Index every column a policy touches.** A policy filter on an unindexed column is a scan whether
+or not the policy is written well. This is the other half of the FK-index rule in §14.2.
+
+### 13.3 Least privilege
+
+```sql
+revoke all on schema public from public;
+alter default privileges in schema public revoke all on tables from public, anon, authenticated;
+```
+
+Then grant deliberately. The application never connects as superuser, and `anon` gets no direct
+table access at all — every read goes through an RPC, which is what makes the RPC the single place
+where a permission decision is written.
+
+| Role | Gets |
+|---|---|
+| `anon` | Nothing. Signed-in users only |
+| `authenticated` | `USAGE` on `public`, `SELECT` on read tables, `EXECUTE` on approved RPCs. **No `DELETE` anywhere** |
+| `service_role` | Full. Worker-side only, from a Worker secret |
+| `postgres` | Never used by the app |
+
 ---
 
-## 14. Migration order
+## 14. Operational Postgres rules
+
+### 14.1 Partition the four prune targets
+
+`events`, `notifications`, `rider_location_pings` and `audit_log` are all deleted by a scheduled
+job on a retention window. On a free tier with limited IOPS, `DELETE` of a large range is the
+expensive operation: it bloats, it blocks, and autovacuum has to clean up afterwards. A monthly
+partition range turns retention into `DROP TABLE`, which is instant and leaves no dead tuples.
+
+```sql
+create table events (
+  id            bigserial,
+  id_uuid       uuid not null default gen_random_uuid() unique,
+  type          text not null,
+  aggregate_type text,
+  aggregate_id  uuid,
+  payload       jsonb not null,
+  attempts      smallint not null default 0,
+  last_error    text,
+  created_at    timestamptz not null default now(),
+  delivered_at  timestamptz,
+  primary key (id, created_at)          -- partition key must be in the PK
+) partition by range (created_at);
+```
+
+`pg_partman` 5.3.1 is available on this project and automates partition creation. If it is not
+used, a `pg_cron` job creates next month's partition three days ahead.
+
+Partitioning is **not** applied to `orders`, `order_items` or `ledger_entries`. They are not
+pruned, and `ledger_entries` must stay a single queryable relation forever. Partitioning them would
+break the balance computation for no gain.
+
+### 14.2 Index every foreign key
+
+Postgres does **not** create an index on a referencing column. An unindexed FK makes every JOIN
+through it a sequential scan and every `ON DELETE CASCADE` or `SET NULL` on the parent a full scan
+of the child. This schema declares 60+ foreign keys; all are indexed, added after an audit of the
+DDL in this file.
+
+The highest-value ones, because they are on hot paths:
+
+| Index | Why it is hot |
+|---|---|
+| `order_items (vendor_id)` | Every vendor-facing order query |
+| `voucher_redemptions (voucher_id)` | Every quote counts redemptions to enforce a usage limit |
+| `sub_orders (payout_id)` | Settlement runs scan by payout |
+| `payouts (account_id, created_at desc)` | "What did this vendor earn" |
+| `orders (area_id)`, `orders (address_id)` | Zone and area analytics |
+| `rider_location_pings (rider_id, recorded_at desc)` | Rider trip replay |
+| `reviews (user_id)`, `reviews (rider_id)` | "My reviews", rider reputation |
+
+Verify rather than trust. This query, run after migration 014, must return zero rows:
+
+```sql
+select conrelid::regclass as table_name, a.attname as fk_column
+from pg_constraint c
+join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+where c.contype = 'f'
+  and not exists (
+    select 1 from pg_index i
+    where i.indrelid = c.conrelid and a.attnum = any(i.indkey)
+  );
+```
+
+### 14.3 Vacuum and autovacuum
+
+Bloat is the silent killer of a shared-CPU free plan. Nightly `VACUUM ANALYZE` on the highest-churn
+tables — `orders`, `order_items`, `events`, `notifications` — plus `pg_stat_statements` (already
+installed) to catch a query that regressed into a sequential scan. See `free-tier-plan.md` §3.7.
+
+### 14.4 Queue consumers use `SKIP LOCKED`
+
+Two places drain a queue: `claim_events_v1` for the outbox, and `claim_order_v1` for rider
+acceptance. Neither may block. `claim_events_v1` uses `for update skip locked` so two cron ticks or
+two Workers never wait on each other. `claim_order_v1` does not need it, because it claims one row
+by primary key with a guarded `UPDATE` — the uniqueness constraint and the `where rider_id is null`
+predicate are what guarantee exactly one winner, and pgTAP asserts two concurrent calls produce
+one.
+
+---
+
+## 15. Migration order
 
 Dependency-ordered, so each step is independently deployable.
 
@@ -1755,7 +1928,7 @@ Dependency-ordered, so each step is independently deployable.
 
 ---
 
-## 15. Changes from the original brief
+## 16. Changes from the original brief
 
 Every deviation, and why.
 
@@ -1788,3 +1961,29 @@ Every deviation, and why.
 | — | `users.role` column → `user_roles` | Riders are also customers |
 | — | `addresses.landmark` | In this market the address alone is not navigable |
 | — | `orders.address_snapshot`, `delivery_base_fee`, `delivery_multiplier_bps` | The fee inputs and the address are frozen at checkout so history cannot be rewritten by a later config change |
+
+---
+
+## 17. Hardening applied from `supabase-postgres-best-practices`
+
+An audit of the DDL in §1–§11 against Supabase's own Postgres rule set found six classes of defect.
+All are fixed here; the requirements are in §13.2, §13.3 and §14.
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | `set search_path = public` on three `security definer` functions | `set search_path = ''` with fully-qualified names. Pinning to `public` still allows a shadowing object in `public` to hijack a built-in |
+| 2 | No `(select auth.uid())` mandate, and no rule preventing a per-row membership subquery | §13.2. Mandatory scalar-subquery form, `private` schema helpers, and a lint check in migration 022 that fails on a bare `auth.uid()` in a policy |
+| 3 | **18 unindexed foreign-key columns** | All indexed. Highest-value: `order_items.vendor_id`, `voucher_redemptions.voucher_id`, `sub_orders.payout_id`, `payouts.account_id`. Postgres does not auto-index FKs, so each was a sequential scan on JOIN and a full scan on cascade |
+| 4 | No `private` schema, no `revoke execute` | `private.vendor_ids_for()` and friends, with `EXECUTE` revoked from `public, anon, authenticated` |
+| 5 | No `revoke all on schema public from public` | §13.3. Least-privilege grants per role, no `DELETE` for `authenticated` |
+| 6 | Prune targets were plain `DELETE` on an unpartitioned table | §14.1. `events`, `notifications`, `rider_location_pings`, `audit_log` partition by month so retention is `DROP TABLE`. Deliberately **not** applied to `ledger_entries`, which must stay one relation forever |
+
+Also confirmed correct as written, so not changed:
+
+- `claim_order_v1` uses a guarded single-row `UPDATE`, not `SKIP LOCKED`. The PK plus
+  `where rider_id is null` is what guarantees one winner, and that is simpler to prove with pgTAP
+  than a locking clause.
+- `claim_events_v1` uses `for update skip locked`, which is correct for a multi-consumer drain.
+- Partial indexes on `is_active`, `is_open` and `settlement_status` are already the right shape for
+  these access patterns.
+- Money columns are `integer`, never `numeric` or `float`.
