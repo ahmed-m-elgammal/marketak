@@ -732,9 +732,28 @@ create trigger trg_menu_item_vendor before insert or update of category_id on me
 for each row execute function public.sync_menu_item_vendor();
 ```
 
-Name search is **not** indexed here. Migration 015 adds normalised generated columns plus trigram
+Name search was **not** indexed here. Migration `015` adds normalised generated columns plus trigram
 indexes, because Arabic search needs diacritic and alef normalisation first, and an index on raw
 `lower(name)` would never be used by that query.
+
+**Shipped in `015` as implemented.** `public.normalize_text_v1(text)` folds alef variants to a bare
+alef, waw/yeh-with-hamza, alef maksura, teh marbuta, Arabic-Indic digits, the Arabic comma, Latin
+accents and three ligatures, and deletes tashkeel, superscript alef, standalone hamza and tatweel. A
+`jsonb` overload flattens `menu_items.ingredients`, whose shape is unspecified. Ten columns across
+`vendors`, `menu_categories`, `menu_items` and `cuisines` are generated from it, with partial trigram
+indexes on live rows only.
+
+Three things worth knowing before changing any of it:
+
+- **`extensions.unaccent` is not usable in a generated column.** It is STABLE, not IMMUTABLE, on this
+  project. Latin folding is hand-rolled for that reason.
+- **Changing `normalize_text_v1` does not recompute existing rows.** `GENERATED ... STORED` stores the
+  computed value, not the expression, so any change to the folding rules requires an explicit backfill of
+  all ten columns or search silently keeps the old rules.
+- **The trigram indexes are not used by the planner at launch scale.** Measured: a rare-term search over
+  40,000 `menu_items` chose a seq scan. At the ~4,500 items this plan models they cost about 2.6 MB and
+  buy nothing; they are kept because they are partial on live rows and stop search degrading into a full
+  scan as the catalog grows. `DROP INDEX` is the escape hatch if that judgement is wrong.
 
 ### `menu_item_sizes`
 

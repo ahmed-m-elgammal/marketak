@@ -54,7 +54,8 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       44 tables, 164 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
       005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
       is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
-      **Remaining: 015–022.** `013` shipped `events` and `014`/`014a` shipped RLS; `008` shipped
+      **Remaining: 016–022.** `013` shipped `events`, `014`/`014a` shipped RLS, and `015` shipped search;
+      `008` shipped
       `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
       migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes
@@ -127,7 +128,14 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       propagate to partitions, and one policy reused across the order subtree leaked a co-vendor's
       sub-orders. `feature_flags` seed rows are still outstanding
 - [ ] **T0.7** `get_areas_v1`, `get_feed_manifest_v1`, `get_vendor_feed_v1`, `get_vendor_detail_v1`
-- [ ] **T0.8** Search: normalised generated columns, trigram indexes, `search_catalog_v1`
+- [x] **T0.8** Search: normalised generated columns, trigram indexes, `search_catalog_v1` —
+      **done in `015`.** `normalize_text_v1` with `text` and `jsonb` overloads, 10 generated columns,
+      10 partial trigram indexes, `haversine_km`, and `search_catalog_v1` as
+      `SECURITY DEFINER` re-implementing §13.1's visibility rules. Two caveats recorded rather than
+      hidden: **the trigram indexes are unused by the planner at the ~4,500-item launch scale** (a seq
+      scan wins at 40,000 rows in testing), and **`menu_items.ingredients` has no specified jsonb
+      shape**, so the overload flattens all three jsonb types mechanically and would match nothing if
+      the searchable part turned out to be the object's keys
 - [ ] **T0.9** Seed script: 150 vendors across 20 areas, lunch-only schedules, split shifts
 - [ ] **T0.10** Auth: **Google and Apple only.** Native SDK sign-in via `signInWithIdToken`,
       account linking for a user who has both identities, custom SMTP

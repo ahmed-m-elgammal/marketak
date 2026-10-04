@@ -49,9 +49,9 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–014b written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
-partitions, 229 indexes, 115 RLS policies, 0 tables without RLS, 0 unindexed foreign keys, 0 client
-write grants, 0 grants to `anon`.
+Migrations 001–015 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
+partitions, 239 indexes, 115 RLS policies, 10 trigram indexes, 0 tables without RLS, 0 unindexed foreign
+keys, 0 client write grants, 0 grants to `anon`.
 
 ### Fixed
 
@@ -91,7 +91,77 @@ including no-op edits leaving `updated_at` alone.
   customer, `email` included. RLS cannot mask a column on an allowed row. Accepted **conditional on
   `users.email` not acquiring a use** that would make it sensitive — marketing consent or a breach list.
   The trigger to revisit is recorded, because that is the thing that would change the answer.
-- **All open questions raised by `012`–`014` are now closed.**
+### Added - search
+
+**`015_search`** makes catalog search work in Arabic, which data-model.md 5 warned was impossible with an
+index on `lower(name)`. A customer typing the bare alef must match a row storing a hamza'd alef, and a
+customer typing taa marbuta must match taa marbuta.
+
+**`extensions.unaccent` could not be used.** It is **STABLE on this project**, not IMMUTABLE, and a
+`GENERATED ... STORED` column may only call immutable functions - verified before writing rather than
+discovered at DDL time. Latin folding is hand-rolled instead; `unaccent` remains correct for ad-hoc ILIKE.
+
+**A silent character-mapping bug, caught by testing.** The first implementation typed `translate()`'s
+from-string and to-string as literals, and the from-string turned out to be **one character shorter** in
+its first group. `translate` maps positionally, so every later mapping was shifted: **e-acute folded to
+`a`, n-tilde to `u`, and Arabic alef-with-hamza to `c`.** The function ran, returned plausible text, and
+raised nothing. The to-string is now built with `repeat()` so both lengths derive from the same intent.
+
+**Then the guard against it was also wrong.** The first fix asserted the *length difference* between the
+two strings, via a helper that re-typed the same character literals. That failed on correct code, because
+the helper's copy had drifted by one character. **A guard that duplicates the thing it guards is a second
+source of truth, not a check.** Replaced with behavioural assertions that call the real function: all 8
+folds, all 11 deletions, 7 Latin folds, digit and comma mappings, and the jsonb overload - all by
+codepoint via `chr()`, because hand-typed Arabic is what caused the original bug.
+
+**Folding, all 22 verified against raw codepoints:** alef madda / hamza-above / hamza-below / wasla to
+bare alef; waw-with-hamza to waw; yeh-with-hamza and alef-maksura to yeh; teh-marbuta to heh; Arabic-Indic
+digits to ASCII; Arabic comma to space; deletes tashkeel, superscript alef, standalone hamza, tatweel;
+Latin accents; `ss` from sharp s; ligature expansion.
+
+**`haversine_km` is created here deliberately, not invented for one call site** - contracts.md 1.2 wants
+distance as a search tie-breaker and free-tier-plan.md needs the same number for per_km_fee. Its
+least/greatest clamp is load-bearing: `acos()` raises a domain error when float drift pushes its argument
+outside [-1,1].
+
+**`search_catalog_v1` is SECURITY DEFINER and therefore re-implements the 13.1 visibility rules rather
+than inheriting them** - definer bypasses RLS, so an omitted predicate would be a leak no policy could
+catch. An empty query is **browse, not search**, because similarity-ranked nonsense for an empty box is
+worse than showing the good local vendors.
+
+### Measured - and one honest negative result
+
+**Search works, verified end to end:** an Arabic query finds the Arabic item name; **the same word typed
+without hamza still matches**, which is the entire point of normalisation; a Latin query finds the vendor;
+an **unapproved vendor is invisible even when it matches**; max_price filters; distance computes from the
+area; a 2-character query takes the non-indexed path without error; p_limit clamps to [1,50].
+
+**The trigram indexes are not used by the planner at realistic catalog sizes.** Measured here:
+
+| Rows | Observed |
+|---|---|
+| 40,000 menu_items | **Seq Scan**, 2,352 buffers |
+| 100,000 menu_items | 119 MB total with indexes, 62 MB heap |
+
+So they cost ~570 bytes/row in storage and buy nothing at launch scale - free-tier-plan.md models 150
+vendors and ~4,500 items, where the indexes would be about 2.6 MB and unused. **Kept anyway** because they
+are partial on live rows only, they cost ~2.6 MB at the plan's own scale, and they are what stops search
+degrading into a full scan as the catalog grows; dropping them later is a cheap DROP INDEX. **Recorded as a
+measured trade, not asserted as a win.**
+
+The **generated columns are cheap** - 11 + 13 + 5 = 29 bytes/row, 2.7 MB per 100,000 rows - so the storage
+cost is in the indexes, not the columns.
+
+`tags text[]` is **deliberately not indexed**: casting an array to text is not immutable, so it cannot go
+in a generated column, and a fourth trigram index on the largest catalog table is not worth a bespoke
+wrapper for admin metadata rather than customer-facing copy.
+
+**`menu_items.ingredients` is jsonb and no shape for it is specified anywhere** in data-model.md or
+contracts.md. Rather than bet on one, `normalize_text_v1(jsonb)` flattens arrays, objects and scalars
+mechanically. **If ingredients turns out to be an object whose keys are the searchable part, this
+normalises the values and the search silently matches nothing** - recorded as an open assumption rather
+than buried in a CASE.
+- **All open questions raised by `012`–`015` are now closed.**
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -149,6 +219,8 @@ including no-op edits leaving `updated_at` alone.
 - `014_rls` — row-level security on all 62 tables and partitions
 - `014a_fix_vendor_sub_order_leak` — closes a cross-vendor leak found by testing `014`
 - `014b_sync_rider_contact` — `riders` and `users` contact fields can no longer drift (open Q 3.13)
+- `015_search` — Arabic-aware catalog search: normalisation, 10 generated columns, 10 trigram
+  indexes, `haversine_km`, `search_catalog_v1`
 
 ### Security
 
