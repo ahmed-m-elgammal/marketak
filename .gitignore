@@ -1,0 +1,64 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+service-account*.json
+firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+
+# Android SQLCipher key material, if ever extracted
+*.db-journal
+*.keystore
+!debug.keystore
+
+# Node
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-error.log*
+.npm/
+
+# Build output
+dist/
+build/
+.next/
+out/
+.expo/
+*.tsbuildinfo
+web-build/
+
+# Cloudflare / Supabase local state (contains secrets)
+.wrangler/
+.dev.vars
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# Native / mobile
+*.ipa
+*.aab
+*.apk
+*.aab
+Pods/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+android/app/build/
+ios/build/
+ios/Pods/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+*.swp
+
+# Logs and coverage
+*.log
+logs/
+coverage/
+.pgtest/
