@@ -173,6 +173,43 @@ spec and the database do not disagree.
   - `effective_cash_limit_v1` does **not** check `p_rider_id` against the caller, so any
     authenticated user can read any rider's cash limit. Minor, but the guard belongs with the
     caller-identity rules in migration `018`.
+- **`vendor_staff` gained `deleted_at`** (`010a`). Constitution III.17 asks for soft delete plus
+  `updated_at` on every business table, and this was the one table with neither a `deleted_at` nor an
+  `is_active` — no lifecycle mechanism at all, so a staff member who leaves could only be deleted,
+  losing the record that they ever had access. Every other table lacking `deleted_at` has a competing
+  mechanism (`is_active`, `effective_until`, a status enum, or append-only semantics) and was left
+  alone. Nullable, so instant, and the table is empty.
+- **Audit of 001–010 against the data-integrity standard.** Findings recorded rather than silently
+  fixed, because each needs a decision:
+  - **Four polymorphic columns have no referential integrity** — `wallets.owner_id`,
+    `payouts.account_id`, `ledger_entries.account_id`, `commission_rules.target_id` are bare `uuid`
+    with no FK, because each resolves against a different table via a sibling discriminator. The
+    database currently permits a wallet for a vendor who does not exist. Open question 3.14.
+  - **`riders` restates the user's name and phone**, and `users.phone_number` and
+    `riders.phone_number` are *separate* unique constraints, so the two can drift. Open question
+    3.13.
+  - **43 of 50 tables have no `deleted_at`.** Reviewed individually: the large majority are correct
+    — append-only (`ledger_entries`, `order_status_history`), immutable snapshots (`orders`,
+    `order_items`), config with its own lifecycle (`cities`, `commission_rules`, `payouts`), pure
+    join tables (`vendor_areas`), or pruned rather than deleted (`notifications`). Only
+    `vendor_staff` was a genuine gap, fixed above.
+  - **`notifications` and `rider_location_pings` use `bigserial`**, so their ids are guessable and a
+    single sequence would serialize writes if the app ever writes from more than one region. Both are
+    empty, so converting is free now and expensive after launch. Open question 3.15.
+- **Three rules have no surface to audit yet, and saying otherwise would be false.** There is no
+  `package.json`, no `apps/` and no application code of any kind, so `SELECT *`, N+1 queries and
+  slow-query tuning cannot be assessed in the application — there is none. What *can* be reported:
+  - No `SELECT *` against any table in any migration. The single textual match, `005b:150`, is
+    `select * from (values …)` — a projection of a literal `VALUES` list, not a table.
+  - `pg_stat_statements` is installed and has **1,205 real statements** recorded. Every one of the
+    eight slowest is Supabase/PostgREST schema introspection — `pg_timezone_names`,
+    `pg_extension`, `information_schema`, domain-type recursion. There is not one application query,
+    and nothing to optimise against zero rows. Their 300–400 ms means are catalog scans on an empty
+    database and are not a signal about production.
+  - What will enforce the remaining rules, and where: `014`'s policies replace the table-wide grants
+    so every read is column-scoped rather than `SELECT *`; `016`–`020`'s RPCs return projections
+    instead of rows, which is also the structural answer to N+1; `free-tier-plan.md` §11 already lists
+    the weekly query checks, and its monitoring table names the slow-query alert.
 - **`driver_shifts.area_ids` stays a `uuid[]`, as specced.** §16 removed JSON arrays from `vendors`
   for exactly this reason — "JSON arrays cannot be indexed; forces a scan on every availability
   check" — and then used an array here. A join table would be consistent with `vendor_areas` and
@@ -226,6 +263,37 @@ spec and the database do not disagree.
 
 ### Security
 
+- **A demonstrated cross-tenant read, closed.** `public.effective_cash_limit_v1` is
+  `SECURITY DEFINER` and accepts a `rider_id`, but never checked the caller was that rider. `008`
+  revoked `EXECUTE` from `public, anon` — insufficient, because `authenticated` is a member of
+  `PUBLIC` and so still held `EXECUTE`, leaving the function reachable at
+  `POST /rest/v1/rpc/effective_cash_limit_v1`.
+
+  Proven by execution, not inference. With `request.jwt.claims` set to a customer identity and the
+  session switched to the `authenticated` role:
+
+  | check | result |
+  |---|---|
+  | `current_user` after switch | `authenticated` / session `postgres` |
+  | control — `select from public.riders` | **CONTROL OK: privileges genuinely reduced** |
+  | `effective_cash_limit_v1(<other rider>)` | **LEAKED 777777** |
+
+  The control is what makes this trustworthy: it proves the role switch actually reduced privileges,
+  so the leak is the function bypassing the table lockdown rather than an artefact of testing as the
+  owner. A locked-down table is worthless if a definer function hands its rows to anyone who asks —
+  the same shape as `005b` and `007b`, where the write path was guarded and a read path around it
+  was not.
+
+  Fixed in `010a`: split into `private.effective_cash_limit` (unguarded, unreachable from PostgREST
+  because it is not in an exposed schema — settlement and reconciliation use it) and a guarded public
+  entry point. Re-verified live: own rider still reads `55555`, another rider is now **blocked 42501**,
+  and the private helper is **not callable** from the client role. A rejected read *raises* rather
+  than returning null, because a null would read as "limit 0" and per §8 a limit of 0 disables cash
+  collection — turning an information leak into an outage.
+- **Audited 001–010 for leakage.** `anon` and `authenticated` hold **zero** table grants; no views
+  exist in `public`; all 3 `SECURITY DEFINER` functions are pinned to `search_path = ''`; and the only
+  function in an exposed schema that takes arguments was the one above. RLS is still off on every
+  table — deliberate, since `005d` revoked the grants and the policies land in `014`.
 - Purged an Apple App Store Connect private key (`*.p8`) and an iOS distribution certificate
   (`*.cer`) from git history after they were committed by a `git add -A`. `.gitignore` extended
   to cover `*.p8 *.cer *.p12 *.pfx *.jks *.mobileprovision` and the `appstore/` directory.
