@@ -276,8 +276,37 @@ appear to work, which is exactly why it would survive to production.
 
 ---
 
+## 15. One mobile app for customer and rider; vendors get a web dashboard
+
+**Context.** The original plan was three React Native apps — customer, rider, vendor — each with its
+own store listing.
+
+**Decision.** **One** mobile app, `com.jaylak.mobile`, for Android and iOS. The rider surfaces sit
+behind a role switch available to anyone holding the `rider` role, so a user who is both a customer
+and a rider is one install and one session. Vendor staff and admins use web dashboards on Cloudflare
+Pages. There is no native vendor app.
+
+**Rejected.** Three separate apps. A second and third store listing, a second and third release
+train, and two more things to keep in sync — for an audience whose entire daily workflow is changing
+four things. Also rejected: one app with the rider role assigned by an admin only, which would stop
+riders who are also customers from using their normal account.
+
+**Consequences.**
+
+- One store listing, one release train, one update to push. Riders get features immediately.
+- `device_tokens.app_role` becomes a **hint, not a permission**. Push routing must decide from the
+  order at send time, never from the token's role, because one device can be both.
+- Customer and rider code ship together, so a rider-only bug is still a customer-facing release.
+  Keep the rider surface behind `feature_flags` so a plain customer never sees or downloads it.
+- The bundle grows. Two web dashboards are separate deploys from Cloudflare Pages, not store apps.
+- The accepted cost: most vendors will manage lunch **from a phone browser**, which is a worse
+  experience than native. Accepted deliberately.
+
+---
+
 ## Amendments
 
 | # | Date | Change | Reason |
 |---|---|---|---|
-| — | 2026-10-04 | Initial set of 15 ADRs | Recorded during spec authoring |
+| 1 | 2026-10-04 | Initial set of 15 ADRs | Recorded during spec authoring |
+| 2 | 2026-10-04 | Split ADR 15 out as its own decision | One-app topology was decided after the first 14 were written |

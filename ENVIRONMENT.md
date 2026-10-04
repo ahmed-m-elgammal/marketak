@@ -33,9 +33,11 @@ must only ever live in Worker secrets.
 
 | # | Blocker | Why it matters | Who |
 |---|---|---|---|
-| 1a.1 | **Enable R2** in the Cloudflare dashboard | R2 returns `403 Please enable R2 through the Cloudflare Dashboard`. Images, menu snapshots, archives and backups all depend on it. This is the single most important free-tier decision — serving images from Supabase instead is a 5–30× egress overrun | Manual |
-| 1a.2 | R2 may require a payment method at signup | If so, it is still ~$0/month at our volume, but it must be added | Manual |
+| 1a.1 | ~~Enable R2~~ | ✅ Done. Buckets created in `EEUR` | — |
+| 1a.2 | ~~R2 payment method~~ | ✅ Done at setup. Still ~$0/month at our volume | — |
 | 1a.3 | **Apple Developer account** | iOS push via FCM needs an APNs key uploaded to the Firebase console. Until then iOS receives **no push notifications at all** | Manual |
+| 1a.4 | Point a domain at Cloudflare | Needed for `cdn.`, `track.`, `admin.`, `vendor.` hosts and the R2 custom domain | Manual |
+| 1a.5 | Android SHA-1 / SHA-256 | Add the release signing cert hash. Not required for FCM, but needed the moment App Check or phone-auth verification is enabled | Manual |
 
 ---
 
@@ -47,8 +49,11 @@ must only ever live in Worker secrets.
 | Supabase region | `eu-central-1` (Frankfurt) | ADR 10. ~100–130 ms from Egypt; accepted against a 900 ms p95 target |
 | Supabase extensions available | `pg_trgm` 1.6, `btree_gist` 1.7, `unaccent` 1.1, `pg_cron` 1.6.4, `pg_net` 0.20.4, `pgtap` 1.3.3, `pg_partman` 5.3.1, `earthdistance` 1.2, `citext`, `pgcrypto` 1.3 *(installed)* | Verified on the live project. `pg_tap` matters: it means the RLS policy tests in migration 022 actually run |
 | PostGIS | **available**, 3.3.7 | Not needed — the design uses geohash prefixes. Recorded because it resolves open question 4.4 |
-| R2 buckets | `marketak-public`, `marketak-private` | Prefixed to avoid collisions. **Cannot create until R2 is enabled in the dashboard** |
+| R2 buckets | `marketak-public`, `marketak-private` | Both created, `EEUR` location (auto-matched to Frankfurt). R2 enabled in the dashboard with a payment method |
 | Firebase project | `marketak-eg` | `marketak` was already taken globally. FCM + Crashlytics + Analytics only; Auth, Firestore, Storage, Functions, Hosting and Remote Config are all **excluded by design** |
+| Firebase Android app | `1:283007295790:android:e74edad733ca1550a55abf` | package `com.jaylak.mobile` |
+| Firebase iOS app | `1:283007295790:ios:6861ceffc5b2d0e3a55abf` | bundle id `com.jaylak.mobile` |
+| App topology | **One** mobile app for customer + rider, role-switched. Vendors use a web dashboard | ADR 15 |
 | SQLCipher keys | Android Keystore, non-exportable | No backup key — a recoverable key defeats the purpose |
 
 ---

@@ -346,7 +346,7 @@ create table device_tokens (
   user_id     uuid not null references users(id) on delete cascade,
   token       text not null unique,
   platform    text not null check (platform in ('android','ios')),
-  app_role    text not null check (app_role in ('customer','rider','vendor','admin')),
+  app_role    text not null check (app_role in ('customer','rider','admin')),  -- hint, not a permission
   app_version text,
   language    text not null default 'ar',
   last_seen_at timestamptz not null default now(),
@@ -584,7 +584,7 @@ create index on vendor_staff (vendor_id);
 
 ### `vendor_earnings_daily`
 
-The "merchant earned today" view, materialised so the vendor app is a single indexed read.
+The "merchant earned today" view, materialised so the vendor dashboard is a single indexed read.
 
 ```sql
 create table vendor_earnings_daily (

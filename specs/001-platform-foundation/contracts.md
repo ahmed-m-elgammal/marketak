@@ -347,5 +347,5 @@ begin
 end $$;
 ```
 
-Every message carries Arabic and English. The customer app shows Arabic by default; the vendor app
+Every message carries Arabic and English. The mobile app shows Arabic by default; the vendor dashboard
 defaults to Arabic and switches with the user's device language.

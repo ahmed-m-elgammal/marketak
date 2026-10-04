@@ -3,7 +3,9 @@
 **Brand:** Marketak · ماركتك
 **Status:** Draft for review
 **Stack:** Supabase (Postgres + Auth + RLS + pg_cron) · Cloudflare (R2, Workers, Durable Objects, Pages) · Firebase (FCM, Crashlytics, Analytics)
-**Apps:** React Native (Expo) customer / rider / vendor, plus admin + vendor web dashboards on Cloudflare Pages
+**Apps:** **One** React Native (Expo) app for customers *and* riders, role-switched after sign-in
+(`com.jaylak.mobile`, Android + iOS). Vendor staff and admins use **web dashboards** on Cloudflare
+Pages — no native vendor app.
 **Market:** Egypt. Arabic and English. **One city at a time**, **lunch service first**
 **Infrastructure:** Supabase project `Marketak`, region **eu-central-1 (Frankfurt)**. Cloudflare account `8ae79d52c8b84a170bcb5c4c0485f34c`. R2 buckets `Marketak-public` / `Marketak-private`
 **Auth:** Google and Apple only. No email, no password. Phone is collected at profile completion
@@ -24,15 +26,32 @@ in cash or by a direct mobile-money transfer. This platform serves **one city at
 
 ### 1.1 Actors
 
-| Actor | Identity | Primary app |
+| Actor | Identity | Surface |
 |---|---|---|
-| Customer | `user_roles.role = 'customer'` | Customer app |
-| Rider | `user_roles.role = 'rider'` + `riders` row | Rider app |
-| Vendor staff | `vendor_staff` (user ↔ vendor, role) | Vendor app, web dashboard |
-| Admin | `user_roles.role = 'admin'` | Admin web dashboard |
+| Customer | `user_roles.role = 'customer'` | Mobile app |
+| Rider | `user_roles.role = 'rider'` + `riders` row | **Same mobile app**, rider surfaces behind a role switch |
+| Vendor staff | `vendor_staff` (user ↔ vendor, role) | Web dashboard only |
+| Admin | `user_roles.role = 'admin'` | Web dashboard only |
 
-A person may hold several roles. A rider is frequently also a customer; the same `users` row and the
-same identity serve both. This is why roles are a join table, not a column on `users`.
+A person may hold several roles. A rider is frequently also a customer; the same `users` row serves
+both. This is why roles are a join table, not a column on `users`.
+
+**One app, two roles.** The customer and rider surfaces share a binary, a session, a push token
+channel and a Crashlytics install. What that buys and costs:
+
+| | Effect |
+|---|---|
+| Buys | One store listing, one release train, one update to push. Riders get rider features immediately instead of waiting on a separate app |
+| Buys | One push-token table. A user who is both a customer and a rider is one device, so `device_tokens.app_role` must resolve dynamically rather than being fixed at registration |
+| Costs | Customer and rider code ship together. A rider-only bug is still a customer-facing release |
+| Costs | `app_role` on a device token is a hint, not a permission. Push routing must decide at send time from the order, not from the token |
+| Costs | The bundle grows. Keep the rider surface feature-flagged so a customer who is not a rider never downloads or sees it |
+
+**Vendors get a dashboard, not an app.** Merchants and staff do not install anything and never go
+through a store review. The cost is that a vendor working from a phone browser gets a worse
+experience than a native app, which matters because most vendors will be managing lunch from a
+phone. Accept it: a vendor app would be a second store listing, a second release train, and a
+second thing to keep in sync — for an audience that logs in to change four things a day.
 
 ### 1.2 Authentication and the profile gate
 

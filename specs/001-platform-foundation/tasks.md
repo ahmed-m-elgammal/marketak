@@ -28,14 +28,19 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       Postgres 17.11, ACTIVE_HEALTHY. Extensions verified available: `pg_trgm`, `btree_gist`,
       `unaccent`, `pg_cron`, `pg_net`, **`pgtap`**, `pg_partman`, `earthdistance`, PostGIS
 - [x] **T-1.13** Firebase project `marketak-eg` created (number `283007295790`) and set active
-- [ ] **T-1.14** Enable R2 in the Cloudflare dashboard, then create `marketak-public` and
-      `marketak-private`. **BLOCKED on dashboard access.** Highest-priority manual step — see
-      `open-questions.md` §1.4
+- [x] **T-1.13** Firebase project `marketak-eg` created (number `283007295790`) and set active
+- [x] **T-1.14** R2 enabled in the dashboard. Buckets `marketak-public` and `marketak-private`
+      created in `EEUR`
+- [x] **T-1.17** Android and iOS apps registered on `marketak-eg` with bundle/package
+      `com.jaylak.mobile`. One app for customer + rider, role-switched (ADR 15)
 - [ ] **T-1.15** Scope the Supabase MCP to `?project_ref=erxxsebcqqcpkipzcdhg` and add a read-only
       variant. Recipe in `ENVIRONMENT.md` §4.3. **Requires editing the global config, so a restart**
 - [ ] **T-1.16** Buy a domain and point it at Cloudflare, then `cdn.`, `track.`, `admin.`,
-      `merchant.` hosts. **BLOCKED on purchase** — see `open-questions.md` §3.1
-- [ ] **T-1.17** Register Android and iOS apps with Firebase. **BLOCKED on package-name decision**
+      `vendor.` hosts. **BLOCKED on purchase** — see `open-questions.md` §3.1
+- [ ] **T-1.18** Add the Android release SHA-1 and SHA-256 to the Firebase app. Needed the moment
+      App Check or phone-auth verification is switched on
+- [ ] **T-1.19** Upload an APNs key once an Apple Developer account exists. **Until then iOS
+      receives no push notifications at all** — see `open-questions.md` §1.11
 - [ ] **T-1.10** Install Docker Desktop — unblocks `supabase start` for local dev. Optional
 - [ ] **T-1.11** Prune the 22 irrelevant agent skills. Optional but recommended
 
@@ -46,8 +51,9 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [ ] **T0.1a** **Extract every fenced SQL block out of `data-model.md` into
       `supabase/migrations/*.sql`, numbered per `data-model.md` §14.** Do not hand-write these.
       Doing this by hand is how the spec and the database drift apart
-- [ ] **T0.1** Repo scaffold: `supabase/` (migrations, functions, seed), `apps/customer`,
-      `apps/rider`, `apps/vendor`, `apps/admin-web`, `apps/merchant-web`, `packages/shared`
+- [ ] **T0.1** Repo scaffold: `supabase/` (migrations, functions, seed), `apps/mobile`
+      (customer + rider, one binary, role-switched), `apps/admin-web`, `apps/vendor-web`,
+      `packages/shared`
       (types, error codes, money helpers), `packages/ui`
 - [ ] **T0.2** Migration 001: `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`. Verify `postgis`
       availability in the dashboard; do not depend on it
@@ -150,7 +156,7 @@ produces a clear diff the customer must accept. **Gate: do not proceed until thi
 - [ ] **T3.6** FCM via HTTP v1, WebCrypto JWT signing, Google access token cached 55 minutes
 - [ ] **T3.7** `transition_sub_order_v1` with the full state machine, validated in pgTAP
 - [ ] **T3.8** `orders.status` and ETA recomputation on every transition
-- [ ] **T3.9** Vendor app: accept / reject with reason, bulk prepare, ready, out-of-stock
+- [ ] **T3.9** Vendor dashboard: accept / reject with reason, bulk prepare, ready, out-of-stock
 - [ ] **T3.10** `vendor_staff` RLS: a vendor sees only its own sub-orders, plus the delivery
       address and nothing else
 - [ ] **T3.11** Rider app: online status, nearby orders, `claim_order_v1` atomic claim
@@ -214,7 +220,7 @@ daily cash reconciliation balances exactly against an external statement.
 - [ ] **T5.3** `run_vendor_payout_v1`, `run_rider_payout_v1`, `approve_payout_v1`;
       `payable → in_payout → settled` in one transaction
 - [ ] **T5.4** pgTAP: a sub-order cannot be paid twice; a second payout run finds nothing payable
-- [ ] **T5.5** Vendor app: "earned today" and period history, split by cash vs direct transfer
+- [ ] **T5.5** Vendor dashboard: "earned today" and period history, split by cash vs direct transfer
 - [ ] **T5.6** Rider app: earnings, `cash_held`, settlement history
 - [ ] **T5.7** Migration 011: `vouchers`, `voucher_redemptions`, `promo_slots`
 - [ ] **T5.8** Voucher engine inside `quote_order_v1`, including vendor scoping and per-vendor
@@ -239,7 +245,7 @@ daily cash reconciliation balances exactly against an external statement.
 
 ## Phase 6 — Operations
 
-- [ ] **T6.1** `notifications` inbox in all three apps, pruned at 30 days
+- [ ] **T6.1** `notifications` inbox in the mobile app and both dashboards, pruned at 30 days
 - [ ] **T6.2** Feature flags surfaced in the admin console; every flag has a default in the app
 - [ ] **T6.3** Force-update screen driven by `min_app_version_android` / `_ios`
 - [ ] **T6.4** Maintenance mode banner

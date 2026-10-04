@@ -4,10 +4,26 @@
 !.env.example
 *.pem
 *.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+*.cer
+*.certSigningRequest
+*.pvk
 service-account*.json
 firebase-adminsdk-*.json
 google-services.json
 GoogleService-Info.plist
+
+# Apple App Store Connect — the API key can mint credentials, revoke builds and
+# read sales. Treat the .p8 as a live secret even though it "never expires".
+appstore/*.p8
+appstore/*.cer
+appstore/*.mobileprovision
+appstore/*.p12
 
 # Android SQLCipher key material, if ever extracted
 *.db-journal
