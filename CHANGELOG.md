@@ -47,6 +47,30 @@ Nothing shipped. This project is specification-only.
 - **Firebase apps registered** for Android and iOS under bundle/package `com.jaylak.mobile`.
 - **R2 enabled.** Buckets `marketak-public` and `marketak-private` created in `EEUR`.
 
+### Database
+
+Migrations 001–004 written **and applied** to the live project. 20 tables, 58 indexes.
+
+- `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
+  available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
+  distance, so nothing in the schema depends on a spatial extension.
+- `002_geo_and_config` — `cities`, `areas`, `delivery_zones`, `delivery_fee_tiers`, `settings`
+- `002s_seed_fee_tiers` — the ×1.00 / ×1.10 / ×1.20 vendor-count tiers, as data, in a separate file
+- `003_identity` — `users`, `user_roles`, `user_auth_providers`, `addresses`, `device_tokens`,
+  `feature_flags`, plus the `on_auth_user_created` trigger
+- `004_vendors` — `brands`, `vendors`, `vendor_areas`, `vendor_schedules`, `vendor_holidays`,
+  `cuisines`, `vendor_cuisines`, `vendor_staff`, `vendor_earnings_daily`
+
+Verified against the live database rather than assumed: **0 unindexed foreign keys**, every
+`security definer` function pinned to `search_path = ''`, and the profile gate proven across six
+cases — the trigger fires on sign-in, grants the base `customer` role, leaves the profile
+incomplete, rejects a completion with no phone, accepts a valid one, and rejects a duplicate phone.
+
+**Defect found by applying rather than reading:** `users.id uuid primary key default
+auth.users(id)` is illegal — Postgres rejects a column reference in a `DEFAULT` expression
+(`ERROR 0A000`). `data-model.md` carried the same bug and was corrected in the same change, so the
+spec and the database do not disagree.
+
 ### Changed
 
 - **Nothing shipped, so nothing changed.** This section is where refactors and specification

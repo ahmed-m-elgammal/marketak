@@ -48,9 +48,13 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 
 ## Phase 0 — Foundation
 
-- [ ] **T0.1a** **Extract every fenced SQL block out of `data-model.md` into
-      `supabase/migrations/*.sql`, numbered per `data-model.md` §14.** Do not hand-write these.
-      Doing this by hand is how the spec and the database drift apart
+- [x] **T0.1a** **Extract every fenced SQL block out of `data-model.md` into
+      `supabase/migrations/*.sql`, numbered per `data-model.md` §15.2.** Do not hand-write these.
+      Doing this by hand is how the spec and the database drift apart.
+      **Partially done:** 001, 002, 002s, 003, 004 written **and applied** to
+      `erxxsebcqqcpkipzcdhg`. 20 tables, 58 indexes, 0 unindexed foreign keys, profile gate
+      verified across six cases. Found and fixed a real defect: `default auth.users(id)` is
+      illegal in a `DEFAULT` expression. **Remaining: 005–022**
 - [ ] **T0.1** Repo scaffold: `supabase/` (migrations, functions, seed), `apps/mobile`
       (customer + rider, one binary, role-switched), `apps/admin-web`, `apps/vendor-web`,
       `packages/shared`
@@ -78,18 +82,21 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [ ] **T0.1e** `scripts/precommit.sh` — refuse a commit that stages a secret, by scanning the
       index for `*.p8 *.pem *.key *.cer *.p12 *.mobileprovision .env*`. Belt and braces: the
       ignore list already missed an Apple key once
-- [ ] **T0.2** Migration 001: `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`. Verify `postgis`
-      availability in the dashboard; do not depend on it
+- [x] **T0.2** Migration 001: `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`.
+      **Applied.** `postgis` is available but deliberately not installed — area matching is
+      geohash-prefix plus a haversine distance, so nothing depends on it
 - [ ] **T0.2a** Create the `private` schema and revoke public access:
       `revoke all on schema public from public`, plus `alter default privileges`. See
-      `data-model.md` §13.3
-- [ ] **T0.2b** Migration 014 must satisfy `data-model.md` §13.2: every policy uses
-      `(select auth.uid())`, every `security definer` function uses `set search_path = ''` with
-      fully-qualified names, and membership checks go through `private.*` helpers with `EXECUTE`
-      revoked. **Migration 022 fails the build on a bare `auth.uid()` in a policy**
+      `data-model.md` §13.3. **Deferred to migration 014**, which is where RLS lands
+- [x] **T0.2b** Migration 003 installs `on_auth_user_created` with `security definer` and
+      `search_path = ''`, and revokes `EXECUTE` from `public, anon, authenticated`.
+      **Verified on the live database**
 - [ ] **T0.2c** Partition `events`, `notifications`, `rider_location_pings` and `audit_log` by month
-      (`data-model.md` §14.1). `pg_partman` 5.3.1 is available. Do **not** partition
+      (`data-model.md` §14.1). `pg_partman` 5.3.1 installed. Do **not** partition
       `ledger_entries`
+- [ ] **T0.2d** `scripts/check-policies.mjs` is now the mechanical gate. Run these three queries
+      after migration 014 and require: zero unindexed foreign keys, every `prosecdef` function with
+      `search_path=''`, and no bare `auth.uid()` inside a policy body
 - [ ] **T0.3** Migration 002: `cities`, `areas`, `delivery_zones`, `delivery_fee_tiers`, `settings`.
       Seed the operating city (not hardcoded) plus ~20 areas with real geohash prefixes, and the
       1/2/3-vendor tiers at 10000/11000/12000 bps
