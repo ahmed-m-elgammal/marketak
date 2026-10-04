@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–007b written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 32 tables,
-115 indexes, 0 unindexed foreign keys.
+Migrations 001–008 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 36 tables,
+135 indexes, 0 unindexed foreign keys.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -70,6 +70,16 @@ Migrations 001–007b written **and applied** to the live project `erxxsebcqqcpk
   `order_modifications`
 - `007a` — `sync_order_status` joined the transition table on a column that does not exist
 - `007b` — `orders.item_count` could never become non-zero (see **Fixed**)
+- `008_riders` — `riders`, `driver_shifts`, `delivery_assignments`, `rider_location_pings`, plus
+  `effective_cash_limit_v1`
+
+`rider_location_pings` is created **empty and stays empty until Phase 8**. ADR 9 defers live
+tracking, `contracts.md` defines no RPC that writes to it, and the writer is the Durable Object.
+Kept deliberately, for when the tracking API exists. It is created **plain and unpartitioned** —
+see open question 3.10. It is also the highest-volume table in the database, budgeted at 4.0 KB per
+order, which is why `riders.current_latitude` / `current_longitude` / `last_location_at` exist
+alongside it: those three columns are enough to ship "where is my rider", and only the trip trail
+needs the pings table.
 
 `order_eta_snapshots` is specified in `data-model.md` §6 and §15.2 but **does not exist yet**, in the
 repository or in the database. Not yet migrated.
@@ -86,8 +96,28 @@ spec and the database do not disagree.
 
 ### Changed
 
-- **Nothing shipped, so nothing changed.** This section is where refactors and specification
-  revisions land. It is empty by design, not by omission.
+- **`008` adds constraints that are not in `data-model.md` §8.** Flagged in the migration and
+  reversible by dropping the constraint. Each was verified to reject the bad case:
+  - Money and domain `CHECK`s on `riders` and `delivery_assignments`, following the rule `007`
+    established. Includes `delivery_assignments_rider_pay_sums`, so a frozen pay breakdown cannot
+    disagree with its own total.
+  - `riders_is_online_consistent` — §8 declares **both** `status` and `is_online` without saying how
+    they relate, which is the same desync shape that let `menu_items.vendor_id` drift in `005b`. The
+    constraint enforces `is_online = (status <> 'offline')`. **This assumes the two are the same
+    fact.** If `is_online` instead means "the app is open" while `status` means "delivery state",
+    the constraint is wrong and should be dropped.
+  - `driver_shifts_no_overlap` — an `EXCLUDE USING gist` constraint preventing one rider from
+    holding two overlapping active shifts, which would let a single rider be matched to two
+    concurrent orders. This is what migration `001` installs `btree_gist` for.
+  - `riders_location_has_time` — a position with no timestamp reads as current and is not.
+  - `effective_cash_limit_v1` does **not** check `p_rider_id` against the caller, so any
+    authenticated user can read any rider's cash limit. Minor, but the guard belongs with the
+    caller-identity rules in migration `018`.
+- **`driver_shifts.area_ids` stays a `uuid[]`, as specced.** §16 removed JSON arrays from `vendors`
+  for exactly this reason — "JSON arrays cannot be indexed; forces a scan on every availability
+  check" — and then used an array here. A join table would be consistent with `vendor_areas` and
+  would make the shift-area lookup indexable. Not changed unilaterally: that means adding a table
+  nobody approved. Recorded for a decision.
 
 ### Fixed
 
@@ -139,9 +169,8 @@ spec and the database do not disagree.
 
 Recorded in `open-questions.md` §6. The significant ones:
 
-- Migrations 005–022 have **not** been written. `order_eta_snapshots` is specified but absent, and
-  `rider_location_pings` has an unresolved contradiction over partitioning (see
-  `open-questions.md`) that blocks `008`.
+- Migrations 009–022 have **not** been written. `order_eta_snapshots` is specified but still absent,
+  and belongs with `007`.
 - No application code. No `apps/`. No `package.json`.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run verify` do not exist, so **no
   engineering checklist can currently be signed off.** See `AGENTS.md` §Verification commands.
