@@ -22,9 +22,16 @@ All money columns are integer piastres.
 
 | Function | Returns | Notes |
 |---|---|---|
-| `get_profile_status_v1()` | `{ profile_completed_at, has_phone, has_address, can_browse, can_order, missing[] }` | Called at app launch. `missing` drives which fields the completion screen asks for |
-| `complete_profile_v1(p_first_name, p_last_name, p_phone)` | the new profile state | The only way to set `profile_completed_at`. Validates E.164 and phone uniqueness |
-| `update_profile_v1(p_patch jsonb)` | the new profile | Cannot set `profile_completed_at` |
+| `get_profile_status_v1()` | `{ profile_completed_at, has_phone, has_address, can_browse, can_order, missing text[] }` | Called at app launch. `missing` drives which fields the completion screen asks for. Tokens are `first_name`, `last_name`, `phone_number`, `address` — **column names, in that order**, so the app binds a label to a token without a lookup table that can drift |
+| `complete_profile_v1(p_first_name, p_last_name, p_phone)` | the new profile state | The only way to set `profile_completed_at`. Validates E.164 and phone uniqueness. **Idempotent on identical retry**: same values after completion returns the current state and writes **no** second event, because a client re-sending after a timeout must not be shown an error for a request that succeeded. Differing values after completion raise `PROFILE_ALREADY_COMPLETE` rather than silently no-op'ing, because a silent no-op leaves a user believing a changed name was stored |
+| `update_profile_v1(p_patch jsonb)` | the new profile | Cannot set `profile_completed_at` — rejected **twice over**: by key, and structurally by its absence from the `SET` list. Accepts exactly `first_name`, `last_name`, `phone_number`, `avatar_path`, `preferred_language`, `country_code`. A key that is forbidden and a key that does not exist are **different** client bugs, so they raise different messages (`INVALID_PATCH`) rather than one silent union hiding a typo |
+
+All three `SECURITY DEFINER`, `search_path` pinned to `''`, `EXECUTE` granted to `authenticated` and
+**not** to `anon`. Shipped in `016`.
+
+**Both mutators write exactly one `events` row in the same transaction** (constitution III.21), with
+**id-only payloads** — the changed field *names* for an edit, never their values, because the values
+include the phone number.
 
 ### 1.4 Cart
 
@@ -244,6 +251,13 @@ Every endpoint is idempotent. `webhooks/events` keys on `events.id_uuid`.
 | `rider.cash_limit_warning` | rider_id, cash_held, effective_cash_limit | Batched 15 s | FCM to the rider only |
 | `commission.activated` | scope, value, effective_from | Batched 15 s | Admin audit notification |
 | `voucher.created` | voucher_id | Batched 15 s | None in v1 |
+| `user.profile_completed` | user_id | Batched 15 s | None in v1 — `auth_daily_stats` is the obvious future reader |
+| `user.profile_updated` | user_id, changed field **names** | Batched 15 s | None in v1 |
+
+**These two were missing from this table and were added by `016`.** The catalogue has no profile event
+at all, which was a real gap: constitution 18 makes the profile gate load-bearing, and nothing recorded
+that completing it happened. They follow the catalogue's own shape — singular aggregate, dot, past-tense
+verb — and carry **id-only payloads**, so neither leaks the phone number into the outbox.
 | `vendor.earnings_rolled` | vendor_id, business_date | Batched 15 s | None |
 ### 3.2 Guarantees
 
@@ -318,6 +332,22 @@ Never surface a raw Postgres message to a user.
 |---|---|---|
 | `PROFILE_INCOMPLETE` | `profile_completed_at is null` | Route to the completion screen. Never a dead end |
 | `PHONE_IN_USE` | Another account already has this number | Inline message on the phone field |
+| `PHONE_INVALID` | Not a well-formed E.164 number | Inline message on the phone field |
+| `NAME_INVALID` | First or last name empty after trim, or over 80 characters | Inline message on the name field |
+| `PHONE_IN_USE_BY_RIDER` | The number is registered to a **rider** profile | **Not** an inline field error — see below |
+| `PROFILE_ALREADY_COMPLETE` | `complete_profile_v1` called with different values after completion | Route to settings; `update_profile_v1` is the save path |
+| `INVALID_PATCH` | `update_profile_v1` given a forbidden key, or a key that does not exist | Developer error, not a user error |
+
+**`PHONE_IN_USE_BY_RIDER` is deliberately distinct from `PHONE_IN_USE`, and that distinction is the
+whole point.** Migration `014b` keeps `riders.phone_number` in step with `users.phone_number`, so a
+profile completion can be aborted by a collision with a rider row — possibly one who never signed in
+(their `riders.user_id` is `null`, admin-onboarded), possibly a colleague, possibly the user themself
+with a stale second number on file. `PHONE_IN_USE`'s documented behaviour is "inline message on the
+phone field", which is a **dead end**: the user cannot resolve it by typing a different number, because
+retrying is precisely what loops them. A distinct code lets the app route to support instead of to the
+field. It is also reachable from `update_profile_v1` for a reason that is easy to miss — `014b`'s trigger
+is `after update of first_name, last_name, phone_number, country_code`, so it fires for a **name-only
+edit** on a linked rider whose numbers have drifted.
 | `TOO_MANY_VENDORS` | Cart exceeds `max_vendors_per_order` | Name the vendors to remove |
 | `PRICE_CHANGED` | Quote fingerprint mismatch | Show the diff, require re-confirmation |
 | `ITEM_UNAVAILABLE` | Item disabled, deleted or out of stock | Remove it, show what changed |

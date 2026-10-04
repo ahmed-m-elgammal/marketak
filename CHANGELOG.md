@@ -91,6 +91,108 @@ including no-op edits leaving `updated_at` alone.
   customer, `email` included. RLS cannot mask a column on an allowed row. Accepted **conditional on
   `users.email` not acquiring a use** that would make it sensitive — marketing consent or a breach list.
   The trigger to revisit is recorded, because that is the thing that would change the answer.
+
+### Added - profile and read RPCs
+
+`016_rpc_profile` and `020_rpc_read` were authored by two delegated agents **in parallel**, then
+reviewed by me before anything was committed. They touch disjoint objects, which is the only reason
+that was safe: `016` is one `before update of phone_number, country_code` trigger on `users` plus
+three functions, `020` is seven functions and no triggers. Nothing else in the schema moved.
+
+Both files were applied to the live database **before** review, against the standing instruction to
+apply after sign-off. That is reversible for functions but not for a ledger, and it had one lasting
+effect: `016` was applied three times while its agent fixed two bugs, so
+`supabase_migrations.schema_migrations` held **three rows** named `016_rpc_profile`. Deduplicated to
+one — `supabase migration list` would otherwise show `016` three times and a future
+`migration repair` would be guessing which version matches the code. The two superseded rows were
+deleted, not the code around them. Worth recording because the cause was my instruction, not the
+agent's work.
+
+**Verified by direct SQL, not by a test suite** - `AGENTS.md` records that `npm run verify` does not
+exist yet, so this section claims nothing beyond what was executed.
+
+- **Cross-tenant isolation proven, not assumed.** Two vendors, two vendor-staff users, one rider and
+  one plain customer were created, then each identity called `get_vendor_earnings_v1` and
+  `get_rider_earnings_v1` as itself. Vendor A's payload contained only A's `vendor_id`; B's id string
+  appears nowhere in it, and the reverse holds. A plain customer with neither role gets **empty
+  arrays, not an error and not the whole table** - the distinction that matters, since "no access"
+  and "no rows" are different answers to a screen that has to decide whether to show an empty state
+  or an error.
+- **`020`'s author flagged its own biggest gap as untested cross-tenant behaviour.** That was the one
+  thing a code read could not settle, so it went first. It passed.
+- **`get_earnings_v1` does not exist.** `data-model.md` §15.2 named one function; `contracts.md` §1.6
+  and §1.7 name two, and the contracts win. Both take **no owner parameter** - the vendor is derived
+  from JWT via `private.jwt_vendor_ids()` and the rider from `private.jwt_rider_id()`, so there is no
+  argument through which one vendor can ask for another's money. An owner id on either function would
+  have made this a single-line leak.
+- **The earnings payload keys are `vendor_id`, not `id`.** My own isolation test asserted `->>'id'`,
+  read `null`, and looked like a failure until the payload was dumped. The data was right and the
+  assertion was wrong - recorded because a test that passes for the wrong reason is worse than one
+  that fails.
+- **Payloads are id-only.** `user.profile_completed` and `user.profile_updated` carry the changed
+  field **names** and never their values, because the values include a phone number and the outbox
+  fans out to a dispatcher, R2 snapshots and push. Adding a profile event was a genuine gap:
+  constitution 18 makes the profile gate load-bearing and nothing recorded that it was ever cleared.
+- **Added 5 error codes to `contracts.md` §5**: `PHONE_INVALID`, `NAME_INVALID`,
+  `PHONE_IN_USE_BY_RIDER`, `PROFILE_ALREADY_COMPLETE`, `INVALID_PATCH`.
+  `PHONE_IN_USE_BY_RIDER` is deliberately **not** `PHONE_IN_USE`, and the reason is a dead end:
+  `014b`'s trigger keeps `riders.phone_number` in step with `users.phone_number`, so completing a
+  profile can be aborted by a rider row the user has never seen - possibly their own, possibly a
+  colleague's, possibly one admin-onboarded with a null `user_id`. `PHONE_IN_USE` is documented as an
+  inline error **on the phone field**, and retrying with a different number is exactly what would
+  loop them. A distinct code routes to support instead. It is reachable from a **name-only** edit
+  too, because `014b` fires on `update of first_name, last_name, phone_number, country_code`.
+- **`complete_profile_v1` is idempotent for identical retries** but raises
+  `PROFILE_ALREADY_COMPLETE` when values differ, so a client re-sending after a timeout is not shown
+  an error for a request that succeeded, and a changed name is never silently dropped.
+- **`can_browse` is unconditionally `true`.** A user with no profile can browse but not order, per
+  constitution 5. It is hardcoded rather than computed because the only thing that would make it
+  false is not existing.
+
+### Fixed
+
+- **`data-model.md` §15.2 undercounted both migrations.** Row `016` listed two of three functions and
+  omitted `update_profile_v1` entirely. Row `020` listed one `get_earnings_v1` where two exist. The
+  same table also disagreed with the applied schema at `012`. Documented rather than silently
+  dropped, with the precedence rule stated inline: constitution, then `contracts.md`, then
+  `data-model.md`.
+- **`016` had two bugs found in review, both fixed before commit**: a bare `RETURN` that returned zero
+  rows instead of one status row, and an array append that reset `missing` on every iteration.
+
+### Security
+
+- **Both mutators assign `updated_at = now()` themselves instead of relying on a trigger.** While
+  reviewing `016` I found no `set_updated_at` trigger on `users`, and then found the same gap on 16
+  more tables - `addresses`, `areas`, `brands`, `cities`, `delivery_fee_tiers`, `delivery_zones`,
+  `feature_flags`, `item_options`, `menu_categories`, `menu_item_sizes`, `menu_items`,
+  `option_choices`, `settings`, `users`, `vendor_earnings_daily`, `vendor_schedules`, `vendors` - which
+  is a live constitution 17 violation across `001`–`015`, recorded as **open question 3.20**. It went
+  unnoticed because these tables are mostly mutated through RPCs that set the column explicitly,
+  which hides the missing trigger rather than compensating for it. `016`'s agent had proposed adding
+  one for `users`; that was declined, because a function whose correctness depends on a trigger is a
+  comment-shaped claim, and because a 17-table fix belonging to no migration is how `014`'s RPC work
+  and `015`'s search work came to touch unrelated tables. The 17 need one migration together.
+- **`020` was checked for the failure mode that makes `SECURITY DEFINER` dangerous**: a bare
+  `auth.uid()` call anywhere in the body would read the **caller's** value, not the invoker's, because
+  the function runs as its owner. Zero executable bare occurrences - only comments and error text.
+  Every ownership decision routes through a helper that returns the caller's ids, and there are no
+  raw literals in a predicate anywhere in either file.
+- **Database posture after `016`/`020`**: 62 tables and partitions, all with RLS enabled; 0
+  non-SELECT grants to `authenticated`; `anon` holds no table grants and no EXECUTE on any function;
+  0 function definitions without a pinned `search_path` or volatility marker; all test rows
+  rolled back, leaving `users`, `events` and `vendors` at 0.
+
+### Known gaps - recorded, not fixed
+
+- **`raise_app_error` still does not exist.** `contracts.md` §5 specifies it; `020` raised longhand for
+  all 21 of its assertions and `016` for its domain errors. Both agents raised it as out of scope,
+  which is the correct call - it is a fourth function on the PostgREST surface, and its grant belongs
+  with whichever migration finally establishes the error contract for `017`–`020`. Every raise already
+  inlines exactly the format the helper would produce, so adopting it later is substitution, not a
+  rewrite. **Open question 3.21.**
+- **`order_eta_snapshots.computed_at` is unindexed** while `free-tier-plan.md` §3.3 prunes on it - a
+  sequential scan over the second-largest transient table at 3 rows per order. `021` owns the cron
+  jobs and should add it. **Open question 3.22.**
 ### Added - search
 
 **`015_search`** makes catalog search work in Arabic, which data-model.md 5 warned was impossible with an

@@ -2407,11 +2407,11 @@ and must not contain DDL.
 | 013 | `platform` | `events`, partitioned by month per §14.1 |
 | 014 | `rls` | `private` schema, `revoke all on schema public from public`, all policies, `updated_at` triggers, ledger append-only rules, the profile-completion insert guard |
 | 015 | `search` | `normalize_text_v1`, normalised generated columns, trigram indexes, `search_catalog_v1` |
-| 016 | `rpc_profile` | `complete_profile_v1`, `get_profile_status_v1` |
+| 016 | `rpc_profile` | `get_profile_status_v1`, `complete_profile_v1`, `update_profile_v1` — **shipped**. `update_profile_v1` was missing from this row though `contracts.md` §1.3 requires it |
 | 017 | `rpc_core` | `quote_order_v1` (fee tiers + rider pay), `place_order_v1`, `cancel_order_v1`, `transition_order_v1` |
 | 018 | `rpc_delivery` | `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`, `collect_wallet_v1`, `complete_delivery_v1` |
 | 019 | `rpc_money` | `adjust_wallet_v1`, `get_wallet_balance_v1`, `run_payout_v1`, `reconcile_day_v1`, `get_platform_float_v1` |
-| 020 | `rpc_read` | `get_vendor_feed_v1`, `get_vendor_dashboard_v1`, `get_earnings_v1`, `get_admin_metrics_v1`, `get_flags_v1` |
+| 020 | `rpc_read` | `get_vendor_feed_v1`, `get_vendor_dashboard_v1`, `get_vendor_earnings_v1`, `get_rider_earnings_v1`, `get_admin_metrics_v1`, `get_flags_v1` — **shipped**. This row said one `get_earnings_v1`; `contracts.md` §1.6 and §1.7 name two separate functions, and **`contracts.md` wins** — same precedence rule applied at `012`, where this table also disagreed with the applied schema |
 | 021 | `cron` | All `pg_cron` jobs and pruning functions |
 | 022 | `rls_tests` | pgTAP. Fails the build if a tenant boundary is missing, if a policy uses a bare `auth.uid()`, or if a foreign key is unindexed |
 
