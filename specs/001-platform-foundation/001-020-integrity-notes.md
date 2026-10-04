@@ -261,15 +261,113 @@ innocent-looking `update wallets set balance` in a Worker that silently breaks t
 `platform`/`platform_earnings` with a null one. Constitution's "the platform holds no customer money" is
 therefore impossible to violate by insert, not merely a convention.
 
-## 5. Database state after the suite
+## Batch 5 — state machine (10 assertions, 10 pass)
+
+Enum CHECKs exist on all ten state columns. `transition_order_v1(order, sub_order, to_status, reason)` is
+the only writer.
+
+| # | Probe | Verdict |
+|---|---|---|
+| 1 | CHECK refuses a non-existent `sub_orders` state, even for `service_role` | pass |
+| 2 | status unchanged after the refused write | pass |
+| 3 | RPC refuses an out-of-enum `to_status` | pass |
+| 4 | **customer** cannot accept its own sub-order | pass |
+| 5 | status still `pending` after the customer attempt | pass |
+| 6 | vendor drives its own leg `pending → accepted → preparing → ready` | pass |
+| 7 | **backwards** `ready → preparing` refused | pass |
+| 8 | **vendor** cannot perform the rider-only `picked_up` | pass |
+| 9 | status still `ready` after the vendor tried to self-deliver | pass |
+| 10 | **rider** cannot skip `ready → delivered` | pass |
+
+Two layers doing their job: the CHECK keeps the value inside the enum even for a privileged writer, and
+the RPC enforces both the direction and *who* may move it.
+
+## Batch 6 — boundaries and transaction atomicity
+
+| Probe | Verdict |
+|---|---|
+| negative `base_price` refused | pass |
+| NULL `base_price` refused | pass |
+| zero quantity refused | pass |
+| negative quantity refused | pass |
+| `int4` max `base_price` | refused (overflow) — info |
+| stale quote after a real reprice aborts with `PRICE_CHANGED` | pass |
+| after abort: `orders` / `sub_orders` / `order_items` / `delivery_assignments` / `events` all 0 | pass |
+| after abort: stock untouched at 50 | pass |
+| **control:** a fresh quote at the new price *does* place | pass |
+
+### The first version of the atomicity test was a lie
+
+It asserted the abort was `PRICE_CHANGED` and got `permission denied`. The vendor has no direct `UPDATE`
+grant on `menu_items`, so the reprice never happened, no order was ever attempted, and the five
+"nothing was written" rows passed **vacuously**. Re-run with the reprice as `service_role`, the test then
+genuinely exercised the abort path and `PRICE_CHANGED` came back. A green row proves nothing unless the
+precondition is asserted too — hence the explicit `precondition: the price really moved` line.
+
+## 7. Two real defects in the stock and availability path
+
+Found while testing that `stock_count` is not decremented on purchase. Chasing it turned up two genuine
+bugs, both in `017_rpc_core.sql`.
+
+### 7a. A sold-out item can be quoted and bought
+
+With `stock_count = 0` on the only item in the cart:
+
+```
+precondition: stock_count is 0                                    0     PASS
+quote_order_v1 on a SOLD-OUT item (stock_count=0)    QUOTE ISSUED         FAIL
+and placing that sold-out quote                       ORDER PLACED         FAIL
+```
+
+The order completes. `stock_count` is not consulted anywhere on the purchase path. Three sources agree:
+
+- `005_catalog.sql:64` declares it with `check (stock_count is null or stock_count >= 0)` and
+  `null = unlimited`.
+- The **only** other reference in any migration is `020_rpc_read.sql:528`, which *reads* it to hide
+  sold-out items from browse. **No function anywhere assigns it.**
+- The fingerprint at `017_rpc_core.sql:579-592` includes zone, fees, distance, vendor count, subtotal,
+  tip, discount, voucher, and per line `line_key`, `unit_price`, `selected_size_id`, `selected_options`.
+  It contains **neither `is_available` nor `stock_count`**.
+
+This contradicts two documents:
+
+- `contracts.md:477` — `OUT_OF_STOCK | stock_count exhausted`.
+- `spec.md:519` — "Availability changes are caught the same way, via `is_available` and `stock_count` in
+  the fingerprint." They are not in the fingerprint.
+
+So the customer-facing effect is: a vendor marks an item sold out, browse correctly hides it, but a
+customer with it already in their cart still gets a quote and a completed order.
+
+### 7b. Unavailability raises an internal crash, not a domain error
+
+Item goes `is_available = false` between quote and place. The order is correctly **not** placed — but the
+error surfaced is:
+
+```
+invalid input syntax for type json
+```
+
+not `OUT_OF_STOCK`. `place_order_v1` evidently drops the unavailable line and then tries to cast a
+structure that is no longer the expected shape. The guard works by accident; a customer hitting this gets
+an opaque Postgres error instead of a code the app knows how to render. `contracts.md` lists `OUT_OF_STOCK`
+for exactly this and it is never raised.
+
+### Not auto-decremented — and that part is by design
+
+Worth separating from the bugs above: `spec.md` treats stock as a *fingerprint input*, not something the
+platform decrements, and `null = unlimited` makes manual vendor control the intended model. My assertion
+that a successful order should have moved `stock_count` 50 → 48 was **wrong**. What is missing is the
+*refusal*, not the decrement. Whether to go further and decrement atomically — which would actually prevent
+two customers buying the last unit — is a product decision, not a bug fix, and is **not** assumed here.
+
+## 8. Database state after the suite
 
 All fixtures rolled back. Every public table is empty except the three seeded by earlier migrations
 (`commission_rules`=2, `notification_templates`=38, `settings`=13). `auth.users` = 0.
 
 ## Still to do
 
-- State machine: every illegal transition refused from and to every state, as the actor that owns it.
-- Integrity at boundaries: `0`, negative, and `int4` max on money columns; NULL in NOT NULL columns.
-- Transaction atomicity: force a mid-function failure and assert no partial write survives.
 - Reconcile idempotency across a day boundary.
 - Review the 33 jsonb columns for normalisation.
+- Fix 7a and 7b in a forward `017a_fix_stock_enforcement.sql` once the enforce-vs-decrement decision is made.
+- 022 `rsl_tests` should carry the standing assertions from batches 1 and 4 as pgTAP.
