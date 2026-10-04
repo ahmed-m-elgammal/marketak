@@ -172,6 +172,12 @@ create index on rider_pay_rules (rider_id, is_active);
 Resolution order at collection time: an active rule for this rider → else the active rule for the
 city → else zero, which surfaces as an admin error rather than a silent free delivery.
 
+**Readable by admin, by the rider it names, and by everyone for the city-wide defaults.**
+`rider_id is null` is not a leak — a rider with no personal override must be able to discover what
+they are owed, or the resolution above is invisible to them and the fallback to zero reads as "this
+rider earns nothing" instead of "no rule is configured". Named per-rider overrides are private
+salary figures. Delivery fee tiers, by contrast, stay fully public: the customer is quoted from them.
+
 ### `settings`
 
 Key-value configuration for values that are not fees. Replaces Firebase Remote Config as the
@@ -1486,6 +1492,33 @@ create table riders (
 create index on riders (is_online, status, current_geohash) where is_active;
 create index on riders (status) where is_online;
 ```
+
+**`first_name`, `last_name`, `phone_number` and `country_code` are kept in step with `users` by
+trigger, in both directions.** `users` and `riders` each hold a contact, and each has its **own
+independent `UNIQUE (phone_number)`** — so without a sync the same rider can be `+201000000001` in
+one table and `+201000000999` in the other, with nothing objecting. That matters because ADR 20
+exposes `riders.phone_number` through `riders_public` as **the number the customer calls**: on
+divergence the customer calls a number the rider's own account does not show, and dispatch calls
+another.
+
+The duplication exists at all because `user_id` is nullable — a rider can be onboarded by an admin
+before ever signing in, so `riders` must be able to stand alone.
+
+Two triggers, because one is not enough:
+
+- `trg_rider_contact_from_user` — `BEFORE INSERT OR UPDATE` on `riders`. When `user_id` is set, copies
+  the four fields from `users`.
+- `trg_user_contact_to_rider` — `AFTER UPDATE OF first_name, last_name, phone_number, country_code`
+  on `users`. Pushes them back, guarded by `is distinct from` so a no-op edit does not bump
+  `riders.updated_at`.
+
+**Each field is only overwritten when the source is non-null.** This is the load-bearing detail:
+constitution 18 makes the phone "a profile field collected after sign-in", so `users.phone_number` is
+NULL until the profile is completed, and a plain `SELECT … INTO` would assign NULL and **wipe a
+working contact number an admin entered during onboarding**. Both triggers are `SECURITY DEFINER`,
+because clients hold no write on `riders` at all (ADR 20) and the rider editing their own phone would
+otherwise get a permission error. A phone collision with another rider's profile fails loudly on
+`riders_phone_number_key` rather than silently reassigning.
 
 **`max_cash_held` is configuration, not a constant.** `null` on the rider means "use
 `settings.rider_max_cash_held_default`", which an admin sets per city or per rider cohort. The

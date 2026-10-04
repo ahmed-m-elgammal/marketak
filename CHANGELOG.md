@@ -49,9 +49,49 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–014a written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
+Migrations 001–014b written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
 partitions, 229 indexes, 115 RLS policies, 0 tables without RLS, 0 unindexed foreign keys, 0 client
 write grants, 0 grants to `anon`.
+
+### Fixed
+
+**`014b` — `riders` and `users` could hold different phone numbers for the same person.** Each table has
+its **own independent** `UNIQUE (phone_number)`, so the same rider could be `+201000000001` in one and
+`+201000000999` in the other with nothing objecting. Verified before writing: the only trigger on
+`riders` was `updated_at`. ADR 20 exposes `riders.phone_number` through `riders_public` as the number
+the customer calls, so on divergence the customer calls a number the rider's own account does not
+show, and dispatch calls another — the customer eats the failed delivery.
+
+The columns cannot be dropped: `riders.user_id` is nullable **by design** so a rider can be onboarded
+before ever signing in. Two triggers instead, because one is not enough — a trigger only on `riders`
+closes the gap at insert time and reopens it the moment an admin edits the auth profile.
+
+**The null guard is the load-bearing detail.** Constitution 18 makes the phone "a profile field
+collected after sign-in", so `users.phone_number` is NULL until the profile is completed. A plain
+`SELECT … INTO new.phone_number` would have assigned NULL and **wiped a working contact number an
+admin entered during onboarding**. Every field is only overwritten when the source is non-null.
+Verified: a linked rider whose auth profile has no phone keeps `+202222222222` and the name
+`Onboarded`; a linked rider with a complete profile inherits both.
+
+Both triggers are `SECURITY DEFINER` — clients hold no write on `riders` at all, so without it a rider
+editing their own phone would get a permission error. A collision with another rider's number **fails
+loudly** on `riders_phone_number_key` rather than silently reassigning. 12 assertions, all passing,
+including no-op edits leaving `updated_at` alone.
+
+### Changed
+
+- **Open question 3.13** resolved as option (a), confirmed by a human reviewer.
+- **Open question 3.17** resolved: `search_daily_stats` stays admin-only. `012`'s `CHECK` had already
+  closed the storage path; the read-side residual risk of unsalted md5 is now accepted knowingly
+  rather than left dangling, and `014` makes the admin-only posture structural — the table is absent
+  from the 51-table grant list.
+- **Open question 3.18** resolved earlier: `rider_pay_rules` readable by admin, the named rider, and
+  the city-wide default rows.
+- **Open question 3.19** accepted for v1: the assigned rider can read the whole `users` row for their
+  customer, `email` included. RLS cannot mask a column on an allowed row. Accepted **conditional on
+  `users.email` not acquiring a use** that would make it sensitive — marketing consent or a breach list.
+  The trigger to revisit is recorded, because that is the thing that would change the answer.
+- **All open questions raised by `012`–`014` are now closed.**
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -108,6 +148,7 @@ write grants, 0 grants to `anon`.
 - `013_events` — `events`, the outbox, **shipped unpartitioned on measured evidence**
 - `014_rls` — row-level security on all 62 tables and partitions
 - `014a_fix_vendor_sub_order_leak` — closes a cross-vendor leak found by testing `014`
+- `014b_sync_rider_contact` — `riders` and `users` contact fields can no longer drift (open Q 3.13)
 
 ### Security
 
