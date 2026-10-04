@@ -1899,32 +1899,58 @@ one.
 
 ## 15. Migration order
 
-Dependency-ordered, so each step is independently deployable.
+### 15.1 Rules for every migration
+
+From the `database-migrations` skill. These bind the files under `supabase/migrations/`.
+
+| # | Rule | Why |
+|---|---|---|
+| 1 | **Schema and data migrations are separate files** | Mixing DDL and DML makes a migration un-rollable and holds a long transaction open |
+| 2 | **Forward-only.** Rollback is a new forward migration, never a `down` file | Postgres DDL is rarely reversible in place. A `down` that "works" can lose data |
+| 3 | **Immutable once applied.** Never edit a migration that has run | Editing it silently diverges environments |
+| 4 | **No `NOT NULL` without a default** on an existing table | Rewrites every row and holds an exclusive lock |
+| 5 | **`CREATE INDEX CONCURRENTLY` when the table has rows** | A plain `CREATE INDEX` blocks writes for the duration |
+| 6 | **Never mix statements that need different transaction semantics in one file** | `CONCURRENTLY` cannot run inside a transaction block, so a file containing it must be applied outside one — which some runners cannot do |
+| 7 | **Every table needs a backfill path from day one.** New nullable column, backfill, then add the constraint | The expand-contract pattern |
+| 8 | **Test against a production-sized copy**, not 100 rows | A migration that is instant on 100 rows can lock for hours on 10M |
+
+**Migration 001–022 all run against an empty database, so rule 5 does not apply to them.** Plain
+`CREATE INDEX` is correct there and `CONCURRENTLY` would in fact fail, because the Supabase migration
+runner wraps the file in a transaction. Rule 5 activates from migration 023 onward, which is where
+the schema starts changing rather than being created.
+
+### 15.2 Order
+
+Dependency-ordered, so each step is independently deployable. `S` marks a file that is **data only**
+and must not contain DDL.
 
 | # | Migration | Contents |
 |---|---|---|
-| 001 | `extensions` | `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, optional `postgis` |
+| 001 | `extensions` | `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. Optional `postgis`, unused |
 | 002 | `geo_and_config` | `cities`, `areas`, `delivery_zones`, `delivery_fee_tiers`, `settings` |
+| 002s | `seed_fee_tiers` **S** | The 1/2/3-vendor tiers. Separate from 002 per rule 1 |
 | 003 | `identity` | `users`, `user_roles`, `user_auth_providers`, `addresses`, `device_tokens`, `feature_flags` |
 | 004 | `vendors` | `brands`, `vendors`, `vendor_areas`, `vendor_schedules`, `vendor_holidays`, `cuisines`, `vendor_cuisines`, `vendor_staff` |
 | 005 | `catalog` | `menu_categories`, `menu_items`, `item_options`, `option_choices` + version triggers |
 | 006 | `cart` | `carts`, `cart_items` |
 | 007 | `orders` | `orders`, `sub_orders`, `order_items`, `order_status_history`, `order_modifications`, `order_eta_snapshots` |
-| 008 | `riders` | `riders`, `driver_shifts`, `delivery_assignments`, `rider_location_pings` |
+| 008 | `riders` | `riders` (`car`, `bicycle`, `motorcycle`, `scooter`), `driver_shifts`, `delivery_assignments`, `rider_location_pings` |
 | 009 | `money` | `commission_rules`, `wallets`, `ledger_entries`, `payouts`, `payout_lines`, `platform_float`, `rider_pay_rules` |
+| 009s | `seed_revenue_config` **S** | The active rider cut and the inactive vendor row. The revenue line is data, not schema |
+| 009t | `seed_settings` **S** | `platform_name` = Marketak, `platform_name_ar` = ماركتك, order prefix, limits |
 | 010 | `engagement` | `reviews`, `favorites`, `favorite_items`, `notifications`, `notification_templates` |
 | 011 | `growth` | `vouchers`, `voucher_redemptions`, `promo_slots` |
 | 012 | `aggregates` | `vendor_earnings_daily`, `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `audit_log` |
-| 013 | `platform` | `events` |
-| 014 | `rls` | All policies + `updated_at` triggers + ledger append-only rules + the profile-completion insert guard |
-| 015 | `search` | Normalised text columns, `normalize_text_v1`, trigram indexes, `search_catalog_v1` |
+| 013 | `platform` | `events`, partitioned by month per §14.1 |
+| 014 | `rls` | `private` schema, `revoke all on schema public from public`, all policies, `updated_at` triggers, ledger append-only rules, the profile-completion insert guard |
+| 015 | `search` | `normalize_text_v1`, normalised generated columns, trigram indexes, `search_catalog_v1` |
 | 016 | `rpc_profile` | `complete_profile_v1`, `get_profile_status_v1` |
 | 017 | `rpc_core` | `quote_order_v1` (fee tiers + rider pay), `place_order_v1`, `cancel_order_v1`, `transition_order_v1` |
 | 018 | `rpc_delivery` | `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`, `collect_wallet_v1`, `complete_delivery_v1` |
 | 019 | `rpc_money` | `adjust_wallet_v1`, `get_wallet_balance_v1`, `run_payout_v1`, `reconcile_day_v1`, `get_platform_float_v1` |
 | 020 | `rpc_read` | `get_vendor_feed_v1`, `get_vendor_dashboard_v1`, `get_earnings_v1`, `get_admin_metrics_v1`, `get_flags_v1` |
 | 021 | `cron` | All `pg_cron` jobs and pruning functions |
-| 022 | `rls_tests` | Policy assertions that fail the build if a tenant boundary is missing |
+| 022 | `rls_tests` | pgTAP. Fails the build if a tenant boundary is missing, if a policy uses a bare `auth.uid()`, or if a foreign key is unindexed |
 
 ---
 

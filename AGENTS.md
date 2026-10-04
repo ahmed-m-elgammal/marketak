@@ -179,12 +179,40 @@ Your source checklist named tools this project does not use. Mapped deliberately
 | `apps/vendor-web/` | Vendor dashboard, Cloudflare Pages, static |
 | `packages/shared/` | Shared types, error codes, money helpers. The only place a DTO is defined once |
 | `packages/ui/` | Design tokens and shared components |
-| `supabase/migrations/` | Numbered `.sql`, extracted from `data-model.md` §14 |
+| `supabase/migrations/` | Numbered `.sql`, ordered by `data-model.md` §15.2 |
 | `supabase/functions/` | Edge Functions. **Reserved for a future payment gateway** — not used in v1 |
 | `functions/` | Cloudflare Workers: outbox dispatcher, upload signer, snapshot builder, file access, export jobs |
-| `scripts/` | `check-test-integrity.mjs` and other CI guards |
+| `scripts/` | `check-test-integrity.mjs`, `check-policies.mjs`, other CI guards |
+| `.agents/skills/` | Project-local agent skills. **Loaded via `skills.paths` in `opencode.json`** — opencode does not auto-scan this directory |
 
-None of these exist yet. `tasks.md` T0.1 scaffolds them.
+None of these exist yet except `.agents/skills/` and `opencode.json`. `tasks.md` T0.1 scaffolds the rest.
+
+### Which skills to load, and when
+
+Loading a 20 KB skill costs context. Load only what the task touches — this is rule A1 applied to
+skills rather than to spec files.
+
+| Skill | Load when |
+|---|---|
+| `supabase-postgres-best-practices` | Writing any SQL, migration, RLS policy or index. **Read before T0.1a** |
+| `database-migrations` | T0.1a and every migration after. Its Prisma/Drizzle/Django/Go sections do not apply here |
+| `architecture-decision-records` | Before changing a dependency, state machine, storage model or ingress |
+| `backend-patterns` | Writing RPCs, transactions, idempotency |
+| `react-native-patterns` | Building the mobile app |
+| `react-testing` | Writing component tests |
+| `accessibility` | Any UI work. Checklist A4 requires it |
+| `design-system` | Token extraction and the 10-dimension visual audit. Its CSS/Tailwind sections do **not** apply to React Native |
+| `git-workflow`, `github-ops` | Committing, branching, opening PRs |
+| `benchmark` | Before claiming a latency target is met |
+| `dashboard-builder` | The admin console, later |
+
+**Do not load:** `firebase-auth-basics`, `firebase-firestore`, `firebase-data-connect`,
+`firestore-rules-creation`, `firebase-security-rules-auditor`, `firebase-hosting-basics`,
+`firebase-app-hosting-basics`, `firebase-remote-config-basics`, `firebase-ai-logic-basics`,
+`extension-to-functions-codebase`, `nextjs-on-cloudflare`, `sandbox-*`, `basin`, `k2`,
+`cloudflare-one*`, `turnstile-spin`, `cloudflare-email-service`. All are excluded by ADR and
+constitution. `firebase-auth-basics` in particular teaches the identity system the constitution
+forbids.
 
 ---
 
