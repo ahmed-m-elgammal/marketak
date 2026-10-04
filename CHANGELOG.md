@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–009t written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 44 tables,
-164 indexes, 0 unindexed foreign keys.
+Migrations 001–010 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 48 tables and
+partitions, 0 unindexed foreign keys.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -78,6 +78,31 @@ Migrations 001–009t written **and applied** to the live project `erxxsebcqqcpk
   `platform_float`, `rider_pay_rules`, plus the `sub_orders.payout_id` foreign key that `007` had to
   leave out because `payouts` did not exist yet
 - `009s_seed_revenue_config` **S** · `009t_seed_settings` **S** — data only, per §15.1 rule 1
+- `010_engagement` — `reviews`, `favorites`, `favorite_items`, `notifications` (**partitioned by
+  month**), `notification_templates`
+
+`notifications` is the first partitioned table in the schema, and the reason is the opposite of
+`rider_location_pings`: pings are empty until Phase 8 so its partitioning was deferred, whereas
+notifications are written from the first order. §14.1 already documents the constraint that forces
+the shape — on a partitioned table a `UNIQUE` constraint must include the partition key, so §10's
+`id bigserial primary key` is illegal. Applied §14.1's own form,
+`primary key (id, created_at)`. The cost is that `notifications.id` is unique only within a month,
+which is acceptable because nothing references it and both access paths are already time-scoped.
+
+Partition management uses §14.1's documented fallback rather than `pg_partman`:
+`private.ensure_month_partition(text, date)` creates the month if missing, is idempotent, and carries
+a **whitelist of the four prune targets** — the table name is interpolated into DDL, so without it the
+function would partition anything a caller named. Current and next month exist now, because a
+partitioned table with no matching partition rejects every insert.
+
+⚠️ **`013` will hit the same wall.** §11's `events` declares `id bigserial primary key` **and**
+`id_uuid uuid not null … unique`. Neither includes `created_at`, so both become illegal the moment
+`events` is partitioned. §14.1 shows the corrected form; `013` must use it.
+
+Recorded as open question 3.12: `contracts.md` §4 enumerates 19 notification keys and
+`notifications.type` constrains none of them, so a typo yields an inbox row matching no template.
+Deliberately unconstrained here — a hardcoded `CHECK` would be a second source of truth drifting from
+`contracts.md`, and an FK is impossible while templates are unique per `(key, channel, lang)`.
 
 `ledger_entries` is now append-only by two independent mechanisms, because constitution III.4 words
 it as Postgres **rules** — which hold against a privileged mistake, not only the client roles — and
