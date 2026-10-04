@@ -1827,10 +1827,11 @@ create table events (
   aggregate_type text,
   aggregate_id  uuid,
   payload       jsonb not null,
-  attempts      smallint not null default 0,
+  attempts      smallint not null default 0 check (attempts >= 0),
   last_error    text,
   created_at    timestamptz not null default now(),
-  delivered_at  timestamptz
+  delivered_at  timestamptz,
+  check (delivered_at is null or delivered_at >= created_at)
 );
 create index on events (created_at) where delivered_at is null;   -- the dispatcher's work queue
 create index on events (delivered_at, created_at);               -- the pruner
@@ -1840,6 +1841,25 @@ create index on events (aggregate_id, created_at);
 Pruned at 7 days after delivery. An un-pruned `events` table grows at roughly 7 rows per order and
 will consume the entire free-tier database within weeks. This is the single most common way this
 architecture fails.
+
+**`events` is NOT partitioned**, which amends §14.1 — see the note there. `id_uuid` stays genuinely
+unique, which is what `contracts.md` §6 means by "downstream idempotency key": `webhooks/events`
+keys on it, and clients ignore a repeat. Under partitioning the only legal form is
+`unique (id_uuid, created_at)`, and that does **not** make `id_uuid` unique — it makes the pair
+unique, so the same `id_uuid` could land in two different months without complaint.
+
+`attempts` has a floor but deliberately no ceiling. `smallint` tops out at 32,767, and a permanently
+failing event must be caught by T7.6's dead-letter alert long before that; a ceiling here would turn a
+visible failure into a silent one.
+
+`aggregate_id` is polymorphic and has **no foreign key**, for the same reason `audit_log.entity_id` has
+none: an outbox row must outlive the thing it describes. Archiving an order to R2 deletes its detail
+rows, and a cascade would take the record of what the customer was told along with them. Unlike
+`audit_log` there is no `before`/`after` snapshot here — `payload` *is* the record — which is a second
+reason the cascade must not happen.
+
+The pruner's index is what makes retention cheap without partitioning: `delivered_at < now() - 7 days`
+is a bitmap index scan, measured at 9 index buffer hits to locate 6,859 of 20,000 rows.
 
 ### Aggregates that replace raw event storage
 
@@ -2123,10 +2143,35 @@ job on a retention window. On a free tier with limited IOPS, `DELETE` of a large
 expensive operation: it bloats, it blocks, and autovacuum has to clean up afterwards. A monthly
 partition range turns retention into `DROP TABLE`, which is instant and leaves no dead tuples.
 
+**`events` is now excluded from this list**, because §14.1's own rationale does not hold for it.
+Its retention is **7 days**, not a month boundary: a September partition still holds deliverable rows
+on 1 October, so it cannot be dropped until roughly 7 October — 37 days of retention in practice.
+Both designs were built and benchmarked on the live database:
+
+| | Unpartitioned | Monthly-partitioned |
+|---|---|---|
+| Hot path, claim 50 rows × 200 | 6.3 ms | 6.6 ms |
+| Prune one day (~1,800 rows) | 3.52 ms | **1.77 ms** |
+| Total size incl. indexes | 7,552 kB | **7,080 kB** |
+| **Peak disk at 2,000 orders/day** | **45.2 MB (11%)** | **238.8 MB (60%)** |
+
+Partitioning wins every micro-benchmark and still loses, because the failure mode is cumulative disk
+rather than per-statement latency, and the percentages are of the 400 MB working ceiling that
+`free-tier-plan.md` calls "the wall". The `DELETE` costs single-digit milliseconds per day at this
+volume, and `events_delivered_at` makes it a bitmap index scan — 9 index buffer hits to locate 6,859
+of 20,000 rows — so autovacuum reuses the dead space and steady-state size does not creep.
+Keeping it plain also preserves §11's `id bigserial primary key` and `unique id_uuid`, which
+partitioning would have forced down to the weaker `(id_uuid, created_at)`.
+
+The snippet below is therefore illustrative only and **must not be applied as written**: it is the
+correct *shape* for any monthly-partitioned table, and it is what `audit_log` actually uses. Note that
+it still contains the half-applied fix — the partition key was added to the primary key while
+`unique id_uuid` was left in place, which is the second illegal constraint.
+
 ```sql
-create table events (
+create table events (                        -- illustrative shape only; events is NOT partitioned
   id            bigserial,
-  id_uuid       uuid not null default gen_random_uuid() unique,
+  id_uuid       uuid not null default gen_random_uuid() unique,   -- illegal when partitioned
   type          text not null,
   aggregate_type text,
   aggregate_id  uuid,
@@ -2142,9 +2187,10 @@ create table events (
 `pg_partman` 5.3.1 is available on this project and automates partition creation. If it is not
 used, a `pg_cron` job creates next month's partition three days ahead.
 
-Partitioning is **not** applied to `orders`, `order_items` or `ledger_entries`. They are not
-pruned, and `ledger_entries` must stay a single queryable relation forever. Partitioning them would
-break the balance computation for no gain.
+Partitioning is **not** applied to `orders`, `order_items`, `ledger_entries` or `events`. The first
+three are not pruned, and `ledger_entries` must stay a single queryable relation forever — partitioning
+would break the balance computation for no gain. `events` is pruned but on a 7-day window that monthly
+granularity cannot express, as measured above.
 
 ### 14.2 Index every foreign key
 

@@ -101,7 +101,10 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [x] **T0.2b** Migration 003 installs `on_auth_user_created` with `security definer` and
       `search_path = ''`, and revokes `EXECUTE` from `public, anon, authenticated`.
       **Verified on the live database**
-- [ ] **T0.2c** Partition `events`, `notifications`, `rider_location_pings` and `audit_log` by month
+- [ ] **T0.2c** Partition `notifications`, `rider_location_pings` and `audit_log` by month.
+      **`events` is deliberately EXCLUDED** — `013` shipped it unpartitioned. Monthly granularity
+      over-holds a 7-day retention window by up to 37 days, which measures at 239 MB against a 400 MB
+      ceiling versus 45 MB unpartitioned. See T3.3.
       (`data-model.md` §14.1). `pg_partman` 5.3.1 installed. Do **not** partition
       `ledger_entries`
 - [ ] **T0.2d** `scripts/check-policies.mjs` is now the mechanical gate. Run these three queries
@@ -198,7 +201,14 @@ produces a clear diff the customer must accept. **Gate: do not proceed until thi
       `scooter`), `driver_shifts`, `delivery_assignments`, `rider_location_pings`
 - [ ] **T3.2** Migration 010: `reviews`, `favorites`, `favorite_items`, `notifications`,
       `notification_templates`
-- [ ] **T3.3** Migration 013: `events`
+- [x] **T3.3** Migration 013: `events` — **done, and shipped UNPARTITIONED on measured evidence.**
+      §14.1 lists it as a monthly-partitioned prune target, but its own rationale cannot hold for a
+      7-day retention window. Both designs were benchmarked on the live database: partitioning was
+      faster per statement (prune 1.77 vs 3.52 ms) yet costs **239 MB vs 45 MB** at peak, because a
+      month-old partition cannot be dropped until ~7 days into the next month. Keeping it plain also
+      preserves §11's `id bigserial primary key` and `unique id_uuid` verbatim, which partitioning
+      would have forced down to the weaker `(id_uuid, created_at)` — a real weakening of the
+      "downstream idempotency key" that `contracts.md` §6 relies on in three places
 - [ ] **T3.4** `outbox-dispatcher` Worker, webhook path for `order.placed`,
       `vendor.rejected_sub_order`, `driver.assigned`
 - [ ] **T3.5** `pg_cron` batched event drain every 15 s, `claim_events_v1(50)`,

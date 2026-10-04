@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–012 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 61 tables and
-partitions, 224 indexes, 0 unindexed foreign keys, 0 client table grants.
+Migrations 001–013 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
+partitions, 229 indexes, 0 unindexed foreign keys, 0 client table grants.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -104,6 +104,7 @@ partitions, 224 indexes, 0 unindexed foreign keys, 0 client table grants.
   single row for `notifications.type` to reference.
 - `012_aggregates` — `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`,
   `auth_daily_stats`, `audit_log`
+- `013_events` — `events`, the outbox, **shipped unpartitioned on measured evidence**
 
 §15.2 assigns six tables to `012`; **five were created and one already existed.**
 `vendor_earnings_daily` was built by `004`, so the list overstated the work. Worse,
@@ -148,6 +149,54 @@ After `012`: **61 tables and partitions, 224 indexes, 0 unindexed foreign keys, 
 
 Open question **3.17** is new and unresolved: the md5 in `query_hash` is still brute-forceable by
 anyone who can read the table. `012`'s `CHECK` closes the storage path, not the read path.
+
+`013_events` ships `events` **unpartitioned**, amending §14.1, which lists it among the four
+monthly-partitioned prune targets.
+
+**The benchmark contradicted the recommendation.** Both designs were built on this database with
+16,000 rows of realistic payload:
+
+| | Unpartitioned | Partitioned monthly |
+|---|---|---|
+| Hot path — claim 50 × 200 | 6.3 ms | 6.6 ms |
+| Prune one day (~1,800 rows) | 3.52 ms | **1.77 ms** |
+| Reinsert 2,000 into pruned space | 32.4 ms | **22.7 ms** |
+| Size incl. indexes | 7,552 kB | **7,080 kB** |
+| **Peak disk at 2,000 orders/day** | **45.2 MB — 11%** | **238.8 MB — 60%** |
+
+Partitioning was faster on three of four measures, and the hot path was a tie (31 µs vs 33 µs per
+claim) — the earlier claim that unpartitioned would win the hot path was simply wrong. Partitioning
+still loses because **the failure mode is cumulative disk, not per-statement latency**, and the
+benchmark's 9 days of data fitted inside a single partition, hiding the thing that matters.
+
+§14.1's rationale — "a monthly partition range turns retention into `DROP TABLE`" — **cannot hold for a
+7-day retention window.** A September partition still holds deliverable rows on 1 October, so it
+survives until roughly 7 October: 37 days in practice, not 7. At 2,000 orders/day × 7 events ×
+483 bytes, that is 238.8 MB against a 400 MB working ceiling that `free-tier-plan.md` calls "the wall".
+The `DELETE` costs ~3.5 ms/day and `events_delivered_at` makes it a **bitmap index scan** —
+verified by `EXPLAIN ANALYZE` at 9 index buffer hits to locate 6,859 of 20,000 rows — so autovacuum
+reuses the dead space and steady state does not creep.
+
+**The uniqueness guarantee is the second reason.** §14.1 reprints the `events` DDL to add the
+partition key to the primary key — and then leaves `unique id_uuid` on the line above, a second
+instance of the same rule. Correcting it is not free: `unique (id_uuid, created_at)` satisfies
+Postgres while **not** making `id_uuid` unique, making only the *pair* unique, so the same key could
+land in two months unnoticed. `contracts.md` depends on the strong form in three places (§6 calls it
+the "downstream idempotency key", `webhooks/events` keys on it, clients ignore a repeat). Staying
+plain keeps §11 exactly as written. Verified: a duplicate `id_uuid` is rejected **even with a
+different `created_at`**, which is precisely the case partitioning would have allowed.
+
+Three checks added: `attempts >= 0`, and `delivered_at >= created_at` — the second catches a
+dispatcher bug that would otherwise make undelivered work look prunable and delete it. `attempts` has
+no ceiling on purpose; a permanently failing event must trip T7.6's dead-letter alert, not a
+constraint. `aggregate_id` gets no foreign key, for the same reason `audit_log.entity_id` gets none:
+an outbox row must outlive what it describes, and R2 archival of order detail would cascade.
+
+The measurement also corrected an error in the budget model: `events` is **483 bytes/row measured,
+not the 400 assumed**, so 7 rows/order is 3.4 KB rather than 2.8 KB. `free-tier-plan.md` §3.1 and
+§3.5 are corrected upward by ~20%, which makes the §5 pruning jobs load-bearing rather than merely
+worthwhile. A new §3.7 records the generalisation: **monthly is the right default for 30-day and
+longer windows and actively harmful below about 14 days.**
 
 `vouchers.discount_value` was `numeric(12,2)`, the **same constitution III.3 violation** `009`
 corrected in `commission_rules.value`: a float where none is allowed, and a percentage that is not

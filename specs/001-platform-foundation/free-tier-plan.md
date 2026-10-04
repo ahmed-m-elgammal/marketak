@@ -81,13 +81,19 @@ the counter-intuitive finding: **the audit trail costs more than the order.**
 | Also retained | Bytes/order |
 |---|---|
 | Retained total | 6.9 KB |
-| `events` (7/order, never pruned) | 2.8 KB |
+| `events` (7/order, never pruned) | 3.4 KB |
 | `notifications` (6/order, never pruned) | 2.4 KB |
 | `rider_location_pings` (20/order, 30-day window) | 4.0 KB |
 | `order_eta_snapshots` (3/order, never pruned) | 0.75 KB |
-| **Total** | **16.85 KB** |
+| **Total** | **17.4 KB** |
 
-**24,300 orders. 49 days at 500/day. 12 days at 2,000/day.**
+**`events` was re-measured at 483 bytes/row, not the 400 originally assumed** — a `events` table built
+on this project with 16,000 rows of realistic payload, measured with `pg_total_relation_size`
+including indexes, came to 7,552 kB. So 7 rows/order is 3.4 KB, not 2.8 KB, and the column below is
+corrected upward. Every scenario in this section is therefore ~20% more expensive than stated, which
+makes the pruning jobs in §5 load-bearing rather than merely worthwhile.
+
+**24,300 orders. 47 days at 500/day. 11 days at 2,000/day.**
 
 This is the scenario that kills a free-tier launch, and it is what you get by simply not writing
 the pruning jobs. Every one of those four tables is a firehose that nobody notices until the disk
@@ -118,10 +124,37 @@ Retained per order: 930 + 672 + 1,034 + 140 + 90 = **2,866 B ≈ 2.9 KB**
 
 | Scenario | KB/order | Cumulative orders | 500/day | 2,000/day |
 |---|---|---|---|---|
-| A — no pruning | 16.9 | 24,300 | 49 days | 12 days |
+| A — no pruning | 17.4 | 23,500 | 47 days | 11 days |
 | B — pruning only | 6.9 | 59,400 | 119 days | 30 days |
 | C — pruning + archive | **2.9** | **142,700** | **285 days** | **71 days** |
 | C + on-demand `order_items` only (history kept 90d) | 3.7 | 110,000 | 220 days | 55 days |
+
+### 3.7 Retention must fit the window, and `events` is the one that nearly does not
+
+A pruned table costs `retention × daily volume`, not `total volume` — which means the *granularity* of
+whatever prunes it has to match its window. This is where §14.1's "partition by month" instinct fails
+for exactly one of its four tables:
+
+| Table | Retention | Granularity that prunes it | Peak disk at 2,000 orders/day |
+|---|---|---|---|
+| `audit_log` | 365 d | month | months of data, by design |
+| `notifications` | 30 d | month | aligned |
+| `rider_location_pings` | 30 d | month | aligned |
+| **`events`** | **7 d** | **month** | **239 MB — 60% of the ceiling** |
+
+Monthly partitions cannot express a 7-day window: a September partition still holds deliverable rows
+on 1 October, so it survives until ~7 October. That is 37 days of retention in practice, and at
+483 bytes/row it is 239 MB — 60% of the 400 MB working ceiling for a queue whose rows live a week.
+Pruned as §14.1 originally specified it would have satisfied the letter of the retention rule while
+defeating its purpose.
+
+`013` therefore ships `events` **unpartitioned and pruned by `DELETE`**, which measures at 45 MB
+(11%). The `DELETE` is a bitmap index scan on `events_delivered_at`, not a sequential scan. See
+`data-model.md` §14.1 for the full benchmark.
+
+**Generalisation for §5:** check that each prune job's granularity matches its retention window before
+assuming partitioning helps. Monthly is the right default here for 30-day and longer windows and
+actively harmful for anything under about 14 days.
 
 ### 3.6 The honest conclusion
 
