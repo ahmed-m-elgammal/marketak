@@ -118,6 +118,36 @@ re-confirmation:
 }
 ```
 
+### 1.5.1 Checkout implementation notes (shipped in `017`)
+
+Four points where `017` had to decide something neither this file nor `data-model.md` covered. All
+four are open questions 3.23–3.26, not settled doctrine.
+
+- **`quote_id` is a row on `carts`** — not a stateless token, and not a new table. The quote needs
+  the inputs it was priced against *and* the old per-line prices, because `place_order_v1` must
+  re-price inside its own transaction and `PRICE_CHANGED` must carry an itemised diff. A
+  fingerprint alone says *that* something moved, not *what*, and a "prices changed" sheet with no
+  numbers in it is not consent. Cost is bounded by the number of active users, not by order volume,
+  which is why this beat a per-order quote table. Consequence accepted: one live quote per cart.
+- **`place_order_v1` takes a fourth argument `p_payment_channel`, defaulted to null.** The table
+  `CHECK` ties `payment_method` to `payment_channel`, and `wallet` means `vodafone_cash` or
+  `instapay` (spec 3.4) with no way to infer which. `cash` derives `cod`; `wallet` with a null
+  channel is **refused, not guessed**. Defaulted, so existing three-argument calls stay valid.
+- **The size is carried in three real columns**, not inside `selected_options`. Measured with
+  `pg_column_size` at one size plus two choices per item: 342 B in columns versus 498 B in JSONB —
+  468 B/order at 3.0 items/order, about 6% of Scenario B runway. A nested-object shape was rejected
+  outright because both tables `CHECK (jsonb_typeof(selected_options) = 'array')`. It also makes
+  `order_items` internally consistent: `item_name` and `unit_price` were already frozen as columns
+  for constitution II.14, and "Large at 15000" belongs to that same frozen identity.
+- **`rider_pay_total` and `platform_revenue` are 0 at placement.** No rider exists yet, so
+  `pct_of_delivery_fee_bps` cannot be resolved, and spec 3.3 freezes the resolved amounts onto
+  `delivery_assignments` at assignment instead. Zero means *not yet determined*, and is
+  distinguishable because no `delivery_assignments` row exists yet. `018` writes the authoritative
+  figures at claim.
+
+`transition_order_v1(p_order_id, p_sub_order_id, p_to_status, p_reason)` was **absent from this
+section** while `data-model.md` §15.2 assigned it to `017`. Its signature is derived from spec 5.
+
 ### 1.6 Vendor
 
 
@@ -364,6 +394,19 @@ edit** on a linked rider whose numbers have drifted.
 | `NO_PAY_RULE` | No active `rider_pay_rules` row for this rider or city | **Rider cannot claim.** An admin error, surfaced loudly, never a free delivery |
 | `CART_STALE` | Cart changed since quote | Re-quote and re-confirm |
 | `INVALID_TRANSITION` | Illegal state change | Refresh and retry |
+| `CART_NOT_PLACABLE` | Cart has lines that cannot be priced (retired, out of range, size required) | Return to the cart and drop the named vendor |
+| `QUOTE_NOT_FOUND` | `quote_id` unknown, or already spent by a completed order | Re-quote |
+| `QUOTE_EXPIRED` | Quote older than its 5-minute TTL | Re-quote |
+| `CANCEL_WINDOW_CLOSED` | Customer tried to cancel after preparation started | Offer support; only admin may cancel |
+| `ORDER_NOT_CANCELLABLE` | Order already delivered or cancelled | — |
+| `NOTHING_TO_CANCEL` | No cancellable parts remain | — |
+| `PAYMENT_METHOD_INVALID` / `PAYMENT_CHANNEL_REQUIRED` / `PAYMENT_CHANNEL_INVALID` | Method not `cash`/`wallet`, or `wallet` without a channel | See §1.5.1 |
+| `IDEMPOTENCY_KEY_REQUIRED` | Empty `p_idempotency_key` | Developer error |
+| `IDEMPOTENCY_KEY_TAKEN` | Key already used by another user's order | Developer error |
+| `CART_NOT_FOUND` / `ADDRESS_NOT_FOUND` / `CART_EMPTY` / `AUTH_REQUIRED` | Ownership or input precondition failed | — |
+| `NO_DELIVERY_ZONE` / `MISSING_FEE_TIER` | Zone or fee tier not configured for this address or vendor count | **Admin error** — refuse rather than guess a fee |
+| `TIP_INVALID` / `DELIVERY_TYPE_INVALID` / `GROUPING_INVALID` | Bad enum argument | — |
+| `PROFILE_INCOMPLETE` | `profile_completed_at` is null | Route to the completion screen (constitution 18) |
 | `ORDER_ALREADY_CLAIMED` | Another rider won | Refresh the list |
 | `COLLECTION_ALREADY_DONE` | Order already collected | Show the existing receipt |
 | `NOT_AUTHORIZED` | RLS or role check failed | Sign out and re-authenticate |

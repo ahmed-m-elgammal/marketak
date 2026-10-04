@@ -92,6 +92,76 @@ including no-op edits leaving `updated_at` alone.
   `users.email` not acquiring a use** that would make it sensitive — marketing consent or a breach list.
   The trigger to revisit is recorded, because that is the thing that would change the answer.
 
+### Added - checkout (017)
+
+`quote_order_v1`, `place_order_v1`, `cancel_order_v1`, `transition_order_v1`. Written by me, not
+delegated, because this is the money path and every one of its four functions had to agree with the
+other three on the same arithmetic.
+
+**The single most important structural decision in this file:** pricing lives in exactly one
+function, `private.compute_quote`, which both `quote_order_v1` and `place_order_v1` call. Had each
+carried its own arithmetic they would eventually disagree on a rounding boundary, `PRICE_CHANGED`
+would fire on an unchanged cart, and customers would be shown a "prices changed" sheet for nothing.
+There is now one implementation of the fee formula in this database.
+
+**Verified by direct SQL against the live database, in four batches:**
+
+| Batch | Assertions | Result |
+|---|---|---|
+| `quote_order_v1` pricing | 22 | pass |
+| `place_order_v1` placement | 35 | 34 pass, 1 bad assertion (below) |
+| cancel and transition, isolation | 17 | 14 pass, 3 bad assertions (below) |
+| state machine, full lifecycle | 10 | 9 pass, 1 bad assertion (below) |
+
+Confirmed by execution, not by inspection: the spec §2.5 formula produces `round(2500 × 1.00) = 2500`
+for one vendor and `round(2500 × 1.10) = 2750` for two, from configuration rows rather than
+literals; a 2-line cart of 3 dishes produces 2 `order_items` rows with `item_count = 3`, which is
+exactly what open question 3.11 defines; fee shares sum to the order delivery fee across sub-orders;
+an idempotent replay returns the original `order_id` and writes no second order and no second event;
+a spent quote cannot be reused; and a user without `profile_completed_at` is refused by the RPC.
+
+**Four real bugs found by testing, all fixed before commit.** None were visible by reading the code.
+
+- **`private.vendor_ids_for` and `private.rider_ids_for` return `SETOF uuid`, not an array.** My
+  authorization used `uuid = any(private.vendor_ids_for(v_user))`, which raises `op ANY/ALL (array)`
+  at runtime. The effect was that **no vendor and no rider could ever transition an order** — the
+  entire fulfilment flow was dead — while the code still read as correct. It surfaced only because a
+  test asserted a *specific error code* rather than "it failed". Rewritten as `EXISTS` over the set.
+- **`count(*) filter (where oc.id is null)` counted the empty array.** `LEFT JOIN LATERAL
+  jsonb_array_elements` emits one row with `oc.id` null for an item with **no** options, so every
+  item that legitimately had no options was rejected `OPTION_UNAVAILABLE` and its money zeroed. An
+  order of ordinary dishes quoted `subtotal: 0` while still charging a delivery fee. Now counts only
+  elements that actually failed to resolve.
+- **`::` binds tighter than `->>`**, so `l ->> 'vendor_id'::uuid` cast the *literal string*
+  `'vendor_id'`. The `uuid` form raised loudly; the `::text` form on `selected_options` would have
+  failed **silently as NULL**, feeding a wrong fingerprint. All such casts are now parenthesised, and
+  the grep for the pattern is now part of the review.
+- **`events` has no `actor_user_id` column.** The three inserts named one. Correct shape is
+  `(type, aggregate_type, aggregate_id, payload)`, with the actor inside the payload — which is what
+  `016` already did.
+
+**Two things I got wrong in the tests themselves, recorded because they are the more dangerous kind
+of failure.** I asserted 3 `order_items` for a 2-line cart (3 dishes, 2 lines — the code was right),
+and I asserted `orders.status = 'picked_up'` for an order with one picked-up and one still-pending leg,
+when `partially_confirmed` is the correct derivation. A test that fails for the wrong reason invites
+a "fix" to correct code, so both are written down rather than quietly corrected.
+
+- **Rejections are per vendor, not fatal.** One unavailable vendor does not lose the basket, per
+  spec 2.6: `quote_order_v1` returns the rejection list and the app offers to drop that vendor.
+  `place_order_v1` refuses with `CART_NOT_PLACABLE`.
+- **Unconfigured money is an error, never a guess.** No active zone for the address raises
+  `NO_DELIVERY_ZONE`; no fee tier for the vendor count raises `MISSING_FEE_TIER`. Neither falls back
+  to a default, because constitution 7 makes these configuration and a silent fallback is how a
+  platform ends up charging a fee nobody set.
+- **`rider_pay_total` and `platform_revenue` are 0 at placement** (open question 3.26). No rider
+  exists yet, so `pct_of_delivery_fee_bps` cannot be resolved; spec 3.3 freezes it at assignment.
+  `018` owns writing the authoritative figures at claim.
+- **Added `orders.order_number_key`.** `order_number` had no unique constraint at all, and it is the
+  identifier printed on a receipt and read over the phone.
+- **Database posture**: 62 tables, all RLS-enabled, 0 non-SELECT grants to `authenticated`, `anon`
+  holds no EXECUTE on any of the four, `private.*` unreachable by `authenticated`, all test rows
+  rolled back leaving `users`, `orders`, `carts`, `events`, `vendors` and `cities` at 0.
+
 ### Added - profile and read RPCs
 
 `016_rpc_profile` and `020_rpc_read` were authored by two delegated agents **in parallel**, then
