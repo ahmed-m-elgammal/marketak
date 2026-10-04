@@ -51,13 +51,13 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       `supabase/migrations/*.sql`, numbered per `data-model.md` §15.2.** Do not hand-write these.
       Doing this by hand is how the spec and the database drift apart.
       **Partially done:** 001–008 written **and applied** to `erxxsebcqqcpkipzcdhg`.
-      36 tables, 135 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
-      005a–005e, 007a and 007b are forward fixes written after auditing what actually ran, which is
-      the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
+      37 tables, 138 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
+      005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
+      is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
       **Remaining: 009–022.** `008` shipped `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
-      migration when the tracking API lands. `order_eta_snapshots` is specced in §6 and §15.2 but
-      **still not migrated**; it belongs with `007` and should be picked up next.
+      migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes
+      the orders domain of §6; `007` had declared it in §15.2 but never created it.
       Note `007_orders.sql` comments that `payouts` arrives in `010`; §15.2 puts it in `009`, so
       **`009` adds the `sub_orders.payout_id` foreign key**. `008` also had to add FK indexes for
       `riders.user_id` and `riders.home_area_id` that §8's index list omits.

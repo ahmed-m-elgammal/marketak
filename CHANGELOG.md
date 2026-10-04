@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–008 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 36 tables,
-135 indexes, 0 unindexed foreign keys.
+Migrations 001–008 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 37 tables,
+138 indexes, 0 unindexed foreign keys.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -70,8 +70,23 @@ Migrations 001–008 written **and applied** to the live project `erxxsebcqqcpki
   `order_modifications`
 - `007a` — `sync_order_status` joined the transition table on a column that does not exist
 - `007b` — `orders.item_count` could never become non-zero (see **Fixed**)
+- `007c` — `order_eta_snapshots`. Declared in `data-model.md` §6 and assigned to `007` by §15.2, but
+  **007 shipped without it.** Adds no constraints beyond the spec — see below
 - `008_riders` — `riders`, `driver_shifts`, `delivery_assignments`, `rider_location_pings`, plus
   `effective_cash_limit_v1`
+
+`order_eta_snapshots` exists so "were we late?" is a query rather than an argument: `promised_at` is
+what the customer was shown, `predicted_at` is what the system believed at `computed_at`, and the gap
+between them is the ETA error. `sub_order_id` is nullable — null is an order-level snapshot, set is a
+per-vendor one — which is how §6's three-rows-per-order budget resolves.
+
+`007c` is deliberately a plain DDL translation, unlike `006`, `007` and `008`: no money columns to
+guard, **no append-only revoke**, and no `computed_at`-not-in-the-future `CHECK` even though `008`
+added the equivalent guard on `rider_location_pings.recorded_at`. That constraint protects a
+trip-duration calculation; this table feeds a diagnostic query, where minutes of clock skew cost
+nothing and a constraint that blocks an analytics write costs debugging. A revoke would also collide
+with the policies migration `014` has yet to write. The omissions are recorded in the migration so
+they read as decisions rather than oversights.
 
 `rider_location_pings` is created **empty and stays empty until Phase 8**. ADR 9 defers live
 tracking, `contracts.md` defines no RPC that writes to it, and the writer is the Durable Object.
@@ -88,6 +103,11 @@ Verified against the live database rather than assumed: **0 unindexed foreign ke
 `security definer` function pinned to `search_path = ''`, and the profile gate proven across six
 cases — the trigger fires on sign-in, grants the base `customer` role, leaves the profile
 incomplete, rejects a completion with no phone, accepts a valid one, and rejects a duplicate phone.
+
+`order_eta_snapshots` was proven to answer its question rather than merely exist: a two-vendor order
+with one envelope snapshot predicted 4 minutes late and two vendor snapshots at −6 and +9 minutes
+returns a mean error of 2.3 minutes across 3 rows — 1 order-level, 2 vendor-level — which is exactly
+the arithmetic inserted.
 
 **Defect found by applying rather than reading:** `users.id uuid primary key default
 auth.users(id)` is illegal — Postgres rejects a column reference in a `DEFAULT` expression
@@ -169,8 +189,8 @@ spec and the database do not disagree.
 
 Recorded in `open-questions.md` §6. The significant ones:
 
-- Migrations 009–022 have **not** been written. `order_eta_snapshots` is specified but still absent,
-  and belongs with `007`.
+- Migrations 009–022 have **not** been written. `009` (`money`) is next, and is where `payouts`
+  lands — therefore where `sub_orders.payout_id` gets its foreign key.
 - No application code. No `apps/`. No `package.json`.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run verify` do not exist, so **no
   engineering checklist can currently be signed off.** See `AGENTS.md` §Verification commands.
