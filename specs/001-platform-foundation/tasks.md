@@ -54,9 +54,11 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       44 tables, 164 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
       005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
       is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
-      **Remaining: 019–022.** `013` shipped `events`, `014`/`014a` shipped RLS, `015` shipped search,
+      **Remaining: 021–022, plus eight unassigned money functions** from `contracts.md` §1.8
+      (open questions 3.30, 3.31). `013` shipped `events`, `014`/`014a` shipped RLS, `015` shipped search,
       `016`/`020` shipped the profile and read RPCs in parallel, `017` shipped checkout, `018` shipped rider
-      delivery and `018a` fixed its revenue calculation; `008` shipped
+      delivery, `018a` fixed its revenue calculation, and `019` shipped reconciliation and payouts with
+      `019a`/`019b` fixing two defects found by executing it; `008` shipped
       `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
       migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes

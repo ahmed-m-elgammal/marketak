@@ -458,3 +458,73 @@ accepted**, which rides on the order policies via `delivery_assignments` rather 
   rider already receives the delivery address and phone from the order itself; revisit if customer
   email is ever used for marketing consent, at which point it needs its own projection.
 - 014 asserts that no client grant on `riders` exists, so the view cannot be bypassed by accident.
+
+## 21. A payout line names the thing it pays: `sub_order_id` for a vendor, `assignment_id` for a trip
+
+**Status:** accepted — **Date:** 2026-10-05
+
+**Context.** `payout_lines` (§7) had one optional foreign key, `sub_order_id`, and a
+`UNIQUE (sub_order_id) WHERE NOT NULL` index. `019` had to pay both parties from it, and those are
+two different things:
+
+- a **vendor leg** — one merchant's portion of one order. `sub_order_id` names it exactly.
+- a **rider trip** — one journey, which may serve N vendor legs. `sub_order_id` does not name it. One
+  trip has N legs, so no single `sub_order_id` identifies it, and the global UNIQUE index is already
+  consumed by the vendor payout for that leg.
+
+So a rider payout line had to carry `sub_order_id = NULL`. Two consequences, both real:
+
+1. **It had no double-payment protection.** Its only guard was
+   `payouts.idempotency_key`, which is derived from (type, account, period). That stops a retried job
+   but not two *overlapping* periods paying the same trip — and nothing else stood in the way.
+2. **Cash in transit had to be re-derived rather than read.** The amount a rider is holding is
+   `delivery_assignments.collected_amount`; the amount a line carries is `net_amount`, which is what
+   the rider is **owed**. On the reference order those are 13,000 and 500. An earlier draft read one
+   where the other belonged and banked the wrong figure — a bug the `platform_float_variance_consistent`
+   CHECK could not catch, because the resulting row was arithmetically consistent. The only thing that
+   caught it was `reconcile_day_v1` refusing to return a non-zero variance without a written
+   explanation, which is worth knowing as a fact about this schema.
+
+**Decision.** `payout_lines` gains `assignment_id uuid REFERENCES delivery_assignments(id)`, nullable,
+plus `UNIQUE (assignment_id, payout_line_type) WHERE assignment_id IS NOT NULL`, plus a
+`payout_lines_shape` CHECK that makes a mis-paired line impossible:
+
+| line type | `sub_order_id` | `assignment_id` |
+|---|---|---|
+| `vendor_earning` | required | must be null |
+| `rider_trip` | must be null | required |
+| `tip`, `bonus` | must be null | required |
+| `adjustment` | must be null | must be null |
+
+Uniqueness is per `(assignment_id, payout_line_type)`, **not** on `assignment_id` alone. One trip
+legitimately earns two lines — a `rider_trip` line and a `tip` line — and single-column uniqueness
+aborted the first tipped payout. That is `019a`, and it exists because the original index was wrong in
+a way only execution revealed.
+
+**Alternatives rejected.**
+
+- *Read cash from `delivery_assignments` by (rider_id, status, delivered_at) window.* No schema change,
+  but it is the re-derivation that already produced a wrong-column bug, it leaves a payout line
+  untraceable to its trip, and it has a boundary case: a trip completing between `create` and `approve`
+  on the same day has its cash swept into the remittance with no line for it.
+- *`GRANT`-free uniqueness by convention.* `payout_lines_sub_order_unique` exists precisely because
+  plan.md §4 rule 2 says a manual mistake must not be able to pay a sub-order twice. Extending that
+  guarantee to trips is the same requirement, not a new one.
+- *Make `payout_line_type` carry the trip instead.* Constitution II.13: anything filtered, joined or
+  sorted on is a real column, not a value smuggled into another one.
+
+**Consequences.**
+
+- Cash in transit is now read from the rows the batch is actually paying, so the figure cannot drift
+  from what is being settled, and the date-window boundary case disappears.
+- A trip cannot be paid twice, and neither can its tip.
+- `payout_lines_shape` replaces `payout_lines_sub_order_type`, which only forbade `tip`/`bonus` from
+  carrying a `sub_order_id`. One rule to read instead of two overlapping ones.
+- The change is additive on an empty table: nullable, no default, no rewrite, no backfill, and no
+  application code exists yet to break.
+- `run_payout_v1` now writes `wallets.balance` for the party it pays. Constitution I.4 requires a
+  cached balance to move in the same transaction as the entries that change it, and `tasks.md` T4.15
+  asserts ledger sums equal cached balances — so leaving the wallet alone would satisfy every
+  individual line of the spec and break the invariant binding them. The wallet is **not** an accrual
+  ledger: a payout credits it, and `adjust_wallet_v1` remains the only way money enters a wallet
+  without one, which is what `spec.md` §3.4 means by funding being an admin adjustment.

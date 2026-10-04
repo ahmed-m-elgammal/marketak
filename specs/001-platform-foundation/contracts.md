@@ -262,6 +262,42 @@ Wallets exist for **vendors and riders only**. There is no customer wallet and n
 | `get_fee_rules_v1(p_zone_id uuid)` | base fee, free radius, per-km, `max_vendors`, all tiers | Read-only, for the admin console and for support |
 | `set_fee_tier_v1(p_zone_id, p_vendor_count, p_multiplier_bps)` | the tier | Admin. Basis points, so no float ever enters the fee |
 
+### 1.8.1 What `019` actually shipped, and what it did not
+
+`data-model.md` §15.2 row 019 names five functions and that row is the migration inventory. `019`
+implements those five. **Eight of the thirteen above are assigned to no migration** and remain
+unbuilt:
+
+| Not built | Consequence today |
+|---|---|
+| `freeze_wallet_v1`, `list_frozen_v1` | `wallets.status` accepts `'frozen'` and `'review'` and `wallets_status_reason_required` already demands a reason for either, but **no function can set one**. A wallet can only be frozen by editing the row directly |
+| `get_commission_v1`, `set_commission_rule_v1` | constitution I.9 requires vendor commission to be switchable by an `update`, never a migration. There is no RPC to do it, so it needs raw SQL |
+| `get_fee_rules_v1`, `set_fee_tier_v1` | same for constitution I.7's other configurable constants |
+| `get_wallet_v1` | implemented as `get_wallet_balance_v1`, per §15.2. The naming split is unresolved |
+
+Three decisions `019` had to make where this section and `data-model.md` were silent:
+
+- **The approval gate is `p_action` on `run_payout_v1`**, not a separate `approve_payout_v1`, because
+  §15.2 assigns no such function while `payouts_paid_is_approved` makes approval structurally
+  mandatory. Values are `create` \| `approve` \| `reject`, and create and approve stay in **separate
+  transactions** — `plan.md` §4 requires it, so a crash mid-payout leaves a visible recoverable batch.
+- **A bank reference is mandatory to approve.** `run_payout_v1` is the only function in the repository
+  that can write `platform_float.cash_remitted`, and constitution I.10 requires variance to be zero or
+  explained in writing. Without a required reference, variance could be closed by assertion.
+- **One rider payout batch mixes cash and earnings**, with cash flagged per `payout_lines.source`, so a
+  single approval covers a single net transfer.
+
+New error codes: `OWNER_TYPE_INVALID`, `OWNER_REQUIRED`, `WALLET_NOT_FOUND`, `WALLET_NOT_ACTIVE`,
+`WALLET_CONFLICT`, `LEDGER_CONFLICT`, `REASON_REQUIRED`, `REFERENCE_INVALID`, `PAYOUT_TYPE_INVALID`,
+`ACCOUNT_REQUIRED`, `ACTION_INVALID`, `PERIOD_REQUIRED`, `PERIOD_INVALID`, `PERIOD_TOO_LONG`,
+`PAYOUT_ID_REQUIRED`, `PAYOUT_NOT_FOUND`, `PAYOUT_NOT_DRAFT`, `METHOD_REQUIRED`, `REFERENCE_REQUIRED`,
+`NOTHING_DUE`, `DATE_REQUIRED`, `DATE_IN_FUTURE`, `RANGE_INVALID`, `VARIANCE_UNEXPLAINED`,
+`VENDOR_NOT_FOUND`, `RIDER_NOT_FOUND`.
+
+**`service_role` holds `EXECUTE` on the mutations and still cannot use them.** All three money
+mutations begin `if v_user is null then raise AUTH_REQUIRED`, and `private.is_admin()` is false with no
+JWT, so a service-role call writes nothing. Verified by execution, not by inspection.
+
 ### 1.9 Platform
 
 | Function | Returns | Notes |

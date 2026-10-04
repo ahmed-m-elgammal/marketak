@@ -138,6 +138,88 @@ the correct way to test that branch is to deactivate the seeded row inside the t
 assertion tried to print what the old code "would have" returned by recomputing the arithmetic, which
 produced the fixed value instead; the old value had already been proven directly.
 
+### Added - reconciliation and payouts (019)
+
+`adjust_wallet_v1`, `get_wallet_balance_v1`, `run_payout_v1`, `reconcile_day_v1`,
+`get_platform_float_v1` — the five functions `data-model.md` §15.2 row 019 assigns. Plus
+`payout_lines.assignment_id`, the `payout_lines_shape` CHECK, and four indexes.
+
+**This closes the cash-in-transit loop.** Constitution I.10 requires `platform_float.variance` to be
+zero or explained in writing before the next settlement, and `018` left it permanently non-zero: it
+raised `cash_expected` on every cash collection and nothing could ever lower it, because no function
+existed that banked cash. `run_payout_v1` approving a rider payout is now the only writer of
+`cash_remitted` in the repository, and **variance reaching zero is verified end to end**.
+
+**The number that mattered most, and the one an earlier draft got wrong.** A rider payout's `net` is
+what the rider is **owed** — `rider_pay_total + tip`, 500 on the reference order. The cash in transit
+is what the rider is **holding** on the platform's behalf — `delivery_assignments.collected_amount`,
+13,000 on the same order. They differ by more than an order of magnitude, and reading one where the
+other belongs banks a fraction of the real exposure while looking plausible. `cash_amount` is read from
+the payout's own `payout_lines` joined to their assignments, so it cannot drift from what is being
+paid. The test asserts the two figures are **distinct**, not merely that one equals the other.
+
+**A rider payout line could not identify its trip, and that was a schema hole rather than a code
+mistake.** `payout_lines` had only `sub_order_id`, which identifies a vendor's *leg*, not a rider's
+*trip* — and `payout_lines_sub_order_unique` is global on it, so the vendor payout for a leg already
+consumes the value a rider line would need. So a rider line had to carry `NULL`, which meant it was
+untraceable and its only double-payment guard was `payouts.idempotency_key` covering (type, account,
+period) — insufficient against two *overlapping* periods. `019` adds a nullable
+`assignment_id uuid REFERENCES delivery_assignments(id)` with a UNIQUE index, additive on an empty
+table: no rewrite, no `NOT NULL` without default, no backfill, and no application code to break.
+
+`payout_lines_shape` then makes a mis-paired line impossible rather than merely unusual:
+`vendor_earning` carries `sub_order_id` and no `assignment_id`; `rider_trip` and `tip`/`bonus` carry
+`assignment_id` and no `sub_order_id`; `adjustment` carries neither.
+
+**Two bugs found by executing, not reading, both now forward migrations.**
+
+- `019a` — `payout_lines_assignment_unique` was UNIQUE on `assignment_id` **alone**. One trip
+  legitimately earns two lines, a `rider_trip` line and a `tip` line, so the first rider payout with a
+  non-zero tip aborted the whole transaction on a duplicate key. The index is now
+  `(assignment_id, payout_line_type)`: one trip, one line of each type. That is the rider-side
+  equivalent of `payout_lines_sub_order_unique`, which is single-column precisely because one vendor
+  leg earns exactly one line type. Caught by the schema change I had just made myself.
+- `019b` — `payout.paid` was the only 019 event whose payload lacked `actor`, using `approved_by`
+  instead, so a consumer could not attribute the approval without special-casing that one event type.
+  Both keys are now present and carry the same value.
+
+**Seven of the nine test failures were mine, recorded rather than quietly corrected.** The one worth
+repeating: I asserted a replayed `create` would raise `NOTHING_DUE`, and it instead returned the
+existing batch with `already_applied = true` — because the idempotency-key lookup runs before the
+payable scan. That is **better** than an error, and my expectation had been written against the
+previous draft's behaviour. Two more were string truncations (`PAYOUT_NOT_DRAFT` is 16 characters,
+`DATE_IN_FUTURE` is 14), one assumed a fixture would go negative when it did not, and one dropped the
+vendor-staff actor so the leg never reached `ready`.
+
+| Suite | Assertions | Result |
+|---|---|---|
+| vendor payout, approval gate, balance invariant | 30 | 28 pass, 2 bad expectations |
+| rider payout, float, reconcile, isolation, idempotency | 40 | 38 pass, 2 bad expectations |
+| `service_role` cannot bypass the admin gate | 7 | pass |
+| structure, events, ledger immutability | 12 | pass |
+
+Confirmed by execution: vendor net equals `Σ vendor_net_payout`; `payable → in_payout → settled` with
+`payout_id` stamped; **no `commission` ledger row while commission is 0**, because
+`CHECK (signed_amount <> 0)`; approval refused without a method, without a bank reference, without a
+`payout_id`, and on a second attempt; `approved_by` and both timestamps recorded. Rider payout emits
+both line types against one trip, net = `rider_pay + tip`, `cash_held` reaches 0, `cash_remitted`
+equals what was collected and **`variance` reaches zero**. `wallets.balance` equals the ledger sum after
+a payout, after a **negative** adjustment (`-89,999`, accepted, because `009` deliberately gave balance
+no non-negativity CHECK) and after a replayed adjustment, with `version` at 2 rather than 3.
+`service_role` holds `EXECUTE` on the mutations and still writes nothing, since all three require a
+user JWT. Ledger `UPDATE` and `DELETE` are silent no-ops.
+
+**Two things this deliberately did not fix.** `contracts.md` §1.8 names 13 money functions and 8 are
+assigned to no migration — including `freeze_wallet_v1`, where the `frozen` status and its mandatory
+reason already exist with no writer (open question 3.31). And `private.visible_order_ids(p_user)` and
+friends are `SECURITY DEFINER`, executable by `authenticated`, and **trust their argument**, so a
+client can enumerate a named user's order ids. Contents stay protected by RLS, so it is disclosure and
+not a breach, but it belongs to `014` rather than `019` (open question 3.30).
+
+**Money constants: none.** No fee, multiplier, limit or rate appears as a literal in any function body.
+The only numeric literal is the 366-day bound on a payout period, which is a safety bound rather than a
+money constant and is called out as such in the source.
+
 ### Added - rider delivery (018)
 
 `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`,

@@ -1354,7 +1354,10 @@ create table ledger_entries (
   id              uuid primary key default gen_random_uuid(),
   account_type    text not null check (account_type in
                     ('vendor','rider','platform','platform_earnings')),
-  account_id      uuid not null,               -- vendor_id, rider_id, or NULL for platform accounts
+  -- NULL for platform and platform_earnings, NOT NULL for vendor and rider. This line previously
+  -- said `not null` while its own comment said "or NULL for platform accounts"; the column is
+  -- nullable and ledger_entries_account_required carries the real rule. Corrected in 019.
+  account_id      uuid,
   entry_type      text not null check (entry_type in (
                     'rider_cut','cash_collected','cash_remitted','delivery_fee',
                     'service_fee','commission','refund','reversal',
@@ -1423,6 +1426,7 @@ create table payout_lines (
   id            uuid primary key default gen_random_uuid(),
   payout_id     uuid not null references payouts(id) on delete cascade,
   sub_order_id  uuid references sub_orders(id),
+  assignment_id uuid references delivery_assignments(id),   -- 019; see below
   payout_line_type text not null check (payout_line_type in ('vendor_earning','rider_trip','tip','bonus','adjustment')),
   source        text not null check (source in ('cash_collected','wallet_payment','adjustment')),
   gross_amount  integer not null,
@@ -1433,7 +1437,28 @@ create table payout_lines (
 create index on payout_lines (payout_id);
 create unique index payout_lines_sub_order_unique on payout_lines (sub_order_id)
   where sub_order_id is not null;             -- a sub-order can be paid exactly once
+create unique index payout_lines_assignment_unique on payout_lines (assignment_id, payout_line_type)
+  where assignment_id is not null;             -- a trip earns each line type at most once
 ```
+
+**A vendor leg and a rider trip are different things, and the table has to say which is which.**
+`sub_order_id` identifies a vendor's leg; `assignment_id` identifies the rider's trip. `019` added
+`assignment_id` because a rider payout line could not otherwise be traced to its trip, and because
+`payout_lines_sub_order_unique` is global on `sub_order_id` — the vendor payout for a leg already
+consumes the value, so a rider line claiming the same one would collide.
+
+`payout_lines_shape` then makes a mis-paired line impossible rather than merely unusual:
+`vendor_earning` must carry `sub_order_id` and no `assignment_id`; `rider_trip` and `tip`/`bonus` must
+carry `assignment_id` and no `sub_order_id`; `adjustment` carries neither. It replaces the weaker
+`payout_lines_sub_order_type`, which only forbade `tip`/`bonus` from carrying a `sub_order_id`.
+
+Uniqueness is per `(assignment_id, payout_line_type)` rather than on `assignment_id` alone, because one
+trip legitimately earns two lines — a `rider_trip` line and a `tip` line. See `019a`, which exists
+because single-column uniqueness aborted the first tipped payout.
+
+`assignment_id` is also what lets `run_payout_v1` read cash in transit from the rows it is actually
+paying. Reading it from a date window instead is how an earlier draft banked what the rider was *owed*
+rather than the cash they were *holding*.
 
 ### Platform float
 
@@ -2411,7 +2436,9 @@ and must not contain DDL.
 | 017 | `rpc_core` | `quote_order_v1`, `place_order_v1`, `cancel_order_v1`, `transition_order_v1` — **shipped**. Also adds 8 quote columns to `carts`, `orders.idempotency_key`, a UNIQUE index on `orders.order_number` (which had none), 3 size-snapshot columns on `cart_items`/`order_items`, and 6 helper indexes. See open questions 3.23–3.26 |
 | 018 | `rpc_delivery` | `get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`, `collect_wallet_v1`, `complete_delivery_v1` — **shipped**. Also adds `private.pay_rule_for`, `private.resolve_pay`, `private.trip_distance_km`, plus indexes on `delivery_assignments` (unclaimed offers), `ledger_entries(order_id)` and `platform_float(business_date)`. See open questions 3.27–3.29 |
 | 018a | `fix_pay_revenue` | Corrects `private.resolve_pay`, whose no-rule branch returned `commission_rules.value` unscaled and so booked basis points as an amount. **shipped**. Forward migration, not an edit to `018` |
-| 019 | `rpc_money` | `adjust_wallet_v1`, `get_wallet_balance_v1`, `run_payout_v1`, `reconcile_day_v1`, `get_platform_float_v1` |
+| 019 | `rpc_money` | `adjust_wallet_v1`, `get_wallet_balance_v1`, `run_payout_v1`, `reconcile_day_v1`, `get_platform_float_v1` - **shipped**. Also adds `payout_lines.assignment_id`, the `payout_lines_shape` CHECK, and four indexes for the two payout scans. `contracts.md` 1.8 names 13 money functions; 8 remain unassigned. See `019-rpc-money-notes.md` |
+| 019a | `fix_payout_line_uniqueness` | `payout_lines_assignment_unique` was UNIQUE on `assignment_id` alone, which forbade a trip from having both a `rider_trip` and a `tip` line. **shipped** |
+| 019b | `fix_paid_event_actor` | `payout.paid` was the only 019 event whose payload lacked `actor`. **shipped** |
 | 020 | `rpc_read` | `get_vendor_feed_v1`, `get_vendor_dashboard_v1`, `get_vendor_earnings_v1`, `get_rider_earnings_v1`, `get_admin_metrics_v1`, `get_flags_v1` — **shipped**. This row said one `get_earnings_v1`; `contracts.md` §1.6 and §1.7 name two separate functions, and **`contracts.md` wins** — same precedence rule applied at `012`, where this table also disagreed with the applied schema |
 | 021 | `cron` | All `pg_cron` jobs and pruning functions |
 | 022 | `rls_tests` | pgTAP. Fails the build if a tenant boundary is missing, if a policy uses a bare `auth.uid()`, or if a foreign key is unindexed |

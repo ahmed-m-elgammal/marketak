@@ -1,6 +1,9 @@
 # Features
 
-Every feature the platform is specified to have, and its real state. **Nothing is implemented.**
+Every feature the platform is specified to have, and its real state. **No application code exists**; what
+is shipped below is database behaviour, verified by direct SQL. See `CHANGELOG.md` for the per-migration
+record. This table was last swept at `019`, so rows for earlier migrations may still read as not
+started where the RPC in fact exists.
 This file exists so Checklist A step 6 has somewhere to add a line, and so nobody has to guess what
 exists.
 
@@ -65,14 +68,14 @@ All vendor surfaces are **web dashboard** (Cloudflare Pages). There is no native
 |---|---|---|---|
 | A-01 | Approve vendors; configure areas, zones, **fee tiers** and **rider pay rules** live | ⬜ | FR-A-01 |
 | A-02 | Verify riders and vendors, documents via signed URLs | ⬜ | FR-A-02 |
-| A-03 | Daily cash reconciliation, with a written explanation for any variance | ⬜ | FR-A-03 |
+| A-03 | Daily cash reconciliation, with a written explanation for any variance | ✅ | FR-A-03 |
 | A-04 | Create vouchers with scoping, caps and usage limits | ⬜ | FR-A-04 |
 | A-05 | Set, target and toggle feature flags without a release | ⬜ | FR-A-05 |
-| A-06 | Run and approve settlement and payout batches | ⬜ | FR-A-06 |
+| A-06 | Run and approve settlement and payout batches | ✅ | FR-A-06 |
 | A-07 | Live order monitor with intervention | ⬜ | FR-A-07 |
 | A-08 | Analytics: funnel, area performance, delivery-time percentiles | ⬜ | FR-A-08 |
 | A-09 | **Turn vendor commission on** when supply can absorb it | ⬜ | FR-A-09, ADR 3 |
-| A-10 | Adjust a vendor or rider wallet, mandatory reason, signed ledger entry | ⬜ | FR-A-10 |
+| A-10 | Adjust a vendor or rider wallet, mandatory reason, signed ledger entry | ✅ | FR-A-10 |
 
 ## Money
 
@@ -87,9 +90,9 @@ All vendor surfaces are **web dashboard** (Cloudflare Pages). There is no native
 | M-07 | Vendor commission on items — **inactive until month 3–4** | ⬜ | ADR 3 |
 | M-08 | Customer service fee — inactive | ⬜ | §3.1 |
 | M-09 | Per-rider configurable cash limit with a `cash_held` running total | ⬜ | constitution I |
-| M-10 | Vendor and rider payout runs with `payable → in_payout → settled` | ⬜ | §3.2 |
-| M-11 | `platform_float` with a daily variance that must reach zero | ⬜ | §3.4 |
-| M-12 | Wallet adjustment by admin, append-only, mandatory reason | ⬜ | FR-A-10 |
+| M-10 | Vendor and rider payout runs with `payable → in_payout → settled` | ✅ | §3.2 |
+| M-11 | `platform_float` with a daily variance that must reach zero | ✅ | §3.4 |
+| M-12 | Wallet adjustment by admin, append-only, mandatory reason | ✅ | FR-A-10 |
 | M-13 | Payment gateway | ❌ | §6.4 — extension point only, not built |
 
 ## Platform
