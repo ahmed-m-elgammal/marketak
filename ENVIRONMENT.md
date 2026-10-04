@@ -9,9 +9,33 @@ cost time if you hit them cold.
 
 | Service | Account | Identifier |
 |---|---|---|
-| Supabase | `ahmedmelgammal6@gmail.com` | project `Marketak` — **not yet created** |
+| Supabase | `ahmedmelgammal6@gmail.com` | project **`marketak`** · ref `erxxsebcqqcpkipzcdhg` |
 | Cloudflare | `ahmedmelgammal6@gmail.com` | `8ae79d52c8b84a170bcb5c4c0485f34c` |
-| Firebase | `ahmedmelgammal6@gmail.com` | project — **not yet created** |
+| Firebase | `ahmedmelgammal6@gmail.com` | project **`marketak-eg`** · number `283007295790` |
+
+### Live connection details
+
+| Thing | Value |
+|---|---|
+| Supabase URL | `https://erxxsebcqqcpkipzcdhg.supabase.co` |
+| Supabase publishable key | `sb_publishable_RHsYSwhbXBo1vzy4NHQdZA_RG8kzY8j` |
+| Legacy anon key | present in the dashboard; prefer the `sb_publishable_` key |
+| DB host | `db.erxxsebcqqcpkipzcdhg.supabase.co` |
+| Postgres | 17.11.0.002 (engine 17, GA channel) |
+| Supabase org | `irlojawfmoffhueecvsa` |
+
+The publishable key is public by design and safe to commit. The **service-role key is not** and
+must only ever live in Worker secrets.
+
+---
+
+## 1a. Blockers requiring dashboard access
+
+| # | Blocker | Why it matters | Who |
+|---|---|---|---|
+| 1a.1 | **Enable R2** in the Cloudflare dashboard | R2 returns `403 Please enable R2 through the Cloudflare Dashboard`. Images, menu snapshots, archives and backups all depend on it. This is the single most important free-tier decision — serving images from Supabase instead is a 5–30× egress overrun | Manual |
+| 1a.2 | R2 may require a payment method at signup | If so, it is still ~$0/month at our volume, but it must be added | Manual |
+| 1a.3 | **Apple Developer account** | iOS push via FCM needs an APNs key uploaded to the Firebase console. Until then iOS receives **no push notifications at all** | Manual |
 
 ---
 
@@ -19,10 +43,12 @@ cost time if you hit them cold.
 
 | Thing | Value | Why |
 |---|---|---|
-| Supabase project name | `Marketak` | Display name **Marketak / ماركتك** |
+| Supabase project name | `marketak` | Display name **Marketak / ماركتك** |
 | Supabase region | `eu-central-1` (Frankfurt) | ADR 10. ~100–130 ms from Egypt; accepted against a 900 ms p95 target |
-| R2 buckets | `Marketak-public`, `Marketak-private` | Prefixed to avoid collisions across projects |
-| Firebase products used | FCM, Crashlytics, Analytics | Auth, Firestore, Storage, Functions, Hosting, Remote Config are all **excluded by design** |
+| Supabase extensions available | `pg_trgm` 1.6, `btree_gist` 1.7, `unaccent` 1.1, `pg_cron` 1.6.4, `pg_net` 0.20.4, `pgtap` 1.3.3, `pg_partman` 5.3.1, `earthdistance` 1.2, `citext`, `pgcrypto` 1.3 *(installed)* | Verified on the live project. `pg_tap` matters: it means the RLS policy tests in migration 022 actually run |
+| PostGIS | **available**, 3.3.7 | Not needed — the design uses geohash prefixes. Recorded because it resolves open question 4.4 |
+| R2 buckets | `marketak-public`, `marketak-private` | Prefixed to avoid collisions. **Cannot create until R2 is enabled in the dashboard** |
+| Firebase project | `marketak-eg` | `marketak` was already taken globally. FCM + Crashlytics + Analytics only; Auth, Firestore, Storage, Functions, Hosting and Remote Config are all **excluded by design** |
 | SQLCipher keys | Android Keystore, non-exportable | No backup key — a recoverable key defeats the purpose |
 
 ---
@@ -81,12 +107,36 @@ change, run this once by hand to re-warm the cache:
 npx -y firebase-tools@latest mcp --help
 ```
 
-### 4.3 Gotcha: `wrangler login` is not Cloudflare MCP auth
+### 4.3 Scope the Supabase MCP to one project
+
+Unscoped, the Supabase MCP has access to **every** project in the account. Once real orders exist,
+scope it and add a separate read-only entry for read work:
+
+```jsonc
+"supabase": {
+  "type": "remote",
+  "url": "https://mcp.supabase.com/mcp?project_ref=erxxsebcqqcpkipzcdhg",
+  "enabled": true,
+  "oauth": {}
+},
+"supabase-readonly": {
+  "type": "remote",
+  "url": "https://mcp.supabase.com/mcp?project_ref=erxxsebcqqcpkipzcdhg&read_only=true",
+  "enabled": true,
+  "oauth": {}
+}
+```
+
+Restricting feature groups with `?features=database,docs` cuts the tool surface further. The
+`&read_only=true` variant executes SQL as a read-only Postgres role and is the right default for
+diagnostics and unattended checks.
+
+### 4.4 Gotcha: `wrangler login` is not Cloudflare MCP auth
 
 They are separate OAuth clients. `wrangler whoami` succeeding does **not** mean the MCP servers are
 authenticated. Each needs `opencode mcp auth <name>`.
 
-### 4.4 Re-authenticating
+### 4.5 Re-authenticating
 
 ```
 opencode mcp auth cloudflare

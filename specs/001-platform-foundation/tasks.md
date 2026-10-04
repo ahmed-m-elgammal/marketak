@@ -24,6 +24,18 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [x] **T-1.7** Git initialised on `main`, `.gitignore` written, spec committed as `d033c7d`
 - [x] **T-1.8** `AGENTS.md`, `ENVIRONMENT.md`, `decisions.md`, `open-questions.md` written
 - [x] **T-1.9** Stale `architecture-spec-…md` marked SUPERSEDED with a contradiction table
+- [x] **T-1.12** Supabase project `marketak` created — ref `erxxsebcqqcpkipzcdhg`, `eu-central-1`,
+      Postgres 17.11, ACTIVE_HEALTHY. Extensions verified available: `pg_trgm`, `btree_gist`,
+      `unaccent`, `pg_cron`, `pg_net`, **`pgtap`**, `pg_partman`, `earthdistance`, PostGIS
+- [x] **T-1.13** Firebase project `marketak-eg` created (number `283007295790`) and set active
+- [ ] **T-1.14** Enable R2 in the Cloudflare dashboard, then create `marketak-public` and
+      `marketak-private`. **BLOCKED on dashboard access.** Highest-priority manual step — see
+      `open-questions.md` §1.4
+- [ ] **T-1.15** Scope the Supabase MCP to `?project_ref=erxxsebcqqcpkipzcdhg` and add a read-only
+      variant. Recipe in `ENVIRONMENT.md` §4.3. **Requires editing the global config, so a restart**
+- [ ] **T-1.16** Buy a domain and point it at Cloudflare, then `cdn.`, `track.`, `admin.`,
+      `merchant.` hosts. **BLOCKED on purchase** — see `open-questions.md` §3.1
+- [ ] **T-1.17** Register Android and iOS apps with Firebase. **BLOCKED on package-name decision**
 - [ ] **T-1.10** Install Docker Desktop — unblocks `supabase start` for local dev. Optional
 - [ ] **T-1.11** Prune the 22 irrelevant agent skills. Optional but recommended
 

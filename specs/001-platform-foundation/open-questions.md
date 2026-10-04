@@ -8,16 +8,19 @@ Status: ⬜ open · 🟡 in progress · ✅ resolved (move to `decisions.md`)
 
 ---
 
-## 1. Infrastructure not yet created
+## 1. Infrastructure
 
 | # | Item | Status | Note |
 |---|---|---|---|
-| 1.1 | Supabase project `Marketak` | ⬜ | Not created. Region decided: `eu-central-1`. Needs `create_project` via MCP |
-| 1.2 | Supabase project_ref | ⬜ | Blocks scoping the MCP to one project (`?project_ref=`) |
-| 1.3 | Firebase project | ⬜ | Needed before the Android and iOS apps can register |
-| 1.4 | R2 buckets | ⬜ | `Marketak-public` (CDN-fronted), `Marketak-private` (signed URLs only) |
-| 1.5 | Cloudflare custom domain | ⬜ | Required for `cdn.` and `track.` hosts. **Blocked on a domain purchase** |
-| 1.6 | Does R2 require a payment method at signup? | ⬜ | If yes, the image decision needs a different home. Check at signup |
+| 1.1 | Supabase project `marketak` | ✅ | ref `erxxsebcqqcpkipzcdhg`, region `eu-central-1`, ACTIVE_HEALTHY, Postgres 17.11 |
+| 1.2 | Supabase project_ref | ✅ | `erxxsebcqqcpkipzcdhg`. **Not yet written into the MCP URL** — see §1.7 |
+| 1.3 | Firebase project | ✅ | `marketak-eg` (`marketak` was taken globally), number `283007295790` |
+| 1.4 | R2 buckets | ⬜ | **BLOCKED.** `403 Please enable R2 through the Cloudflare Dashboard`. Needs manual dashboard access |
+| 1.5 | Cloudflare custom domain | ⬜ | Required for `cdn.` and `track.` hosts. **Blocked on a domain purchase** — see §2.1 |
+| 1.6 | Does R2 require a payment method? | ⬜ | Check at signup. If yes, still ~$0/month at our volume |
+| 1.7 | Scope the Supabase MCP | ⬜ | Unscoped it can touch every project in the account. Add `?project_ref=erxxsebcqqcpkipzcdhg` plus a read-only variant — recipe in `ENVIRONMENT.md` §4.3 |
+| 1.8 | Android app package names | ⬜ | **Blocked on 3.1.** Bundle IDs are effectively permanent once shipped, so guessing is expensive |
+| 1.9 | Register Android + iOS apps | ⬜ | Blocked on 1.8 |
 
 ---
 
@@ -56,7 +59,7 @@ Each of these is modelled, not measured. Re-check before trusting any of them fo
 | 4.1 | Row and index sizes within 2× of the model | `pg_total_relation_size` after 1,000 real orders |
 | 4.2 | Free-plan CPU survives a lunch peak | Load test 100 concurrent `place_order_v1` through the peak window |
 | 4.3 | 2.9 KB/order after archiving holds | Same as 4.1 |
-| 4.4 | PostGIS availability on `eu-central-1` | Dashboard. The design assumes geohash and does not need it |
+| 4.4 | PostGIS availability on `eu-central-1` | ✅ **Resolved.** Available, 3.3.7. The design still uses geohash and does not need it |
 | 4.5 | DO memory bills at 128 MB for SQLite-backed objects | Dashboard, before enabling tracking |
 | 4.6 | Frankfurt latency acceptable against a 900 ms p95 | Measure. **If it fails, migrate regions early — it is not a toggle** |
 
