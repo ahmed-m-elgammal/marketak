@@ -50,17 +50,21 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [x] **T0.1a** **Extract every fenced SQL block out of `data-model.md` into
       `supabase/migrations/*.sql`, numbered per `data-model.md` §15.2.** Do not hand-write these.
       Doing this by hand is how the spec and the database drift apart.
-      **Partially done:** 001–008 written **and applied** to `erxxsebcqqcpkipzcdhg`.
-      37 tables, 138 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
+      **Partially done:** 001–009t written **and applied** to `erxxsebcqqcpkipzcdhg`.
+      44 tables, 164 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
       005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
       is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
-      **Remaining: 009–022.** `008` shipped `rider_location_pings` **plain and unpartitioned** per
+      **Remaining: 010–022.** `008` shipped `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
       migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes
-      the orders domain of §6; `007` had declared it in §15.2 but never created it.
-      Note `007_orders.sql` comments that `payouts` arrives in `010`; §15.2 puts it in `009`, so
-      **`009` adds the `sub_orders.payout_id` foreign key**. `008` also had to add FK indexes for
-      `riders.user_id` and `riders.home_area_id` that §8's index list omits.
+      the orders domain of §6. `009` shipped the money domain and **added the `sub_orders.payout_id`
+      foreign key** that `007` had left out because `payouts` did not exist yet.
+      Three conflicts between `data-model.md` §7 and the constitution were resolved **in favour of the
+      constitution** and flagged in the changelog: `commission_rules.value` became integer basis
+      points (rule III.3), `payouts` gained `idempotency_key` (rule III.5), and
+      `platform_float.variance` gained a `CHECK` tying it to `cash_expected - cash_remitted` (rule
+      III.10). `wallets.balance` intentionally has **no** non-negativity check — a negative balance is
+      a real state.
 - [ ] **T0.1** Repo scaffold: `supabase/` (migrations, functions, seed), `apps/mobile`
       (customer + rider, one binary, role-switched), `apps/admin-web`, `apps/vendor-web`,
       `packages/shared`

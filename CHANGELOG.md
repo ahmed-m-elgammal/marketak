@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–008 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 37 tables,
-138 indexes, 0 unindexed foreign keys.
+Migrations 001–009t written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 44 tables,
+164 indexes, 0 unindexed foreign keys.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -74,6 +74,21 @@ Migrations 001–008 written **and applied** to the live project `erxxsebcqqcpki
   **007 shipped without it.** Adds no constraints beyond the spec — see below
 - `008_riders` — `riders`, `driver_shifts`, `delivery_assignments`, `rider_location_pings`, plus
   `effective_cash_limit_v1`
+- `009_money` — `commission_rules`, `wallets`, `ledger_entries`, `payouts`, `payout_lines`,
+  `platform_float`, `rider_pay_rules`, plus the `sub_orders.payout_id` foreign key that `007` had to
+  leave out because `payouts` did not exist yet
+- `009s_seed_revenue_config` **S** · `009t_seed_settings` **S** — data only, per §15.1 rule 1
+
+`ledger_entries` is now append-only by two independent mechanisms, because constitution III.4 words
+it as Postgres **rules** — which hold against a privileged mistake, not only the client roles — and
+`TRUNCATE` is revoked as well, since no `ON UPDATE`/`ON DELETE` rule covers it. Both are used on
+purpose: with only the rules a buggy application `UPDATE` succeeds and changes nothing, which is the
+hardest failure to notice, while the revoke makes it a loud permission error.
+
+Seeded and verified live: the rider revenue line is **active at 2000 bps (20%)** of the delivery fee
+and the vendor commission row exists **inactive**, so month 3–4 is an `UPDATE`. `rider_max_cash_held_default`
+is seeded at 250000, which is what makes `008`'s `effective_cash_limit_v1` return 2,500 EGP instead of
+falling through to 0 — and 0 would have silently disabled cash collection for every rider.
 
 `order_eta_snapshots` exists so "were we late?" is a query rather than an argument: `promised_at` is
 what the customer was shown, `predicted_at` is what the system believed at `computed_at`, and the gap
@@ -138,6 +153,21 @@ spec and the database do not disagree.
   check" — and then used an array here. A join table would be consistent with `vendor_areas` and
   would make the shift-area lookup indexable. Not changed unilaterally: that means adding a table
   nobody approved. Recorded for a decision.
+- **Three places `data-model.md` §7 conflicts with the constitution.** The constitution wins, because
+  `AGENTS.md` makes it non-negotiable and `data-model.md` a proposal:
+  - `commission_rules.value` was `numeric(12,4)` seeded with `20` for 20%. Rule III.3 says *no
+    numeric* and that *percentages are basis points*, so this broke the rule twice. Now `integer`
+    basis points — `2000` is 20%.
+  - `payouts` had no `idempotency_key`. Rule III.5 names a payout as one of the cases that must
+    carry one, so a retried payout run would have paid twice, and `run_payout_v1` in `019` had
+    nowhere to put it. Added `NOT NULL UNIQUE`; the table was empty so nothing needed backfilling.
+  - `platform_float.variance` had nothing tying it to `cash_expected - cash_remitted`, which is how
+    §7 defines it and what rule III.10 makes the daily health check. Now constrained.
+- **`wallets.balance` deliberately has NO non-negativity check.** A wallet is a liability the platform
+  owes, so a negative balance is a real state — that party owes the platform, e.g. a rider who took
+  more cash than the order was for. `balance >= 0` would make it unrepresentable. Verified by
+  inserting `-25000` and confirming acceptance. It is the one money column in this migration where the
+  reflexive constraint is wrong.
 
 ### Fixed
 
@@ -189,8 +219,7 @@ spec and the database do not disagree.
 
 Recorded in `open-questions.md` §6. The significant ones:
 
-- Migrations 009–022 have **not** been written. `009` (`money`) is next, and is where `payouts`
-  lands — therefore where `sub_orders.payout_id` gets its foreign key.
+- Migrations 010–022 have **not** been written. `010` (`engagement`) is next.
 - No application code. No `apps/`. No `package.json`.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run verify` do not exist, so **no
   engineering checklist can currently be signed off.** See `AGENTS.md` §Verification commands.
