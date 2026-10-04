@@ -220,7 +220,7 @@ after first sign-in as part of profile completion, not as a credential.
 
 ```sql
 create table users (
-  id            uuid primary key default auth.users(id),
+  id            uuid primary key references auth.users(id) on delete cascade,
   phone_number  text unique,                    -- E.164: +201xxxxxxxxx, NULL until completed
   email         text,                           -- carried from the OAuth provider, not a credential
   first_name    text,
@@ -242,6 +242,37 @@ create table users (
 );
 create index on users (last_seen_at desc) where is_active and profile_completed_at is not null;
 ```
+
+**`users.id` has no default, deliberately.** `default auth.users(id)` is illegal — Postgres rejects
+a column reference in a `DEFAULT` expression (`ERROR 0A000`). Found by applying migration 003 to a
+live project rather than by reading it. The id arrives from a trigger instead:
+
+```sql
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.users (id, email) values (new.id, new.email)
+  on conflict (id) do nothing;
+  insert into public.user_roles (user_id, role) values (new.id, 'customer')
+  on conflict (user_id, role) do nothing;
+  return new;
+end $$;
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+```
+
+The `customer` role is granted to every authenticated user because customer is the **base** role —
+anyone can browse and order. Every other role is granted explicitly and never inherited.
+`security definer` because the trigger writes on behalf of `supabase_auth_admin`; `search_path`
+pinned to `''` per §13.2.
 
 **The profile gate.** `phone_number` is logically required — the requirement is that a completed
 user always has one — but it cannot be `NOT NULL` at the column level, because a user row is created
@@ -1962,6 +1993,7 @@ Every deviation, and why.
 |---|---|---|
 | `orders.vendor_id` | Removed; split into `orders` + `sub_orders` | Multi-vendor checkout is the core requirement |
 | `order_items.order_id` only | Added mandatory `sub_order_id` | Per-vendor item status and payouts |
+| `users.id default auth.users(id)` | **Illegal, removed.** `id` references `auth.users(id)` with no default, populated by an `on_auth_user_created` trigger | Postgres rejects a column reference in a `DEFAULT` expression. Found by applying migration 003 to the live project |
 | `vendors.area_ids` JSON | Removed; `vendor_areas` join table | JSON arrays cannot be indexed; forces a scan on every availability check |
 | `vendors.cuisine_types` JSON | Removed; `vendor_cuisines` + `cuisines` | Same, plus filterability |
 | `vendors.estimated_delivery_time_min/max` | Removed; derived | A stored number is wrong at lunch, which is when it matters |

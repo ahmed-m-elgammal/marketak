@@ -6,6 +6,14 @@ decision was made is usually the thing that gets lost.
 
 A change to any of these requires an amendment to `.specify/memory/constitution.md`.
 
+> **Every decision below is `proposed`, not `accepted`.** Nothing here has been reviewed by a human.
+> The specification is authored and internally consistent, not approved. Promote an ADR to
+> `accepted` only after reading it and agreeing with the trade-off.
+>
+> Splitting these into `docs/adr/NNNN-slug.md` with an index and per-file `superseded by` links is
+> worth doing once they are approved. One file is easier to review as a batch; per-file records are
+> better once decisions start superseding each other.
+
 ---
 
 ## 1. Multi-vendor checkout is a parent order plus sub-orders

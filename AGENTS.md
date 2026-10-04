@@ -52,7 +52,8 @@ current plan supersedes with better numbers. **Where they disagree, the current 
 
 ### Current state
 
-- Specification: complete, unreviewed by a human.
+- **Specification: complete but unreviewed by a human.** All 16 ADRs are `proposed`, not `accepted`.
+  Nothing here is approved until you have read it.
 - Infrastructure: Supabase / Cloudflare / Firebase accounts created and MCP servers connected.
 - **Application code: none.** No `apps/`, no `package.json`, no migrations.
 - **`npm run typecheck`, `npm run lint`, `npm test` and `npm run verify` do not exist**, so no
@@ -164,7 +165,7 @@ Your source checklist named tools this project does not use. Mapped deliberately
 | `class-validator` | **Zod** at the app boundary | `class-validator` is a NestJS decorator library. No server framework here — the server is Postgres |
 | Prisma types | **`generate_typescript_types`** from Supabase MCP, wrapped in hand-written DTO interfaces | No ORM. Business logic is RPC |
 | ACID in a service layer | ACID inside the **Postgres function** | There is no service layer. The transaction *is* the function |
-| Tailwind / `AppColors` | **Undecided** — `src/theme/` token module, either plain StyleSheet or NativeWind | Open question 3.9. Resolve before A4 or C3 can pass |
+| Tailwind / NativeWind / `AppColors` | **`StyleSheet` + a `src/theme/` token module** | Settled in open questions 3.9. No Tailwind, no Babel step. The token module is what satisfies rule 2 |
 | `BRD` / `TID` | **`spec.md`** / **`tasks.md`** | Same job, existing files |
 | `npm run …` | Same, but not yet created | T0.1c |
 
