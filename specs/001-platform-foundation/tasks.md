@@ -54,7 +54,8 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       44 tables, 164 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
       005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
       is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
-      **Remaining: 013–022.** `008` shipped `rider_location_pings` **plain and unpartitioned** per
+      **Remaining: 015–022.** `013` shipped `events` and `014`/`014a` shipped RLS; `008` shipped
+      `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
       migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes
       the orders domain of §6. `009` shipped the money domain and **added the `sub_orders.payout_id`
@@ -118,8 +119,13 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       `profile_completed_at = null`
 - [ ] **T0.5** Migration 004: `brands`, `vendors`, `vendor_areas`, `vendor_schedules`,
       `vendor_holidays`, `cuisines`, `vendor_cuisines`, `vendor_staff`
-- [ ] **T0.6** Migration 014 (part): `updated_at` triggers, RLS policies for identity and vendor
-      tables, `feature_flags` seed rows
+- [x] **T0.6** Migration 014 (part): `updated_at` triggers, RLS policies for identity and vendor
+      tables, `feature_flags` seed rows — **RLS shipped as `014` + `014a`.** RLS is on all 62 tables
+      and partitions, 115 policies, `authenticated` holds `SELECT` on 51 tables and **no write
+      privilege anywhere**, `anon` holds nothing. Three spec defects were found by testing rather than
+      reading, and are recorded as ADR 17–20: §13.2's helper pattern was non-functional, RLS does not
+      propagate to partitions, and one policy reused across the order subtree leaked a co-vendor's
+      sub-orders. `feature_flags` seed rows are still outstanding
 - [ ] **T0.7** `get_areas_v1`, `get_feed_manifest_v1`, `get_vendor_feed_v1`, `get_vendor_detail_v1`
 - [ ] **T0.8** Search: normalised generated columns, trigram indexes, `search_catalog_v1`
 - [ ] **T0.9** Seed script: 150 vendors across 20 areas, lunch-only schedules, split shifts

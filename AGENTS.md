@@ -7,8 +7,8 @@ Brand: **Marketak · ماركتك**
 
 ## READ THIS FIRST
 
-This repo currently contains **specification only**. There is no application code yet.
-No `apps/`, no `supabase/migrations/`, no `wrangler.toml`, no `package.json`.
+This repo contains a **complete database and a specification**. There is no application code yet.
+`supabase/migrations/` exists and is applied; `apps/`, `functions/` and `package.json` do not.
 
 If you were asked to build something, read the spec before writing a line of code.
 
@@ -52,15 +52,21 @@ current plan supersedes with better numbers. **Where they disagree, the current 
 
 ### Current state
 
-- **Specification: complete but unreviewed by a human.** All 16 ADRs are `proposed`, not `accepted`.
+- **Specification: complete but unreviewed by a human.** All ADRs are `proposed`, not `accepted`.
   Nothing here is approved until you have read it.
 - Infrastructure: Supabase / Cloudflare / Firebase accounts created and MCP servers connected.
-- **Application code: none.** No `apps/`, no `package.json`, no migrations.
+- **Database: migrations `001`–`014a` written and applied** to the live project. 62 tables and
+  partitions, 229 indexes, 0 unindexed foreign keys, RLS on every table and partition.
+  See `CHANGELOG.md` for the per-migration record.
+- **Application code: none.** No `apps/`, no `package.json`. `functions/` and `apps/` are still to
+  be scaffolded (tasks.md T0.1).
 - **`npm run typecheck`, `npm run lint`, `npm test` and `npm run verify` do not exist**, so no
   engineering checklist below can be signed off. Creating them is task **T0.1c**.
+- **Database behaviour has been verified by direct SQL against the live project.** The SQL
+  verification in `CHANGELOG.md` is real — every claim there was executed. That is *not* a substitute
+  for `npm run verify`, which does not exist yet and covers application code that does not exist
+  yet. Do not report the database as verified by a test suite.
 - **All features are ⬜.** See `FEATURES.md`.
-- The DDL exists as fenced SQL blocks inside `data-model.md`, ordered by its §14. Extracting them
-  into `supabase/migrations/*.sql` is task **T0.1a**.
 
 ---
 
@@ -186,7 +192,8 @@ Your source checklist named tools this project does not use. Mapped deliberately
 | `scripts/` | `check-test-integrity.mjs`, `check-policies.mjs`, other CI guards |
 | `.agents/skills/` | Project-local agent skills. **Loaded via `skills.paths` in `opencode.json`** — opencode does not auto-scan this directory |
 
-None of these exist yet except `.agents/skills/` and `opencode.json`. `tasks.md` T0.1 scaffolds the rest.
+None of these exist yet except `.agents/skills/`, `opencode.json`, `supabase/migrations/` and
+`specs/`. `tasks.md` T0.1 scaffolds the rest.
 
 ### Which skills to load, and when
 

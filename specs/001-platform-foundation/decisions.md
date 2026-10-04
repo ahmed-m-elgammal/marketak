@@ -318,3 +318,143 @@ riders who are also customers from using their normal account.
 |---|---|---|---|
 | 1 | 2026-10-04 | Initial set of 15 ADRs | Recorded during spec authoring |
 | 2 | 2026-10-04 | Split ADR 15 out as its own decision | One-app topology was decided after the first 14 were written |
+
+---
+
+## 17. Client access is RLS over `SELECT`-granted tables, with all mutations behind RPCs
+
+**Status:** accepted · **Date:** 2026-10-04 · **Supersedes:** nothing, resolves the contradiction
+inside `data-model.md` §13.3
+
+**Context.** §13.1 states visibility as row rules ("Own", "Own vendor's sub-orders", "Assigned
+only") and §13.2 is entirely about policy query performance, both of which describe RLS. §13.3 then
+says "`anon` gets no direct table access at all — every read goes through an RPC", while the grant
+table in the same section gives `authenticated` "SELECT on read tables". The spec contradicts itself
+and the choice changes the shape of all 62 tables.
+
+**Decision.** `authenticated` receives table-level `SELECT` on 51 read tables, gated by RLS. It
+receives **no `INSERT`, `UPDATE` or `DELETE` on any table** — every mutation is a `security definer`
+RPC, which is what makes the RPC the single place a permission decision is written
+(constitution III.21). `anon` receives nothing at all.
+
+**Alternatives rejected.**
+
+- *RPC-only.* Strictly tighter and simpler to reason about, but it disables PostgREST and Realtime
+  on tables, and pushes every read into the 016–020 RPC surface — a much larger audit surface to
+  get right in one pass.
+- *Granting `SELECT` on everything and filtering in the app.* Rejected outright; it is the failure
+  mode RLS exists to prevent.
+
+**Consequences.**
+
+- Realtime on `orders` works for order-status push, which is the product's core loop.
+- A client bug can widen *reads* only within the policy, never past it, because the policy is
+  evaluated by the database.
+- The privilege surface is one query: `information_schema.role_table_grants` must show `SELECT` and
+  nothing else for `anon` and `authenticated`. 014 asserts this and 022 re-checks it in CI.
+
+---
+
+## 18. RLS is per-relation, so partitioned tables need policies on every partition
+
+**Status:** accepted · **Date:** 2026-10-04
+
+**Context.** §14.1 makes `notifications` and `audit_log` monthly-partitioned. Enabling RLS and adding
+a policy to the **parent** leaves every partition with `relrowsecurity = false` and zero policies —
+verified on this database with a throwaway partitioned table, not inferred. The partitions live in
+`public`, which `authenticated` holds `USAGE` on, so `select * from notifications_2026_10` bypasses the
+parent's policy entirely.
+
+**Decision.** RLS is enabled on every table *and every partition*. Parent policies are mirrored onto
+each partition, and `private.ensure_month_partition` was rewritten so a partition created later by
+021's `pg_cron` job is born with RLS and the correct policy.
+
+**Alternatives rejected.**
+
+- *Grant nothing on partitions.* Works today, because the current posture grants only the parent, but
+  it is one `grant` away from exposing every notification in the system. It also leaves the §13.3
+  `alter default privileges` line as a loaded gun.
+- *`FORCE ROW LEVEL SECURITY`.* Unrelated mechanism; it affects the table owner, not partitions.
+
+**Consequences.**
+
+- Retention keeps working. Dropping a partition drops its policies with it.
+- 014 verifies the fix by **temporarily granting** on a partition and confirming the policy still
+  filters — proving the defence holds under the exact condition that would have exposed it.
+
+---
+
+## 19. A vendor sees its own sub-orders, not its co-vendors' — even on a shared order
+
+**Status:** accepted · **Date:** 2026-10-04
+
+**Context.** §13.1 invariant 2 requires that "a vendor can read only its own sub-orders", and
+invariant 2's stated risk is leaking "the customer's other orders or reviews". §13.1 also gives the
+vendor the parent `orders` row, which is correct: a vendor needs the order total, the delivery fee
+share and the delivery address.
+
+So the vendor has two different entitlements that look alike: *the order I am part of* and *my slice
+of it*. Migration 014 collapsed them into one rule (`order_id ∈ visible_order_ids`, which unions
+"own order / order containing my sub-order / order I'm delivering") and applied it to the whole
+subtree. Its comment claimed invariant 2 was thereby enforced. It was not.
+
+**Decision.** `sub_orders` and `order_items` are filtered by `vendor_id` OR by
+`private.owned_or_assigned_order_ids` — own order or assigned order, both of which legitimately show
+every sub-order. An order that merely *contains* the vendor's sub-order shows only that vendor's rows.
+The parent `orders` row keeps the wider rule.
+
+**Alternatives rejected.**
+
+- *Filtering by `sub_order_id ∈ (sub_orders I own)`.* Equivalent, but re-derives the join on every
+  row instead of once per query as an InitPlan.
+- *Adding a `vendor_id` to `order_status_history` and `order_modifications`.* Rejected as inventing
+  schema to serve a policy. Both are per-order facts — a status transition is something the customer,
+  the preparing vendor and the carrying rider all already know — and neither table carries the column.
+
+**Consequences.**
+
+- Found by testing, not by reading: on a two-vendor fixture, vendor 1's staff read **3** sub-orders
+  where 2 was correct, one of them a competitor's line items and commission share. `014a` fixes it and
+  asserts the policy shape so it cannot be reintroduced.
+- A general rule this exposes: **a policy reused across a subtree is only correct while every table in
+  that subtree has the same entitlement grain.** `orders` is per-order; `sub_orders` is per-vendor.
+
+---
+
+## 20. `riders` is not readable by clients; `riders_public` carries the projection
+
+**Status:** accepted · **Date:** 2026-10-04
+
+**Context.** §13.1 says a customer sees `riders` — "Public fields only". RLS filters rows and never
+columns, so this is not expressible as a policy. `riders` holds `phone_number`, `current_latitude`,
+`current_longitude`, `vehicle_plate`, `cash_held`, `max_cash_held` and `user_id`. A grant on the table
+exposes all of them, and no row policy can prevent it.
+
+The required product behaviour is more specific than "public fields": **a customer sees each rider's
+name, vehicle, rating and phone number** — the customer pays at the door and has to be able to call.
+**A rider sees the customer's name, phone number and location, but only for an order they have
+accepted**, which rides on the order policies via `delivery_assignments` rather than on `riders`.
+
+**Decision.** `riders` gets **no grant to any client role.** `public.riders_public` exposes `id`,
+`first_name`, `last_name`, `phone_number`, `vehicle_type`, `vehicle_plate`, `rating_avg`,
+`rating_count` for active riders.
+
+**Alternatives rejected.**
+
+- *`GRANT SELECT (col, col) ON riders`.* Breaks `select=*` in PostgREST, and silently changes meaning
+  every time a column is added — a new column is neither included nor visibly excluded.
+- *Grant the table and rely on a row policy.* Does not satisfy the requirement at all; exposes every
+  rider's phone number and live location to every signed-in user.
+
+**Consequences.**
+
+- `user_id` never leaves the database, which matters because it is the key `010a`'s cash-limit leak
+  walked. `cash_held` and `max_cash_held` are unreachable, so the rider's cash position is not
+  readable by competitors or customers.
+- The rider-to-customer direction is enforced by `users_read` plus the order subtree, so it ends
+  automatically when the assignment ends. Nothing extra to keep in sync.
+- **Known residual exposure:** the assigned rider can read the whole `users` row for that customer,
+  which includes `email`. RLS cannot mask a column on an allowed row. Accepted for v1 because the
+  rider already receives the delivery address and phone from the order itself; revisit if customer
+  email is ever used for marketing consent, at which point it needs its own projection.
+- 014 asserts that no client grant on `riders` exists, so the view cannot be bypassed by accident.

@@ -2049,7 +2049,23 @@ cross-cutting: commission_rules · ledger_entries · settings · feature_flags �
 | `feature_flags`, `settings`, `cities`, `areas`, `zones`, `fee_tiers`, `pay_rules` | Read | Read | Read | Read/write |
 | `commission_rules` | Read (effective) | Read | Read | All |
 | `platform_float` | — | — | — | All |
-| `events`, `*_daily_stats`, `audit_log` | — | — | Own earnings only | All |
+| `events`, `audit_log`, `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `notification_templates`, `platform_float` | — | — | — | All |
+| `vendor_earnings_daily` | — | — | Own vendor | All |
+| `rider_earnings_daily` | — | Own rider | — | All |
+| `rider_pay_rules` | — | Own rider | — | All |
+
+**The `events, *_daily_stats, audit_log` row originally read "Own earnings only" for vendor staff,
+and was not implementable** — none of those tables carries a vendor column, so there is no "own" to
+filter on. Split into the two earnings rows above, which tasks T5.5 and T5.6 actually require, plus
+an admin-only row. See ADR 17.
+
+**`rider_pay_rules` is admin-and-own-rider, not "Read" for everyone.** §13.1 originally lumped it in
+with `fee_tiers` under "Read", which would publish every rider's per-trip and per-km pay rate to
+every signed-in user and hand a competitor the wage bill. Delivery fee tiers *are* public — the
+customer is quoted from them. Recorded in open question 3.18.
+
+**`riders` is not in this matrix because no client can read it.** `public.riders_public` is the
+projection a customer reads. See ADR 20.
 
 Three invariants the policies must enforce absolutely:
 
@@ -2096,20 +2112,51 @@ as $$
   select vs.vendor_id from public.vendor_staff vs where vs.user_id = p_user;
 $$;
 
-revoke execute on function private.vendor_ids_for(uuid) from public, anon, authenticated;
+grant execute on function private.vendor_ids_for(uuid) to authenticated;
 
 -- Policy becomes a single indexed membership test
-create policy sub_orders_vendor_read on sub_orders for select
+create policy sub_orders_read on sub_orders for select
   using (vendor_id in (select private.vendor_ids_for((select auth.uid()))));
 ```
 
-Note the shape: the caller supplies the uid, the function re-derives nothing and trusts nothing
-except its argument, and `EXECUTE` is revoked from every role that does not need it.
+**Correction, applied in `014`.** The `revoke execute … from public, anon, authenticated` line that
+originally stood here **breaks the policies that call the function.** An RLS policy expression is
+evaluated as the role running the query, so the calling role must hold `EXECUTE`. Verified on this
+database:
 
-**`set search_path = ''`, never `set search_path = public`.** Pinning to `public` still lets a
-malicious object in `public` shadow a built-in. Pinning to the empty string forces every name to be
-schema-qualified, which is the whole point. Every `security definer` function in this schema uses
-`set search_path = ''` with fully-qualified names.
+| | Result |
+|---|---|
+| `REVOKE EXECUTE FROM authenticated`, policy calls the function | `permission denied for function f` |
+| `GRANT EXECUTE TO authenticated`, **no** `USAGE` on the schema | policy works |
+| direct call to `authenticated` | `permission denied for schema` |
+
+The control that actually blocks direct access is **not** the `EXECUTE` revocation — it is that
+`private` holds no schema `USAGE` for `anon`, `authenticated` *or* `service_role`. A role with
+`EXECUTE` but no `USAGE` cannot name the function, cannot call it through a wrapper, and cannot reach
+it through PostgREST. So `EXECUTE` **is** granted to `authenticated`, because policies need it, and
+the schema stays shut. That is strictly stronger than revoking `EXECUTE`.
+
+**Security definer is a correctness requirement here, not a privilege choice.**
+`private.visible_order_ids` reads `orders`; a security invoker version would re-enter the `orders`
+policy from inside the `orders` policy.
+
+**RLS does not propagate to partitions.** `notifications` and `audit_log` are monthly-partitioned by
+`010` and `012`. Enabling RLS and adding a policy to the **parent** leaves every partition with
+`relrowsecurity = false` and **zero policies** — verified on this database. The partitions are in
+`public`, which `authenticated` may `USAGE`, so querying one directly bypasses the parent policy
+entirely. RLS is therefore enabled on every partition, parent policies are mirrored onto each, and
+`private.ensure_month_partition` was rewritten in `014` so partitions created later by `021`'s cron
+job are born with RLS and the right policy. See ADR 18.
+
+**One policy reused across a subtree is only correct while every table in it shares an entitlement
+grain.** `orders` is a per-order entitlement; `sub_orders` and `order_items` are per-vendor. `014`
+applied one rule to both and its comment claimed §13.1 invariant 2 was thereby enforced — it was not,
+and vendor 1 could read vendor 2's line items on a shared order. `014a` splits them. See ADR 19.
+
+**`riders` is not readable by clients.** RLS cannot mask columns, and `riders` holds `phone_number`,
+`current_latitude`, `current_longitude`, `cash_held` and `user_id`. `public.riders_public` carries the
+projection — including `phone_number`, because the customer pays at the door and has to be able to
+call. See ADR 20.
 
 **Index every column a policy touches.** A policy filter on an unindexed column is a scan whether
 or not the policy is written well. This is the other half of the FK-index rule in §14.2.
@@ -2121,16 +2168,32 @@ revoke all on schema public from public;
 alter default privileges in schema public revoke all on tables from public, anon, authenticated;
 ```
 
-Then grant deliberately. The application never connects as superuser, and `anon` gets no direct
-table access at all — every read goes through an RPC, which is what makes the RPC the single place
-where a permission decision is written.
+Then grant deliberately. `anon` gets **no** table access at all.
+
+**Resolved by ADR 17:** `authenticated` gets `SELECT` on 51 read tables, gated by RLS. It gets **no
+`INSERT`, `UPDATE` or `DELETE` on any table** — every mutation is a `security definer` RPC, which is
+what makes the RPC the single place a permission decision is written (constitution III.21).
 
 | Role | Gets |
 |---|---|
 | `anon` | Nothing. Signed-in users only |
-| `authenticated` | `USAGE` on `public`, `SELECT` on read tables, `EXECUTE` on approved RPCs. **No `DELETE` anywhere** |
-| `service_role` | Full. Worker-side only, from a Worker secret |
+| `authenticated` | `USAGE` on `public`, `SELECT` on 51 read tables, `EXECUTE` on approved RPCs and on the `private` helpers policies require. **No `INSERT`/`UPDATE`/`DELETE` anywhere** |
+| `service_role` | Full, and `BYPASSRLS`. Worker-side only, from a Worker secret |
 | `postgres` | Never used by the app |
+
+The earlier wording in this section — "`anon` gets no direct table access at all, every read goes
+through an RPC" — contradicted its own grant table and is superseded.
+
+Three tables have RLS enabled and a policy, but **no client grant at all**, so they are reachable
+only through an admin RPC: `platform_float`, `events`, `audit_log`. So are `event_daily_stats`,
+`search_daily_stats`, `auth_daily_stats` and `notification_templates` — §13.1's "Own earnings only"
+for `events` and the `*_daily_stats` tables was not implementable, because none of them carries a
+vendor column. The earnings tables get their own rows in §13.1 instead.
+
+**`014` asserts its own invariants** and raises rather than completing if any fails: RLS disabled
+anywhere in `public`, any non-`SELECT` client grant, any grant at all to `anon`, a direct grant on
+`riders`, or `authenticated` holding `USAGE` on `private`. A policy set that silently omits a table
+is the exact failure RLS exists to prevent, so it is checked rather than trusted.
 
 ---
 

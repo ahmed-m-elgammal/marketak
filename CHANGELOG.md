@@ -49,8 +49,9 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–013 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
-partitions, 229 indexes, 0 unindexed foreign keys, 0 client table grants.
+Migrations 001–014a written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 62 tables and
+partitions, 229 indexes, 115 RLS policies, 0 tables without RLS, 0 unindexed foreign keys, 0 client
+write grants, 0 grants to `anon`.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -105,6 +106,98 @@ partitions, 229 indexes, 0 unindexed foreign keys, 0 client table grants.
 - `012_aggregates` — `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`,
   `auth_daily_stats`, `audit_log`
 - `013_events` — `events`, the outbox, **shipped unpartitioned on measured evidence**
+- `014_rls` — row-level security on all 62 tables and partitions
+- `014a_fix_vendor_sub_order_leak` — closes a cross-vendor leak found by testing `014`
+
+### Security
+
+**`014` enables RLS everywhere and hands `authenticated` exactly one privilege: `SELECT` on 51 read
+tables.** No `INSERT`, `UPDATE` or `DELETE` on any table for any client role — every mutation is a
+`security definer` RPC, which is what makes the RPC the single place a permission decision is written
+(constitution III.21). `anon` holds nothing. `service_role` has `BYPASSRLS` and is unaffected.
+115 policies. Recorded as **ADR 17–20**.
+
+**Three defects in the spec were found by testing, not by reading.** Each is reproduced in
+`CHANGELOG` and asserted in the migration so it cannot be reintroduced.
+
+**1. §13.2's helper-function pattern does not work.** The spec says to `revoke execute … from
+public, anon, authenticated` on a `private` helper, then call it from a policy. That fails at runtime
+with `permission denied for function f`, because a policy expression is evaluated as the role running
+the query. Measured on this database:
+
+| | Result |
+|---|---|
+| `REVOKE EXECUTE FROM authenticated`, policy calls it | `permission denied for function f` |
+| `GRANT EXECUTE TO authenticated`, **no** `USAGE` on the schema | policy works |
+| direct call to `authenticated` | `permission denied for schema` |
+
+The control that actually blocks direct access is that `private` holds **no schema `USAGE`** for
+`anon`, `authenticated` *or* `service_role` — verified false for all three. A role with `EXECUTE` but
+no `USAGE` cannot name the function, cannot call it through a wrapper, and cannot reach it through
+PostgREST. So `EXECUTE` **is** granted to `authenticated`, because policies need it, and the schema
+stays shut. **Stronger than what §13.2 describes.**
+
+**2. RLS does not propagate to partitions — a live leak.** Enabling RLS and a deny-all policy on the
+`notifications` **parent** left every partition with `relrowsecurity = false` and **zero policies**,
+verified with a throwaway partitioned table. The partitions live in `public`, which `authenticated`
+may `USAGE`, so `select * from notifications_2026_10` would have returned **every notification in the
+system**. Today's blanket zero-grant posture hid this, but §13.3's own
+`alter default privileges` line would have exposed every partition the moment anyone added one grant.
+RLS is now enabled on every partition, parent policies are mirrored onto each, and
+`private.ensure_month_partition` was rewritten so partitions created by `021`'s cron job are born with
+RLS and the right policy. **Verified by temporarily granting on a partition and confirming the policy
+still filters** — proving the defence under the exact condition that would have exposed it. **ADR 18.**
+
+**3. `014` leaked a co-vendor's sub-orders, and its comment claimed it hadn't.** `014` applied one rule
+to the whole order subtree — `order_id ∈ visible_order_ids` — and the comment asserted this enforced
+§13.1 invariant 2, "a vendor can read only its own sub-orders". It did not. `visible_order_ids`
+deliberately unions "an order containing one of my vendors' sub-orders", which is right for the
+`orders` row (a vendor needs the total and the delivery address) and wrong for `sub_orders`.
+
+Measured on a two-vendor fixture where one order carries a sub-order per vendor:
+
+```
+vendor 1 staff, SELECT count(*) FROM sub_orders   ->  3   (expected 2)
+  of which belonging to vendor 2                  ->  1   (expected 0)
+```
+
+So vendor 1 could read vendor 2's line items, prices and commission share for an order they were both
+cooking — exactly the leak invariant 2 exists to prevent. **A comment that claims a guarantee the code
+does not provide is worse than no comment, because the next reviewer trusts it.** `014a` splits the two
+entitlements: `sub_orders` and `order_items` filter on `vendor_id` **or**
+`private.owned_or_assigned_order_ids`, and `014a` asserts the policy shape. `order_items` was fixed in
+the same migration because it carries `vendor_id` and had the identical shape — fixing one and not
+the other would have kept the same leak one table over. **ADR 19.**
+
+**4. `riders` "Public fields only" is not expressible in RLS, and the requirement was sharper than
+the spec.** RLS filters rows, never columns. `riders` holds `phone_number`, `current_latitude`,
+`current_longitude`, `vehicle_plate`, `cash_held`, `max_cash_held` and `user_id`; a table grant
+exposes all of them and no row policy can prevent it. The specified behaviour: a **customer** sees
+each rider's name, vehicle, rating and **phone number** — they pay at the door and have to be able to
+call. A **rider** sees the customer's name, phone and location, but only for an order they have
+accepted.
+
+`riders` now gets **no client grant at all**, and `public.riders_public` carries the projection. The
+excluded columns are unreachable rather than filtered, and `user_id` never leaves the database —
+which matters because it is the key `010a`'s cash-limit leak walked. The rider→customer direction
+rides on `users_read` plus the order subtree, so it ends automatically when the assignment ends.
+**ADR 20.**
+
+**Verified by switching to the `authenticated` role with real JWT claims** — 17 assertions across
+customer, rider, vendor-1, vendor-2 and admin, each in a rolled-back transaction. A customer sees
+1 of 2 orders, 2 of 3 sub-orders on their own order, 0 ledger rows, 0 wallets, 0 earnings rows, and the
+rider's phone via `riders_public`. A rider sees the assigned order only, plus that order's customer.
+Vendor 1 sees 2 sub-orders and **0** belonging to vendor 2, and vice versa. `anon` is denied
+everything. `platform_float` is denied even to admin, by design — it is reachable only through an
+admin RPC.
+
+The migration also asserts its own invariants and raises rather than completing: RLS disabled
+anywhere in `public`, any non-`SELECT` client grant, any grant to `anon`, a direct grant on `riders`,
+or `authenticated` holding `USAGE` on `private`. **A policy set that silently omits a table is the
+exact failure RLS exists to prevent, so it is checked rather than trusted.**
+
+After `014a`: **62 tables and partitions, 229 indexes, 115 policies, 0 tables without RLS, 0 anon
+grants, 0 client write grants, 0 bare `auth.uid()` in a policy.**
 
 §15.2 assigns six tables to `012`; **five were created and one already existed.**
 `vendor_earnings_daily` was built by `004`, so the list overstated the work. Worse,
