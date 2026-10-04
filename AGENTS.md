@@ -28,6 +28,17 @@ If you were asked to build something, read the spec before writing a line of cod
 | 10 | `ENVIRONMENT.md` | Accounts, regions, CLI versions, MCP setup, known gotchas | Running a command |
 | 11 | `FEATURES.md` | Every feature and its real state. All ⬜ | Before claiming anything works |
 | 12 | `CHANGELOG.md` | What has actually been delivered, and the known gaps | Reporting status |
+| 13 | `specs/001-platform-foundation/001-020-integrity-notes.md` | Live-database results of the adversarial suite: isolation probes, the policy texts they rest on, and the retractions | Before trusting any claim about RLS, or before "fixing" a probe that fails |
+
+### Verification is not a test suite
+
+There is no `npm test`. Every database claim in this repo was produced by **hand-run SQL against the
+live project**, and the notes files record what was actually executed. Two consequences:
+
+- A green probe is evidence about the **database contract**, not about shipped software. No app code
+  exists.
+- **A failing probe is usually a wrong expectation, not a bug.** In the 001–020 suite every failure was
+  mine and the schema was right each time. Read `pg_policies` before changing anything.
 
 ### Do not read `architecture-spec-supabase-cloudflare-firebase.md`
 

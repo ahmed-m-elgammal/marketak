@@ -249,7 +249,7 @@ the first attempt failed when executed rather than when read:
 | `019a_fix_payout_line_uniqueness` | `payout_lines_assignment_unique` was UNIQUE on `assignment_id` alone, so one trip could not have both a `rider_trip` line and a `tip` line. The first rider payout with a tip aborted the transaction. Now UNIQUE on `(assignment_id, payout_line_type)` |
 | `019b_fix_paid_event_actor` | `payout.paid` was the only 019 event whose payload lacked `actor` |
 
-### Verification results — 51 assertions in four batches
+### Verification results — 89 assertions in four batches
 
 | Batch | Result |
 |---|---|
@@ -297,30 +297,40 @@ happens.
 Ledger `UPDATE` and `DELETE` are silent no-ops. No non-SELECT grant to `anon` or `authenticated`.
 RLS on every public table.
 
-## 12. Pre-existing finding, NOT caused by 019, not fixed here
+## 12. Retracted: the `private`-helper finding was wrong
 
-`private.visible_order_ids(p_user uuid)`, `private.vendor_ids_for(p_user uuid)`,
-`private.rider_ids_for(p_user uuid)`, `private.account_ids_for`, `private.owned_or_assigned_order_ids`,
-`private.rider_order_ids` and `private.is_admin()` are all `SECURITY DEFINER` and **executable by
-`authenticated`**. They must be — RLS policies execute as the querying role.
+**An earlier draft of these notes claimed a vulnerability. It does not exist. Do not reintroduce it.**
 
-The problem is that they **trust the `p_user` argument**. A client can therefore call
-`select private.visible_order_ids('<any user uuid>')` over PostgREST and receive that user's order ids,
-or `vendor_ids_for` to learn which vendors a person is affiliated with.
+The claim was that `private.visible_order_ids(p_user)`, `private.vendor_ids_for(p_user)`,
+`private.rider_ids_for(p_user)` and friends are `SECURITY DEFINER`, executable by `authenticated`, and
+trust their `p_user` argument — so a client could call
+`select private.visible_order_ids('<any uuid>')` and enumerate a named user's order ids.
 
-- **What leaks:** the set of order ids belonging to a user id the caller can name, and a user's
-  vendor/rider affiliations.
-- **What does not leak:** order contents. Reading `orders` still goes through RLS, which calls
-  `visible_order_ids(auth.uid())` — the caller's own — so no row becomes readable this way. This is
-  information disclosure, not a data breach.
-- **Why it matters anyway:** constitution III.20 says permission comes from the user's own JWT and
-  never from a client-supplied argument. These helpers invert that.
-- **The fix is not a revoke.** The policies need the grant. The fix is for each helper to ignore its
-  argument and read `auth.uid()` itself, so the parameter becomes decorative, or to move them out of a
-  client-reachable schema.
-- **Left unfixed deliberately.** It belongs to `014`, not `019`, and changing RLS helper signatures
-  mid-money-cycle without a decision is exactly the sort of quiet scope expansion AGENTS.md rule 9
-  forbids. It is now an open question, not a silent defect.
+`EXECUTE` alone was never the reachable path, and I failed to check the schema privilege that gates it.
+Verified against the live project:
+
+| Probe | Result |
+|---|---|
+| `has_schema_privilege('anon', 'private', 'USAGE')` | `false` |
+| `has_schema_privilege('authenticated', 'private', 'USAGE')` | `false` |
+| `has_schema_privilege('service_role', 'private', 'USAGE')` | `false` |
+| `select private.visible_order_ids('<any uuid>')` as `authenticated` | `permission denied for schema private` |
+| `select private.is_admin()` as `authenticated` | `permission denied for schema private` |
+| `select private.rider_ids_for('<any uuid>')` as `authenticated` | `permission denied for schema private` |
+
+Without `USAGE` on the schema a role cannot resolve any object inside it, so the `EXECUTE` grant is
+unreachable from every client role and from PostgREST (which exposes only `public` by default). The
+`EXECUTE`-without-`USAGE` pairing is the **documented design**, not an oversight — `data-model.md` §13.1
+states it explicitly, and it is why the helpers are `SECURITY DEFINER` at all: RLS policies execute as
+the querying role, and `visible_order_ids` must read `orders` without re-entering the policy.
+
+The argument-trust question underneath it stays open for a different reason. If `private` were ever
+added to the PostgREST exposed-schema list, or given `USAGE`, the helpers *would* become callable with a
+caller-chosen `p_user`, and constitution III.20 (permission comes from the user's own JWT, never from a
+client-supplied argument) would then be violated. So the invariant worth keeping is not a revoke —
+the policies need the grant — it is that **`private` must never gain `USAGE` for a client role**, and
+that the `auth.uid()` argument is only trustworthy because of it. That is now a standing assertion in
+the 001–020 integrity suite rather than an open question.
 
 Also noted while looking: `data-model.md` §7 declares `ledger_entries.account_id NOT NULL` and then
 comments "or NULL for platform accounts". The applied column is nullable and

@@ -265,8 +265,10 @@ Wallets exist for **vendors and riders only**. There is no customer wallet and n
 ### 1.8.1 What `019` actually shipped, and what it did not
 
 `data-model.md` §15.2 row 019 names five functions and that row is the migration inventory. `019`
-implements those five. **Eight of the thirteen above are assigned to no migration** and remain
-unbuilt:
+implements those five. **Six of the thirteen above are unbuilt** — the eight-name gap is a naming
+artefact, not eight missing behaviours: `run_payout_v1` absorbs `run_vendor_payout_v1`,
+`run_rider_payout_v1` and `approve_payout_v1` as its `p_action` of `create | approve | reject`, and
+`get_wallet_v1` ships as `get_wallet_balance_v1`. The six with no writer at all:
 
 | Not built | Consequence today |
 |---|---|

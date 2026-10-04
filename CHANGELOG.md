@@ -116,7 +116,7 @@ revenue. The hole was the assertion, not the code.
 `007a`, `010a` and `014a`. Replaying `018` then `018a` on a fresh database produces byte-identical
 function bodies to the live project.
 
-Verified by direct SQL, 51 assertions in two batches plus 21 structural checks:
+Verified by direct SQL, 52 assertions in two batches plus 21 structural checks:
 
 | Suite | Assertions | Result |
 |---|---|---|
@@ -209,12 +209,22 @@ no non-negativity CHECK) and after a replayed adjustment, with `version` at 2 ra
 `service_role` holds `EXECUTE` on the mutations and still writes nothing, since all three require a
 user JWT. Ledger `UPDATE` and `DELETE` are silent no-ops.
 
-**Two things this deliberately did not fix.** `contracts.md` §1.8 names 13 money functions and 8 are
-assigned to no migration — including `freeze_wallet_v1`, where the `frozen` status and its mandatory
-reason already exist with no writer (open question 3.31). And `private.visible_order_ids(p_user)` and
-friends are `SECURITY DEFINER`, executable by `authenticated`, and **trust their argument**, so a
-client can enumerate a named user's order ids. Contents stay protected by RLS, so it is disclosure and
-not a breach, but it belongs to `014` rather than `019` (open question 3.30).
+**Two things this deliberately did not fix.** `contracts.md` §1.8 names 13 money functions; **six are
+unbuilt** — `freeze_wallet_v1`, where the `frozen` status and its mandatory reason already exist with no
+writer, plus `list_frozen_v1`, `get_commission_v1` / `set_commission_rule_v1` and
+`get_fee_rules_v1` / `set_fee_tier_v1` (open question 3.30). The apparent count of eight comes from
+naming, not from missing capability: `run_payout_v1` absorbs the contract's
+`run_vendor_payout_v1` / `run_rider_payout_v1` / `approve_payout_v1`, and `get_wallet_v1` ships as
+`get_wallet_balance_v1`.
+
+**A finding from this entry was retracted.** An earlier draft reported that
+`private.visible_order_ids(p_user)` and friends were callable by a client with a caller-chosen argument,
+letting anyone enumerate a named user's order ids. **That was wrong, and the error was mine** — I read
+the `EXECUTE` grant and never checked the schema privilege that gates it. `private` has **no `USAGE` for
+`anon`, `authenticated` or `service_role`**, so every one of those calls fails with
+`permission denied for schema private`. The helpers are `SECURITY DEFINER` and executable because RLS
+policies execute as the querying role; the pairing of `EXECUTE`-without-`USAGE` is the documented design
+(`data-model.md` §13.1), not a hole. It is now a standing assertion in the integrity suite.
 
 **Money constants: none.** No fee, multiplier, limit or rate appears as a literal in any function body.
 The only numeric literal is the 366-day bound on a payout period, which is a safety bound rather than a
