@@ -763,11 +763,14 @@ Both cross tables, so neither is a row-level constraint.
 
 | Rule | Mechanism | Behaviour |
 |---|---|---|
-| An item with `pricing_mode = 'sized'` must have at least one size | `deferrable initially deferred` constraint trigger | **Rejects** at COMMIT, so an item and its sizes can be inserted in one transaction in any order |
-| Deleting the last size of a `'sized'` item would leave it unsellable | `after delete` trigger | **Repairs** — flips the item to `'fixed'` |
+| An item with `pricing_mode = 'sized'` must have at least one size | `deferrable initially deferred` constraint trigger on `menu_items` | **Rejects** at COMMIT, so an item and its sizes can be inserted in one transaction in any order |
+| Deleting the last size of a `'sized'` item would leave it unsellable | `deferrable initially deferred` constraint trigger on `menu_item_sizes` | **Rejects** — `LAST_SIZE_REMOVED` |
 
-The asymmetry is deliberate. An incomplete transaction should fail loudly. A vendor deleting a size
-mid-edit should not lose the item.
+Both reject, and deliberately so. The first version of the second rule *repaired* the item by
+flipping it to `'fixed'` with `base_price = coalesce(base_price, 0)`, which is always `0`: a `sized`
+item has `base_price` NULL by definition, so the "repair" produced a free, orderable item. There is
+no correct price to invent. The vendor must either add a size or switch the item to `'fixed'` and
+state a real price. **Refusing is the only honest option.**
 
 ```sql
 create or replace function public.assert_item_has_sizes()
@@ -789,47 +792,81 @@ create constraint trigger trg_item_has_sizes
 ### Snapshot invalidation
 
 Any catalog write bumps `vendors.menu_version`, which changes the R2 snapshot URL and tells every
-device its cached menu is stale. One function, five triggers, one code path — so it cannot be
-forgotten on a new catalog table.
+device its cached menu is stale.
+
+**These triggers are statement-level, not row-level.** As `FOR EACH ROW` triggers, a 50-row catalog
+import executed 50 separate `UPDATE vendors` statements against the same row. Statement-level
+triggers with transition tables do the whole statement in one `UPDATE`; verified, a 50-row insert
+now moves `menu_version` by exactly 1.
+
+A transition table is only permitted on a trigger with a **single** event, so `INSERT` and `UPDATE`
+each need their own trigger — five tables therefore need ten triggers, generated in a loop rather
+than written out by hand.
 
 ```sql
-create or replace function public.bump_menu_version()
+create or replace function public.bump_version_for_categories()
 returns trigger language plpgsql set search_path = '' as $$
-declare
-  v_rec    jsonb;
-  v_item   uuid;
-  v_vendor uuid;
 begin
-  -- Read the row as jsonb, NOT as NEW.item_id. PL/pgSQL resolves record fields at RUNTIME, so a
-  -- function referencing new.item_id creates fine and then fails the first time a category is
-  -- inserted. This exact bug shipped in 005 and was fixed in 005a. A jsonb lookup returns NULL for
-  -- an absent key instead of raising, so one function is safe across all five tables.
-  v_rec := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
-
-  if tg_table_name = 'menu_categories' then
-    update public.vendors set menu_version = menu_version + 1, updated_at = now()
-     where id = (v_rec ->> 'vendor_id')::uuid;
-    return null;
-  end if;
-
-  v_item := case when tg_table_name = 'menu_items' then (v_rec ->> 'id')::uuid
-                 else (v_rec ->> 'item_id')::uuid end;
-
-  if tg_table_name = 'option_choices' then
-    v_item := (select o.item_id from public.item_options o
-                where o.id = (v_rec ->> 'option_id')::uuid);
-  end if;
-
-  select mi.vendor_id into v_vendor from public.menu_items mi where mi.id = v_item;
-  if v_vendor is not null then
-    update public.vendors set menu_version = menu_version + 1, updated_at = now() where id = v_vendor;
-  end if;
+  update public.vendors v
+     set menu_version = v.menu_version + 1, updated_at = now()
+   where v.id in (select distinct nr.vendor_id from new_rows nr);
   return null;
 end $$;
-```
 
-Attach to `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` and
-`menu_categories`.
+create or replace function public.bump_version_for_items()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  -- menu_items already carries the denormalised vendor_id, so this needs no join.
+  update public.vendors v
+     set menu_version = v.menu_version + 1, updated_at = now()
+   where v.id in (select distinct nr.vendor_id from new_rows nr);
+  return null;
+end $$;
+
+create or replace function public.bump_version_for_items_of()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  -- Shared by menu_item_sizes and item_options, which both reference menu_items by item_id.
+  update public.vendors v
+     set menu_version = v.menu_version + 1, updated_at = now()
+   where v.id in (select distinct mi.vendor_id
+                    from new_rows nr join public.menu_items mi on mi.id = nr.item_id);
+  return null;
+end $$;
+
+create or replace function public.bump_version_for_choices()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  -- option_choices references item_options, which references menu_items: two hops.
+  update public.vendors v
+     set menu_version = v.menu_version + 1, updated_at = now()
+   where v.id in (select distinct mi.vendor_id
+                    from new_rows nr
+                    join public.item_options io on io.id = nr.option_id
+                    join public.menu_items mi on mi.id = io.item_id);
+  return null;
+end $$;
+
+do $$
+declare r record;
+begin
+  for r in select * from (values
+      ('menu_categories',  'bump_version_for_categories'),
+      ('menu_items',      'bump_version_for_items'),
+      ('menu_item_sizes', 'bump_version_for_items_of'),
+      ('item_options',    'bump_version_for_items_of'),
+      ('option_choices',  'bump_version_for_choices')
+    ) as t(tbl, fn)
+  loop
+    execute format('create trigger %I after insert on public.%I referencing new table as new_rows'
+                   ' for each statement execute function public.%I()',
+                   'trg_bump_v_' || r.tbl || '_ins', r.tbl, r.fn);
+    execute format('create trigger %I after update on public.%I referencing new table as new_rows'
+                   ' for each statement execute function public.%I()',
+                   'trg_bump_v_' || r.tbl || '_upd', r.tbl, r.fn);
+  end loop;
+end $$;
+```
 
 ### `item_options` — add-ons, **not** sizes
 
@@ -875,23 +912,8 @@ create table option_choices (
 create index on option_choices (option_id, display_order);
 ```
 
-Every menu mutation bumps `vendors.menu_version`, which invalidates the R2 snapshot and the device
-cache:
-
-```sql
-create or replace function public.bump_menu_version() returns trigger
-language plpgsql as $$
-declare v uuid;
-begin
-  v := coalesce(new.vendor_id, old.vendor_id, (select vendor_id from menu_categories where id = coalesce(new.category_id, old.category_id)));
-  if v is not null then
-    update vendors set menu_version = menu_version + 1, updated_at = now() where id = v;
-  end if;
-  return coalesce(new, old);
-end $$;
-```
-
-Attach to `menu_items`, `item_options`, `option_choices` and `menu_categories`.
+Sizes and options both feed `menu_version`, so both are covered by the statement-level triggers in
+**Snapshot invalidation** above.
 
 ---
 
@@ -2175,7 +2197,21 @@ are recorded here because both are invisible in review:
 | # | Finding | Fix |
 |---|---|---|
 | 7 | `bump_menu_version()` referenced `new.item_id`, but `menu_categories` has no such column. PL/pgSQL resolves record fields at **runtime**, so the function and all five `CREATE TRIGGER` statements succeeded, and it only failed when a category was inserted | Rewritten to read the row via `to_jsonb(new)`, where an absent key yields `NULL` instead of raising. One function is then safe across all five catalog tables. Shipped as **005a**, not as an edit to 005, because 005 had already been applied |
-| 8 | The sizing rules need one row-level `CHECK` (`fixed` requires a price) and one cross-table guarantee (`sized` requires at least one size). The cross-table rule cannot be a `CHECK` | `CHECK` for the row-level case; a `deferrable initially deferred` constraint trigger for the cross-table case so an item and its sizes can be inserted in one transaction in any order; and an `after delete` trigger that *repairs* rather than rejects when the last size is deleted |
+| 8 | The sizing rules need one row-level `CHECK` (`fixed` requires a price) and one cross-table guarantee (`sized` requires at least one size). The cross-table rule cannot be a `CHECK` | `CHECK` for the row-level case; a `deferrable initially deferred` constraint trigger for the cross-table case so an item and its sizes can be inserted in one transaction in any order |
+| 9 | **Deleting the last size of a `sized` item repaired it to `fixed` with `base_price = coalesce(base_price, 0)`** — which is always `0`, because a `sized` item has `base_price` NULL by definition. The item became orderable for free | Removed the repair entirely. There is no correct price to invent, so the delete is **refused** and the vendor must add a size or switch the item to `fixed` with a real price. Guessing a price is worse than refusing the operation |
+| 10 | `sync_menu_item_vendor` was `BEFORE INSERT OR UPDATE **OF category_id**`, so a bare `UPDATE menu_items SET vendor_id = <other>` never re-derived it. An item could claim a vendor other than its category's owner | Dropped the column list, so any `UPDATE` re-derives. Verified: a bare `vendor_id` update is corrected back |
+| 11 | `bump_menu_version` was `FOR EACH ROW`, so a 50-row catalog import ran 50 separate `UPDATE vendors` statements against the same row | Statement-level triggers over transition tables. Verified: a 50-row insert bumps `menu_version` by exactly 1. Note a transition table requires a **single** event, so `INSERT` and `UPDATE` need separate triggers — generated in a loop |
+| 12 | Six money/range columns had no `CHECK`: `per_km_fee`, `delivery_fee_override`, `minimum_order_value` (×2), `price_modifier`, `max_vendors_per_order`, plus an invertible prep window. A negative `per_km_fee` makes the delivery fee **fall** as distance grows | Row-level `CHECK` on each. `price_modifier` is floored rather than pinned to zero, since a negative modifier is a legitimate discount — unbounded negative would let a choice make an item free |
+| 13 | `vendor_earnings_daily`, `user_auth_providers` and `user_roles` were hard-deletable. The first is a **financial record** | `deleted_at` on the first two, `revoked_at` on `user_roles`, and `is_admin()` updated to ignore revoked grants — otherwise revocation would silently be a no-op |
+| 14 | `vendors.slug` was `UNIQUE` globally while `vendors` is soft-deletable, so a deleted vendor squatted its slug permanently | Partial unique index over `deleted_at is null` |
+| 15 | Nothing stopped an admin configuring 1 vendor = `12000` and 2 vendors = `10000`, which rewards a customer for splitting one order in two | Deferred constraint trigger asserting `multiplier_bps` never falls as `vendor_count` rises |
+
+**The recurring lesson is item 9's class, not any single fix.** PL/pgSQL resolves record fields and
+even table column names at *runtime*, so a trigger function that references something nonexistent
+creates cleanly, creates its trigger cleanly, and fails only on the first real write. This bit the
+repository three times: `new.item_id` in 005a, and `new.delivery_zone_id` (the column is `zone_id`)
+in 005b. **Every trigger function in this repo now has an executed test.** A trigger that has never
+run is not a trigger, it is a comment.
 
 Also confirmed correct as written, so not changed:
 
