@@ -1621,20 +1621,36 @@ first candidate for removal if the database ever gets tight.
 create table rider_earnings_daily (
   rider_id      uuid not null references riders(id) on delete cascade,
   business_date date not null,
-  deliveries    integer not null default 0,
-  legs          integer not null default 0,    -- vendor pickups, higher on multi-vendor trips
-  online_minutes integer not null default 0,
-  base_fees     integer not null default 0,    -- from rider_pay_rules at the time of the trip
-  distance_fees integer not null default 0,
-  tips          integer not null default 0,
-  bonuses       integer not null default 0,    -- per-leg bonus on multi-vendor trips
-  deductions    integer not null default 0,
+  deliveries    integer not null default 0 check (deliveries >= 0),
+  legs          integer not null default 0 check (legs >= 0),
+  online_minutes integer not null default 0 check (online_minutes >= 0),
+  base_fees     integer not null default 0 check (base_fees >= 0),
+  distance_fees integer not null default 0 check (distance_fees >= 0),
+  tips          integer not null default 0 check (tips >= 0),
+  bonuses       integer not null default 0 check (bonuses >= 0),
+  deductions    integer not null default 0 check (deductions >= 0),
   net_payout    integer not null default 0,
-  cash_held     integer not null default 0,
-  cash_remitted integer not null default 0,
+  cash_held     integer not null default 0 check (cash_held >= 0),
+  cash_remitted integer not null default 0 check (cash_remitted >= 0),
   updated_at    timestamptz not null default now(),
+  deleted_at    timestamptz,
   primary key (rider_id, business_date)
 );
+create index rider_earnings_daily_live
+  on rider_earnings_daily (rider_id, business_date) where deleted_at is null;
+```
+
+**`net_payout` is the one column with no `CHECK`, deliberately.** A clawback can legitimately make a
+day negative, and §9's `platform_float` already established that a signed net figure is real money
+rather than a bug. Every other column is an additive total or a count, and cannot be negative.
+
+**`deleted_at` is required, and was missing here.** Constitution 17 requires soft delete on every
+business table, and §13 error 13 already ruled on this exact shape: "`vendor_earnings_daily`,
+`user_auth_providers` and `user_roles` were hard-deletable. The first is a **financial record**" →
+`deleted_at`. `rider_earnings_daily` holds `base_fees`, `tips`, `bonuses` and `net_payout`, so it is
+the same class of record. `005b` applied the ruling to `vendor_earnings_daily` only because
+`rider_earnings_daily` did not exist yet — `008` created `riders` and the delivery tables but omitted
+this one, so `012` is its first appearance and the ruling applies to it now.
 ```
 
 Every figure comes from the `rider_pay_rules` row that was active when the trip happened. A later pay
@@ -1836,49 +1852,112 @@ create table event_daily_stats (
   city_id       uuid references cities(id),
   app_role      text,
   event_name    text not null,
-  count         integer not null default 0,
-  unique_users  integer not null default 0,
+  count         integer not null default 0 check (count >= 0),
+  unique_users  integer not null default 0 check (unique_users >= 0 and unique_users <= count),
   updated_at    timestamptz not null default now(),
-  primary key (business_date, city_id, app_role, event_name)
+  primary key (business_date, city_id, app_role, event_name),
+  check (app_role in ('customer','rider','admin','support'))   -- the user_roles vocabulary
 );
+```
 
+`city_id` and `app_role` are written nullable above and are in fact `NOT NULL`, promoted by the
+primary key. PostgreSQL has no table-level `NOT NULL` constraint, so this cannot be stated
+explicitly. One city at a time, so every event genuinely has both. `app_role` uses `user_roles.role`
+rather than `device_tokens.app_role` because the former is the superset — it carries `support`, which
+push routing has no use for — and a `CHECK` must never reject a role the system can legitimately
+produce.
+
+`unique_users <= count` is enforced because a distinct count cannot exceed the total. It is also not
+incrementally upsertable: adding the number of actors seen in a batch double-counts anyone appearing
+in two batches, so the rollup must recompute it over the affected window rather than add to it.
+
+```sql
 create table search_daily_stats (
   business_date date not null,
   city_id       uuid references cities(id),
-  query_hash    text not null,          -- md5 of the normalised query; the raw text is not stored
-  results_count integer not null,
+  query_hash    text not null check (query_hash ~ '^[0-9a-f]{32}$'),
+  results_count integer not null check (results_count >= 0),
   zero_result   boolean not null default false,
-  clicks        integer not null default 0,
+  clicks        integer not null default 0 check (clicks >= 0 and clicks <= results_count),
   updated_at    timestamptz not null default now(),
-  primary key (business_date, city_id, query_hash)
+  primary key (business_date, city_id, query_hash),
+  check (zero_result = (results_count = 0))
 );
+```
 
+**The `query_hash` format constraint is the privacy property, not decoration.** Without it,
+"the raw text is not stored" is enforced by nothing: a rollup written under time pressure can persist
+raw customer searches into a column whose rows are hashes everywhere else. The format `CHECK` makes
+that mistake unstorable. It does **not** make the hashes unguessable — unsalted md5 of a short
+low-entropy string is brute-forceable by anyone who can read the table. See open question 3.17.
+
+`results_count` deliberately carries no default: every search row must state how many results it
+produced, and a default of `0` would let a broken rollup write zero-result searches for every query
+and silently destroy the most valuable column in the table. The two consistency checks
+(`zero_result`, `clicks <= results_count`) are the ones most likely to fail a future rollup, which is
+the intended outcome — a nightly failure is better than a wrong zero-result rate with no signal.
+
+```sql
 create table auth_daily_stats (
   business_date date not null,
-  event_name    text not null check (event_name in
-                  ('signup','login','login_failed','otp_requested','logout','password_reset')),
-  count         integer not null default 0,
+  event_name    text not null check (event_name in ('signup','login','login_failed','logout')),
+  count         integer not null default 0 check (count >= 0),
   updated_at    timestamptz not null default now(),
   primary key (business_date, event_name)
 );
 ```
 
+**This `CHECK` is narrower than originally specified, on purpose.** The proposal also listed
+`otp_requested` and `password_reset`. Constitution 18 is unambiguous — "Authentication is Google and
+Apple only. No email, no password, no phone OTP" — and constitution 20 makes Supabase Auth the only
+identity system, so nothing in this platform can emit either event. Their presence is worse than
+their absence: a constraint advertising them invites an engineer to build the counter. The constitution
+outranks this document.
+
+No `city_id` here, unlike the other two. Sign-in is platform-level and a user has no city until they
+complete a profile, so a city dimension would be mostly `NULL` — and `NULL` is impossible in a primary
+key. Per-city signups come from `users.city_id` at read time.
+
 ### `audit_log`
 
 ```sql
 create table audit_log (
-  id          bigserial primary key,
-  actor_user_id uuid references users(id),
-  action      text not null,
-  entity_type text not null,
-  entity_id   uuid,
-  before      jsonb,
-  after       jsonb,
-  created_at  timestamptz not null default now()
-);
+  id            bigserial,
+  actor_user_id uuid references users(id) on delete set null,
+  action        text not null,
+  entity_type   text not null,
+  entity_id     uuid,
+  before        jsonb,
+  after         jsonb,
+  created_at    timestamptz not null default now(),
+  primary key (id, created_at)          -- §14.1: partition key must be in the PK
+) partition by range (created_at);
+create index on audit_log (actor_user_id, created_at desc) where actor_user_id is not null;
 create index on audit_log (entity_type, entity_id, created_at desc);
 create index on audit_log (created_at);
 ```
+
+**`on delete set null` is load-bearing.** `references users(id)` with no `ON DELETE` clause defaults
+to `NO ACTION`, which makes a user **permanently undeletable** the moment any audit row names them —
+including via the cascade from `auth.users`. That was verified by reproducing the `NO ACTION` version
+and watching the delete fail. `set null` is the correct audit semantic: the record of what happened
+survives its actor, and `before`/`after` already hold the snapshot, so nothing is lost.
+
+**The `actor_user_id` index exists because of that clause.** Nulling the reference on delete means
+finding every audit row naming that user; with no index that is a sequential scan of every partition on
+a table retained for 365 days. It is partial because system-generated rows carry a `NULL` actor. It
+also serves the admin "what did this user do" query, which is the actual reason an audit log gets read.
+
+**`entity_id` is polymorphic and has no integrity trigger**, unlike `wallets.owner_id` and
+`payouts.account_id` in §11. This is deliberate and is the one place where skipping that pattern is the
+whole point: an audit row must outlive the thing it describes. Deleting a user must not delete the
+record that they approved a vendor, and a trigger rejecting a dangling `entity_id` would make deletion
+fail on its own audit trail. `before`/`after` make each row self-contained.
+
+No `updated_at`, like `ledger_entries`: the table is append-only and there is nothing to update.
+
+`action` and `entity_type` are unconstrained `text`. A `CHECK` would need a stable vocabulary, and
+`entity_type` must track whatever tables exist — inventing one here would freeze it.
 
 Retained 1 year, then archived to R2. Admin-only; the vendor and customer apps never read it.
 
@@ -2159,7 +2238,7 @@ and must not contain DDL.
 | 009t | `seed_settings` **S** | `platform_name` = Marketak, `platform_name_ar` = ماركتك, order prefix, limits |
 | 010 | `engagement` | `reviews`, `favorites`, `favorite_items`, `notifications`, `notification_templates` |
 | 011 | `growth` | `vouchers`, `voucher_redemptions`, `promo_slots` |
-| 012 | `aggregates` | `vendor_earnings_daily`, `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `audit_log` |
+| 012 | `aggregates` | `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `audit_log` | `vendor_earnings_daily` was already created by 004, so this list overstated the work by one table |
 | 013 | `platform` | `events`, partitioned by month per §14.1 |
 | 014 | `rls` | `private` schema, `revoke all on schema public from public`, all policies, `updated_at` triggers, ledger append-only rules, the profile-completion insert guard |
 | 015 | `search` | `normalize_text_v1`, normalised generated columns, trigram indexes, `search_catalog_v1` |

@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–011 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 54 tables and
-partitions, 207 indexes, 0 unindexed foreign keys.
+Migrations 001–012 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 61 tables and
+partitions, 224 indexes, 0 unindexed foreign keys, 0 client table grants.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -82,6 +82,72 @@ partitions, 207 indexes, 0 unindexed foreign keys.
   month**), `notification_templates`
 - `010a` — closed a demonstrated cross-tenant read; `vendor_staff.deleted_at` (see **Security**)
 - `011_growth` — `vouchers`, `voucher_redemptions`, `promo_slots`
+- `011a_polymorphic_integrity` — `BEFORE` triggers so `wallets.owner_id`, `payouts.account_id`,
+  `ledger_entries.account_id` and `commission_rules.target_id` cannot name a row that does not exist.
+  A polymorphic column cannot carry a foreign key, so `011a` supplies the guarantee a FK would. Also
+  made `ledger_entries.account_id` nullable, replacing a `CHECK` that had been vacuous.
+- `011b_fix_trigger_return_value` — **fixed silent row loss.** `011a`'s `BEFORE` triggers ended
+  without a `RETURN`, which in PL/pgSQL means `RETURN NULL`, which for a `BEFORE` trigger means *skip
+  this row*. Every insert into those four tables was being discarded without error. Caught by testing
+  rather than by reading, and recorded here because the failure mode — a write that reports success
+  and stores nothing — is the kind that survives review.
+- `011s_seed_notification_templates` — 19 keys from `contracts.md` §4.1–4.3 × `ar`/`en` = 38 rows.
+  The table had been **empty since `010` created it** and nothing in §15.2 would ever have populated
+  it, so nothing could render a notification at all. **The Arabic is a first draft and wants review**
+  by someone who writes Arabic customer-facing copy; it is correct MSA, and every row is correctable
+  with an `UPDATE` and no code change.
+- `011t_notification_type_lookup` — `private.notification_type_exists(text)`, resolving open question
+  3.12 as option (a′): the RPC validates `notifications.type` against this table rather than against
+  a list frozen into a `CHECK`. A `CHECK` would make the 20th notification type cost a migration and
+  turn a copy change into a deployment; against `notification_templates` adding a key is an `INSERT`.
+  Deliberately not a foreign key — templates are unique per `(key, channel, lang)`, so there is no
+  single row for `notifications.type` to reference.
+- `012_aggregates` — `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`,
+  `auth_daily_stats`, `audit_log`
+
+§15.2 assigns six tables to `012`; **five were created and one already existed.**
+`vendor_earnings_daily` was built by `004`, so the list overstated the work. Worse,
+`rider_earnings_daily` had **never been created at all** — `008` made `riders` and the delivery tables
+but omitted it — so `012` is its first appearance and the only chance to get it right.
+
+Six defects in §12's DDL were corrected. Three would have shipped bugs rather than annoyances:
+
+| # | Defect | Consequence had it shipped |
+|---|---|---|
+| 1 | `rider_earnings_daily` had no `deleted_at` and no non-negativity `CHECK`s | A financial record that could be hard-deleted, contradicting constitution III.17 and §13 error 13, which had already ruled on this exact table shape for `vendor_earnings_daily` |
+| 2 | `event_daily_stats` declared `city_id`/`app_role` nullable, then put them in the `PRIMARY KEY` | Silent `NOT NULL` promotion, so platform-wide events are impossible and the failure looks like a bug |
+| 3 | `search_daily_stats.query_hash` had **no format constraint** | The column's whole stated privacy property — "the raw text is not stored" — was enforced by nothing. A rollup under time pressure could persist raw customer searches into a column called `query_hash`. Now `^[0-9a-f]{32}$`, verified to reject both Latin and Arabic raw text |
+| 4 | `auth_daily_stats` listed `otp_requested` and `password_reset` | **Constitution III.18 breach.** "No email, no password, no phone OTP" — and a constraint advertising those flows invites an engineer to build the counter. Reduced to the four events Google/Apple sign-in can actually emit |
+| 5 | `audit_log` used `id bigserial primary key` while §14.1 requires it partitioned | **Not suboptimal — a syntax error.** Every `UNIQUE` constraint on a partitioned table must include the partition key, the same failure `010` had to correct for `notifications`. Now `primary key (id, created_at)` |
+| 6 | `audit_log.actor_user_id references users(id)` with no `ON DELETE` | Defaults to `NO ACTION`, which makes a user **permanently undeletable** once any audit row names them, including via the `auth.users` cascade. Reproduced to confirm before fixing. Now `on delete set null`: the record outlives its actor, which is the correct audit semantic |
+
+Two performance findings, both in `audit_log`:
+
+- **The `actor_user_id` index is not optional.** Nulling that reference on delete means finding every
+  row naming the user; with no index it is a sequential scan of *every partition* on a table retained
+  365 days. Added partial (`where actor_user_id is not null`, since system rows carry no actor), and
+  it doubles as the admin "what did this user do" query.
+- **`entity_id` deliberately gets no integrity trigger**, unlike `011a`. An audit row must outlive the
+  thing it describes; a trigger rejecting a dangling `entity_id` would make deletion fail on its own
+  audit trail. `before`/`after` make each row self-contained instead.
+
+`event_daily_stats.unique_users` gained `unique_users <= count`, and carries a warning that matters
+more than the constraint: an exact distinct count is **not incrementally upsertable**, so `021`'s
+rollup must recompute it over the affected window rather than add to it, or it drifts upward forever.
+
+**19 assertions, all passing**, each in a rolled-back transaction: user deletion is no longer wedged
+by the audit FK; the audit row survives with its actor nulled and its snapshot intact; raw Latin and
+Arabic query text are both rejected while a real md5 is accepted; `otp_requested` and
+`password_reset` are both unissuable while `login_failed` works; `support` is accepted and `wizard`
+rejected; `clicks > results` and `zero_result = false` with `results_count = 0` are both rejected;
+`net_payout` remains unconstrained so a clawback can go negative; and all 10 rider-earnings
+non-negativity checks are present.
+
+After `012`: **61 tables and partitions, 224 indexes, 0 unindexed foreign keys, 0 unpinned
+`security definer` functions, 0 client table grants.**
+
+Open question **3.17** is new and unresolved: the md5 in `query_hash` is still brute-forceable by
+anyone who can read the table. `012`'s `CHECK` closes the storage path, not the read path.
 
 `vouchers.discount_value` was `numeric(12,2)`, the **same constitution III.3 violation** `009`
 corrected in `commission_rules.value`: a float where none is allowed, and a percentage that is not

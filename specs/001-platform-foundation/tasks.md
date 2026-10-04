@@ -54,7 +54,7 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       44 tables, 164 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
       005a–005e, 007a, 007b and 007c are forward fixes written after auditing what actually ran, which
       is the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
-      **Remaining: 010–022.** `008` shipped `rider_location_pings` **plain and unpartitioned** per
+      **Remaining: 013–022.** `008` shipped `rider_location_pings` **plain and unpartitioned** per
       open question 3.10 — it stays empty until Phase 8, and partitioning it becomes an additive
       migration when the tracking API lands. `order_eta_snapshots` shipped in `007c`, which completes
       the orders domain of §6. `009` shipped the money domain and **added the `sub_orders.payout_id`
@@ -264,9 +264,13 @@ daily cash reconciliation balances exactly against an external statement.
 
 ## Phase 5 — Payouts, earnings, growth
 
-- [ ] **T5.1** Migration 012: `vendor_earnings_daily`, `rider_earnings_daily`,
-      `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `audit_log`
-- [ ] **T5.2** Rollup RPCs, `pg_cron` nightly
+- [x] **T5.1** Migration 012: `rider_earnings_daily`, `event_daily_stats`, `search_daily_stats`,
+      `auth_daily_stats`, `audit_log` — **done, six spec defects corrected.** `vendor_earnings_daily`
+      already existed from `004`, so the original list overstated the scope; `rider_earnings_daily`
+      had never been created by `008` despite being listed here. See `CHANGELOG.md`.
+- [ ] **T5.2** Rollup RPCs, `pg_cron` nightly. **`unique_users` must be recomputed over the affected
+      window, not incremented** — it is an exact distinct count and is not incrementally upsertable.
+      `021` must also satisfy the `zero_result` and `clicks <= results_count` checks in `012`.
 - [ ] **T5.3** `run_vendor_payout_v1`, `run_rider_payout_v1`, `approve_payout_v1`;
       `payable → in_payout → settled` in one transaction
 - [ ] **T5.4** pgTAP: a sub-order cannot be paid twice; a second payout run finds nothing payable
