@@ -187,6 +187,61 @@ section** while `data-model.md` §15.2 assigned it to `017`. Its signature is de
 `p_channel` on both collection calls is one of `cod`, `vodafone_cash`, `instapay`. It is recorded, not
 processed: the platform never moves the money in either case.
 
+### 1.7.1 Rider delivery notes (shipped in `018`)
+
+Four decisions `018` had to make where this section and `data-model.md` were silent or in conflict.
+All four are open questions 3.27–3.29.
+
+- **`get_available_orders_v1` materializes the offer pool.** `claim_order_v1` takes an
+  `assignment_id` and raises `ORDER_ALREADY_CLAIMED`, which means assignment rows must already exist —
+  but **no function in any migration creates them** and there is no offers table. The availability call
+  inserts them with `ON CONFLICT DO NOTHING`, relying on `delivery_assignments_one_active`
+  (`UNIQUE (order_id)` where the status is not terminal). The cost is real and accepted: **a function
+  whose name says "get" writes**, and every call takes row locks on `delivery_assignments`, so callers
+  must treat it as a poll rather than a free read. `021` owning cron does not help, because a rider
+  would see an empty pool until `021` ships.
+- **`platform_revenue` is a commission ON the delivery fee**, read from
+  `commission_rules(scope='rider', applies_to='delivery_fee')`, **not** `delivery_fee − rider_pay_total`.
+  §3.2 line 278 states the latter and it is arithmetically impossible: with the shipped seeds a 2500
+  fee against a 2000 `per_trip` and a 500 leg bonus gives **−2000** of revenue. `per_trip` and
+  `bonus_per_leg` are additive rider costs the platform bears from its own margin; the delivery fee is
+  split between rider and platform. `rider_pay_rules` pays the rider, `commission_rules` books the
+  revenue line — each table for its own concern, matching constitution 9.
+- **Collection writes the `rider_cut` ledger entry; `complete_delivery_v1` backstops it
+  idempotently.** §3.2 places both ledger writes under COLLECTION while this section credits
+  `rider_cut` to `complete_delivery_v1`. Both cannot own it: `ledger_entries.idempotency_key` is
+  UNIQUE, so the second write would raise. Revenue is recognised on collection regardless of payment
+  method, because the platform earned the cut whether the customer handed over cash or transferred to
+  the rider directly.
+- **`ON CONFLICT` cannot be used against `ledger_entries` at all.** Constitution 4 gives the table
+  `DO INSTEAD NOTHING` rules on `UPDATE` and `DELETE`, and **Postgres refuses any
+  `INSERT ... ON CONFLICT` against a table that has rules**, whatever the conflict target. The
+  idempotency guard is therefore `INSERT ... SELECT ... WHERE NOT EXISTS (idempotency_key = ...)`.
+  The UNIQUE index remains the real guarantee; this is the guarded form of it. Worth knowing before
+  anyone writes the settlement migrations.
+
+Also decided here, and not obvious from the schema:
+
+- **One assignment row per ORDER**, not per `sub_order_id`. `delivery_assignments_one_active` is
+  `UNIQUE (order_id)` for any non-terminal status, which permits exactly one active trip, and spec 25
+  is "one rider, one trip, N vendor pickups, one drop-off". The per-leg sequence lives in
+  `stop_sequence` jsonb, so a three-vendor order is one trip with three stops and
+  `bonus_per_leg × 3`.
+- **Availability is judged on distance to the FURTHEST vendor**, not to the customer. A rider can
+  stand next to the customer and still be an hour from the kitchen.
+- **`payment_collected_by` references `users(id)`, not `riders(id)`.** Writing the rider id there is
+  an FK violation, which is the kind of thing the schema check should have made obvious.
+- **`riders` has no `deleted_at`** — `is_active` is the soft-delete flag, unlike the `vendors` family.
+- **A collected amount must equal the order total exactly.** A short collection is a dispute, not a
+  partial success, and silently accepting one would leave `platform_float.variance` permanently out
+  by the difference.
+
+Error codes added: `NOT_A_RIDER`, `RIDER_NOT_VERIFIED`, `RIDER_LOCATION_REQUIRED`, `RADIUS_INVALID`,
+`ASSIGNMENT_NOT_FOUND`, `RIDER_REQUIRED`, `RIDER_NOT_FOUND`, `RIDER_NOT_ELIGIBLE`,
+`ORDER_ALREADY_CLAIMED`, `ORDER_NOT_CLAIMABLE`, `ORDER_NOT_ASSIGNED`, `NOT_YOUR_TRIP` style
+`NOT_AUTHORIZED`, `ALREADY_COLLECTED`, `AMOUNT_INVALID`, `AMOUNT_MISMATCH`, `CASH_LIMIT_EXCEEDED`,
+`PAYMENT_CHANNEL_MISMATCH`, `ALREADY_DELIVERED`, `SUB_ORDERS_INCOMPLETE`.
+
 ### 1.8 Wallet and money
 
 Wallets exist for **vendors and riders only**. There is no customer wallet and no top-up flow.

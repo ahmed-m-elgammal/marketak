@@ -92,6 +92,75 @@ including no-op edits leaving `updated_at` alone.
   `users.email` not acquiring a use** that would make it sensitive — marketing consent or a breach list.
   The trigger to revisit is recorded, because that is the thing that would change the answer.
 
+### Added - rider delivery (018)
+
+`get_available_orders_v1`, `claim_order_v1`, `begin_collection_v1`, `collect_cash_v1`,
+`collect_wallet_v1`, `complete_delivery_v1`, plus `private.pay_rule_for`, `private.resolve_pay` and
+`private.trip_distance_km`.
+
+**This closes open question 3.26.** `017` deliberately wrote `rider_pay_total = 0` and
+`platform_revenue = 0` at placement because no rider existed yet. `claim_order_v1` now resolves the
+pay rule, freezes it onto the assignment, and **mirrors both figures onto `orders`** — so the
+obligation recorded as deferred is discharged rather than forgotten.
+
+**Multi-vendor confirmed by execution, since that was the question asked.** A three-merchant cart
+produces three `sub_orders`, three distinct vendors, three `order_items` each bound to its own
+`sub_order_id`, `vendor_count = 3`, `item_count = 6` dishes, per-vendor subtotals `20000, 8000, 18000`
+preserved as payouts, and **fee shares that sum to the single order delivery fee**. One rider claims
+the whole order; the three pickups live in `stop_sequence` and `bonus_per_leg × 3` pays more for a
+three-stop trip than a one-stop one.
+
+**Three of my own arithmetic errors, recorded because they are the dangerous kind.** I asserted a
+48000 subtotal for `2×10000 + 8000 + 3×6000`, which is **46000** — I mis-added. I asserted a 3000
+delivery fee for three vendors, which is `round(2500 × 1.20) = 3000` **plus a 200 distance charge**,
+because my fixture happened to put a vendor 5.884 km away, just past the 5 km free radius. And I
+asserted a total of 51000. In all three the code was right and the expectation was wrong; the distance
+component was exercised for real rather than skipped. A test that fails for the wrong reason invites
+a "fix" to correct code.
+
+**Five real bugs found by running the code, all fixed before commit.**
+
+- **`ON CONFLICT` cannot be used against `ledger_entries` at all.** Constitution 4 gives the table
+  `DO INSTEAD NOTHING` rules, and Postgres refuses any `INSERT ... ON CONFLICT` against a table that
+  has rules — whatever the conflict target. Every idempotency backstop had to become
+  `INSERT ... SELECT ... WHERE NOT EXISTS`. The UNIQUE index is still the guarantee; this is its
+  guarded form. Recorded because `019` writes the ledger heavily and would otherwise hit it again.
+- **`riders` has no `deleted_at`.** I filtered on `r.deleted_at is null` by analogy with the
+  `vendors` family; `is_active` is the soft-delete flag there. The query failed loudly rather than
+  silently returning nothing, which is the better of the two failure modes.
+- **`payment_collected_by` references `users(id)`, not `riders(id)`.** Writing the rider id is an FK
+  violation. The column wants the *person* who took the money, which is what an audit of it needs.
+- **`platform_float.variance` is `NOT NULL` with `CHECK (variance = cash_expected - cash_remitted)`.**
+  A first insert must seed `cash_remitted = 0` *and* `variance` explicitly, and the upsert branch must
+  recompute `variance` rather than adding to it. `cash_remitted` belongs to the settlement sweep in
+  `021`, never to a collection.
+- **`resolve_pay` used `IF NOT FOUND` after calling a helper that returns a row.** `FOUND` reflects
+  the last statement executed *inside* that function, not whether it returned anything, so the no-rule
+  branch never fired and every rider silently earned **zero** while `platform_revenue` was still
+  booked. Now tests `v_rule.id is not null`. This is the same class of bug as the `SETOF`/`ANY` error in
+  `017`: it produced a plausible number, not an error.
+
+**Verified by direct SQL, in five batches:**
+
+| Batch | Assertions | Result |
+|---|---|---|
+| multi-vendor shape | 13 | 10 pass, 3 bad expectations (above) |
+| availability + claim + pay freeze | 16 | pass |
+| pay resolution after the `FOUND` fix | 16 | pass |
+| cash collection, float, completion | 21 | pass |
+| cash limit, amount guards, isolation | 14 | pass |
+
+Confirmed by execution: rider pay resolves to `per_trip 2000 + 100/km × leg_km + 500 × legs`, the
+components sum to the total, `platform_revenue` is 20% of the actual fee and never negative, the
+017 mirror lands on `orders`, a repeat poll inserts no duplicate offer, a second claim raises
+`ORDER_ALREADY_CLAIMED`, a cash collection raises `cash_held` by exactly the total and writes exactly
+one `cash_collected` and one `rider_cut` entry, a second collection and a wallet-after-cash are both
+refused with `ALREADY_COLLECTED` without double-counting the float, cash in excess of the per-rider
+limit is refused with **no** ledger row and **no** float movement, a rider cannot collect another
+rider's trip, the customer cannot collect at all, `complete_delivery_v1` refuses while any sub-order is
+unfinished, the `rider_cut` backstop does not duplicate the collection entry, and **an `UPDATE` against
+the ledger is a silent no-op** — constitution 4 holding under test.
+
 ### Added - checkout (017)
 
 `quote_order_v1`, `place_order_v1`, `cancel_order_v1`, `transition_order_v1`. Written by me, not
