@@ -7,8 +7,33 @@ should begin until the price-change rejection path is tested.
 
 ---
 
+## Phase -1 — Infrastructure ✅ DONE
+
+Account and tooling setup. Nothing here is application code, and none of it appears in a commit.
+
+- [x] **T-1.1** Node v22.16.0 / npm 10.9.2 verified
+- [x] **T-1.2** Supabase CLI 2.119.0 installed globally
+- [x] **T-1.3** `wrangler` 4.86.0 installed and authenticated as `ahmedmelgammal6@gmail.com`,
+      account `8ae79d52c8b84a170bcb5c4c0485f34c`
+- [x] **T-1.4** `firebase` CLI installed and authenticated as `ahmedmelgammal6@gmail.com`
+- [x] **T-1.5** MCP: `cloudflare`, `cloudflare-docs`, `cloudflare-bindings`, `cloudflare-builds`,
+      `cloudflare-observability`, `supabase`, `firebase` — all connected. Config in
+      `~/.config/opencode/opencode.jsonc`
+- [x] **T-1.6** Agent skills installed: 16 Cloudflare, 13 Firebase, 2 Supabase → `~/.agents/skills`.
+      Relevance noted in `ENVIRONMENT.md` §5
+- [x] **T-1.7** Git initialised on `main`, `.gitignore` written, spec committed as `d033c7d`
+- [x] **T-1.8** `AGENTS.md`, `ENVIRONMENT.md`, `decisions.md`, `open-questions.md` written
+- [x] **T-1.9** Stale `architecture-spec-…md` marked SUPERSEDED with a contradiction table
+- [ ] **T-1.10** Install Docker Desktop — unblocks `supabase start` for local dev. Optional
+- [ ] **T-1.11** Prune the 22 irrelevant agent skills. Optional but recommended
+
+---
+
 ## Phase 0 — Foundation
 
+- [ ] **T0.1a** **Extract every fenced SQL block out of `data-model.md` into
+      `supabase/migrations/*.sql`, numbered per `data-model.md` §14.** Do not hand-write these.
+      Doing this by hand is how the spec and the database drift apart
 - [ ] **T0.1** Repo scaffold: `supabase/` (migrations, functions, seed), `apps/customer`,
       `apps/rider`, `apps/vendor`, `apps/admin-web`, `apps/merchant-web`, `packages/shared`
       (types, error codes, money helpers), `packages/ui`
