@@ -49,8 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–010 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 48 tables and
-partitions, 0 unindexed foreign keys.
+Migrations 001–011 written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 54 tables and
+partitions, 207 indexes, 0 unindexed foreign keys.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -80,6 +80,33 @@ partitions, 0 unindexed foreign keys.
 - `009s_seed_revenue_config` **S** · `009t_seed_settings` **S** — data only, per §15.1 rule 1
 - `010_engagement` — `reviews`, `favorites`, `favorite_items`, `notifications` (**partitioned by
   month**), `notification_templates`
+- `010a` — closed a demonstrated cross-tenant read; `vendor_staff.deleted_at` (see **Security**)
+- `011_growth` — `vouchers`, `voucher_redemptions`, `promo_slots`
+
+`vouchers.discount_value` was `numeric(12,2)`, the **same constitution III.3 violation** `009`
+corrected in `commission_rules.value`: a float where none is allowed, and a percentage that is not
+basis points. Now `integer`, so `2000` is 20%. A percentage above 10000 bps is rejected, while a
+`fixed_amount` of 250000 — a legitimate 2,500 EGP off a large order — is still accepted, because the
+bound belongs to the type rather than to the column.
+
+Three integrity gaps closed that `data-model.md` §9 left to application code:
+- **`usage_limit_total` is now enforced by a `CHECK`.** Previously nothing stopped `usage_count`
+  passing the cap except whichever RPC remembered to check.
+- **Voucher codes are now case-insensitively unique** via a second unique index on `upper(code)`.
+  `save20` and `SAVE20` would both have been redeemable, and codes are typed by hand from a poster.
+- **`promo_slots` cannot name a target type without a target id**, or the reverse — a slot in the
+  first state cannot be navigated to and one in the second cannot be interpreted.
+
+Also added FK indexes §9 omits for `vouchers.created_by`, `voucher_redemptions.user_id` and
+`voucher_redemptions.order_id` — `voucher_id` leads the existing two, so those three led none.
+
+**Measured, not assumed, on the `uuid[]` question.** §16 removed arrays from `vendors` because
+"JSON arrays cannot be indexed". A GIN index on `uuid[]` **is** accepted by Postgres 17 and **is**
+used — `EXPLAIN (FORMAT JSON)` shows `Bitmap Index Scan` for both `&&` and `@>`. What GIN cannot
+serve is the other branch of the predicate, `applies_to_vendor_ids = '{}'` meaning *all vendors*.
+So the array is fine for vendor membership and unindexable for "applies to everything", and a join
+table would fix the first while needing a sentinel convention for the second. Recorded as open
+question 3.16 rather than converted, with `driver_shifts.area_ids` noted as the same shape.
 
 `notifications` is the first partitioned table in the schema, and the reason is the opposite of
 `rider_location_pings`: pings are empty until Phase 8 so its partitioning was deferred, whereas
