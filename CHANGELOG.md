@@ -49,7 +49,8 @@ Nothing shipped. This project is specification-only.
 
 ### Database
 
-Migrations 001–004 written **and applied** to the live project. 20 tables, 58 indexes.
+Migrations 001–007b written **and applied** to the live project `erxxsebcqqcpkipzcdhg`. 32 tables,
+115 indexes, 0 unindexed foreign keys.
 
 - `001_extensions` — `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`. PostGIS is
   available and deliberately **not** installed: area matching is geohash-prefix plus a haversine
@@ -60,6 +61,18 @@ Migrations 001–004 written **and applied** to the live project. 20 tables, 58 
   `feature_flags`, plus the `on_auth_user_created` trigger
 - `004_vendors` — `brands`, `vendors`, `vendor_areas`, `vendor_schedules`, `vendor_holidays`,
   `cuisines`, `vendor_cuisines`, `vendor_staff`, `vendor_earnings_daily`
+- `005_catalog` — `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options`, `option_choices`
+- `005a` – `005e` — forward fixes from auditing the applied migrations: a `bump_menu_version` column
+  list, seven integrity defects, a `zone_id` column corrected in the fee-tier monotonicity guard, the
+  revoke pass that closed the anon read leak, and the `private` schema
+- `006_cart` — `carts`, `cart_items`
+- `007_orders` — `orders`, `sub_orders`, `order_items`, `order_status_history`,
+  `order_modifications`
+- `007a` — `sync_order_status` joined the transition table on a column that does not exist
+- `007b` — `orders.item_count` could never become non-zero (see **Fixed**)
+
+`order_eta_snapshots` is specified in `data-model.md` §6 and §15.2 but **does not exist yet**, in the
+repository or in the database. Not yet migrated.
 
 Verified against the live database rather than assumed: **0 unindexed foreign keys**, every
 `security definer` function pinned to `search_path = ''`, and the profile gate proven across six
@@ -78,7 +91,33 @@ spec and the database do not disagree.
 
 ### Fixed
 
-- **No fixes yet.** This is where bug fixes land, per Checklist B step 6.
+- **`orders.item_count` could never become non-zero.** `sync_order_status()` derives `item_count`
+  from `order_items`, but it was only ever attached to `sub_orders`. `order_items.sub_order_id` is a
+  `NOT NULL` foreign key, so an order line cannot exist until after its sub-order does — the
+  aggregate was therefore always recomputed *before* any line was counted, and nothing recomputed it
+  afterwards. Every order would have carried `item_count = 0` while holding real items.
+
+  Proven by execution, not inference, on a two-vendor order:
+
+  | step | before | after | actual |
+  |---|---|---|---|
+  | after inserting lines | 0 | 5 | 5 |
+  | one of two sub-orders accepted | 0 | 5 | 5 |
+  | a line's quantity 2 → 4 | 0 | 7 | 7 |
+  | a line deleted | 0 | 4 | 4 |
+  | both sub-orders delivered | 0 | 4 | 4 |
+
+  `vendor_count` was always correct, because it reads `sub_orders` — the table that actually fired the
+  trigger. That asymmetry is what identified the cause.
+
+  Fixed in `007b`. The aggregate `UPDATE` moved into `private.recompute_order_aggregates(uuid)` so
+  `sub_orders` and `order_items` share one definition instead of two copies that can drift, and
+  `order_items` gained statement-level triggers for insert, update and delete. The UPDATE trigger
+  reads both transition tables, because `order_items.order_id` is derived from `sub_order_id` — so
+  moving a line to a different sub-order moves it to a different order, and the order it left would
+  otherwise keep counting a line it no longer has. The helper lives in `private` because it takes an
+  argument, which would otherwise make it a callable PostgREST RPC — the problem `005e` moved
+  `private.is_admin()` out of `public` to solve.
 
 ### Security
 
@@ -100,9 +139,17 @@ spec and the database do not disagree.
 
 Recorded in `open-questions.md` §6. The significant ones:
 
-- No migration `.sql` files exist. The DDL is fenced blocks inside `data-model.md`.
+- Migrations 005–022 have **not** been written. `order_eta_snapshots` is specified but absent, and
+  `rider_location_pings` has an unresolved contradiction over partitioning (see
+  `open-questions.md`) that blocks `008`.
 - No application code. No `apps/`. No `package.json`.
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run verify` do not exist, so **no
   engineering checklist can currently be signed off.** See `AGENTS.md` §Verification commands.
+  Migration assertions to date have been run by hand against the live database.
 - `scripts/check-test-integrity.mjs` does not exist, so rule 4 is unenforced.
+- `scripts/check_schema_drift.py` exists and compares the live database against `data-model.md`, but
+  it reports rather than gates: no baseline has been agreed, so its findings are not yet a build
+  failure.
+- RLS is disabled on all 32 tables. Grants are revoked, so `anon` and `authenticated` can read
+  nothing; the policies land in `014`.
 - The spec has never been reviewed by a human. Every number in it is a proposal.

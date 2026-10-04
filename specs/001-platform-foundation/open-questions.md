@@ -50,6 +50,8 @@ Status: ⬜ open · 🟡 in progress · ✅ resolved (move to `decisions.md`)
 | 3.7 | Should a partially-rejected order auto-remove the vendor, or always ask? | ⬜ | Auto-removing loses basket value silently. Always asking adds friction at the worst moment |
 | 3.8 | Minimum order across the whole cart, or per vendor only? | ⬜ | Per-vendor only is implemented. A cart-wide minimum would raise the average basket but add a failure mode |
 | 3.9 | **Styling: plain `StyleSheet` + a `src/theme/` token module, or NativeWind?** | ✅ **Plain `StyleSheet` + `src/theme/` tokens.** One fewer dependency, no Babel step, and a token module satisfies "zero inline styling" on its own. The `design-system` skill's token-extraction discipline and 10-dimension audit apply; its CSS-custom-property output does not, because this is React Native. Task T0.1d |
+| 3.10 | **Is `rider_location_pings` partitioned from the start, or only once volume justifies it?** | ⬜ **Blocks migration `008`.** The spec contradicts itself. `data-model.md` §7 says "partitioned by month **when volume justifies it**"; §14.1 and task T0.2c say it partitions by month, so retention is `DROP TABLE`. Not cosmetic: a partitioned table's unique constraint must include the partition key, so the specced `bigserial primary key` **fails outright** on a partitioned table and has to become `(recorded_at, id)`. So `008` is either a plain table or a partitioned one with a different primary key, and the spec supports both. Decide before writing `008`, not during |
+| 3.11 | **What does `orders.item_count` count — dishes or order lines? And where does the per-sub-order count come from?** | ⬜ Two separate holes. `data-model.md` §6 declares `item_count integer not null default 0` with **no definition anywhere** — not in an ADR, not in `spec.md`, not here. The applied code uses `sum(quantity)`, verified but never specified. Separately, `contracts.md` §3.1 has `vendor.new_order` carrying `item_count`, but that push is **per sub-order** while `orders.item_count` is whole-order, and **`sub_orders` has no item-count column at all** — so the spec's only stated consumer of `item_count` has no column to read from. Fixing 3.11 needs either a `sub_orders.item_count` column or a change to the push contract. Do not pick silently |
 
 ---
 
@@ -89,10 +91,10 @@ Recorded so they are not mistaken for oversights.
 
 | # | Gap | Impact |
 |---|---|---|
-| 6.1 | **No migration `.sql` files exist.** The DDL lives as fenced blocks in `data-model.md`, ordered by its §14 | Task **T0.1a** extracts them. An agent must not write migrations by hand and drift from the spec |
+| 6.1 | **Migration `.sql` files exist for 001–007b only.** 005, 006 and 007 were extracted from this document and applied; 005a–005e, 007a and 007b are forward fixes written after auditing what ran. The DDL is **still** the source of truth in `data-model.md`, and it has drifted from the applied migrations in at least four places — `orders.status` is documented as "derived, never set directly" when nothing derived it until `007`, `sub_orders.sequence` is documented with a `default 1` that `007` deliberately removed, none of `007`'s money CHECK constraints appear in this document, and `order_eta_snapshots` is specified in §6 and §15.2 but has never been created. Task **T0.1a** closes the remaining 008–022. `scripts/check_schema_drift.py` detects this class mechanically |
 | 6.2 | No seed data script | T0.9 |
 | 6.3 | No `.gitignore` | Must exist before the first commit |
-| 6.4 | No CI | pgTAP policy tests in migration 022 are meant to fail the build; nothing runs them yet |
+| 6.4 | No CI | pgTAP policy tests in migration 022 are meant to fail the build; nothing runs them yet. `scripts/check_schema_drift.py` reports spec-vs-database drift but is **not yet wired to fail a build** — no baseline has been agreed, so it is advisory |
 | 6.5 | No human review of this spec | It is authored, not approved. Treat every number as a proposal |
 | 6.6 | RLS policies are described, not written | Migration 014 |
 | 6.7 | RPC bodies are not written | Migrations 016–020 |

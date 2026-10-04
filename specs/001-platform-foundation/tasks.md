@@ -28,7 +28,6 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       Postgres 17.11, ACTIVE_HEALTHY. Extensions verified available: `pg_trgm`, `btree_gist`,
       `unaccent`, `pg_cron`, `pg_net`, **`pgtap`**, `pg_partman`, `earthdistance`, PostGIS
 - [x] **T-1.13** Firebase project `marketak-eg` created (number `283007295790`) and set active
-- [x] **T-1.13** Firebase project `marketak-eg` created (number `283007295790`) and set active
 - [x] **T-1.14** R2 enabled in the dashboard. Buckets `marketak-public` and `marketak-private`
       created in `EEUR`
 - [x] **T-1.17** Android and iOS apps registered on `marketak-eg` with bundle/package
@@ -51,10 +50,15 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [x] **T0.1a** **Extract every fenced SQL block out of `data-model.md` into
       `supabase/migrations/*.sql`, numbered per `data-model.md` §15.2.** Do not hand-write these.
       Doing this by hand is how the spec and the database drift apart.
-      **Partially done:** 001, 002, 002s, 003, 004 written **and applied** to
-      `erxxsebcqqcpkipzcdhg`. 20 tables, 58 indexes, 0 unindexed foreign keys, profile gate
-      verified across six cases. Found and fixed a real defect: `default auth.users(id)` is
-      illegal in a `DEFAULT` expression. **Remaining: 005–022**
+      **Partially done:** 001–007b written **and applied** to `erxxsebcqqcpkipzcdhg`.
+      32 tables, 115 indexes, 0 unindexed foreign keys, profile gate verified across six cases.
+      005a–005e, 007a and 007b are forward fixes written after auditing what actually ran, which is
+      the pattern to keep — `data-model.md` §15.1 rule 3 forbids editing an applied migration.
+      **Remaining: 008–022.** `008` is **blocked on open question 3.10** (`rider_location_pings`
+      partitioning contradicts itself and the specced `bigserial primary key` fails on a partitioned
+      table). `order_eta_snapshots` is specced in §6 and §15.2 but not yet migrated.
+      Note `007_orders.sql` comments that `payouts` arrives in `010`; §15.2 puts it in `009`, so
+      **`009` adds the `sub_orders.payout_id` foreign key**
 - [ ] **T0.1** Repo scaffold: `supabase/` (migrations, functions, seed), `apps/mobile`
       (customer + rider, one binary, role-switched), `apps/admin-web`, `apps/vendor-web`,
       `packages/shared`
