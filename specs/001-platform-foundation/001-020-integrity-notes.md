@@ -520,7 +520,35 @@ window is not rediscovered as a mystery. Revisit if a second city is ever opened
 `cart_items.selected_options` and `order_items.selected_options` — the two most safety-critical jsonb
 columns, since both feed the price fingerprint — **already have** `jsonb_typeof` CHECKs. Correctly guarded.
 
-## 10. Database state after the suite
+## 11. Batch 9 — `022 rls_tests`, the standing assertions as pgTAP
+
+Batches 1 and 4 were hand-run SQL. They are now `tests.run_all()`, ten checks, run as
+`begin; select * from tests.run_all(); rollback;`. **All ten green**, and green for the right reason —
+a negative test injecting `using ((value)::text = auth.uid()::text)` on `settings` made check 3 fail
+with exactly one offender, `settings.zz_negative_test`, and nothing else. A suite that cannot fail is
+worthless, so that was verified rather than assumed.
+
+The ten: RLS enabled on every table · every RLS table has a policy · no bare `auth.uid()` · every FK is
+the leading column(s) of an index · `private` unreachable by all three roles · ledger not client-writable ·
+`anon` holds no grant · clients hold only SELECT · every table has a PK · every definer pins `search_path`.
+
+Four forward fixes were needed, and **every one was found by running it, not reading it** — the same lesson
+as `017a`, applied four times:
+
+| | Defect | Fix |
+|---|---|---|
+| `022a` | pgtap calls `_set()` unqualified, so `search_path = ''` broke it. Also `run_all` was `SECURITY DEFINER` for no reason — it only reads world-readable catalogs | invoker + `search_path = extensions`; grant tightened from `authenticated` to `service_role` |
+| `022b` | this pgtap 1.3.3 provides `plan`, `is`, `ok`, `no_plan` but **no `finishes`** | dropped it; redundant, since the loop bound and `plan()` use the same `array_length` |
+| `022c` | FK check flagged the 5 deliberate unindexed FKs from batch 3 | allowlisted **by name with the reason attached**, so a *new* unindexed FK still fails |
+| `022d` | the bare-`auth.uid()` lint flagged **34 correct policies** across two wrong regexes | rewritten to the only question that matters: is `auth.uid()` preceded by `select`? |
+
+`022d` is the one worth keeping. Both earlier attempts tried to strip correctly-parenthesised subselects
+with a regex and neither matched, because the policies **nest** — `((owner_id IN ( SELECT
+private.account_ids_for(( SELECT auth.uid() AS uid)) …` has four opens before the call. The fix is not a
+better pattern; it is noticing that the alias, spacing and nesting are all irrelevant to the question
+being asked, and that the question is answerable in one clause.
+
+## 12. Still to do
 
 All fixtures rolled back. Every public table is empty except the three seeded by earlier migrations
 (`commission_rules`=2, `notification_templates`=38, `settings`=13). `auth.users` = 0.
@@ -531,5 +559,10 @@ All fixtures rolled back. Every public table is empty except the three seeded by
   `data-model.md:15` to say so — open question 3.31.
 - Add the `jsonb_typeof` CHECKs to `stop_sequence`, `quote_snapshot`, `address_snapshot` and the three
   `menu_items` columns — open question 3.32. All six tables are empty, so no validation pass is needed.
-- 022 `rsl_tests` should carry the standing assertions from batches 1 and 4 as pgTAP, so the privilege
-  surface and the ledger immutability checks stop being hand-run SQL.
+- `021 cron` — the pg_cron jobs and prune functions. **Not started.** Two gaps found while scoping it:
+  `rider_location_pings` and `order_eta_snapshots` have **no index on `created_at`**, which is exactly the
+  "un-indexed prune queries are themselves a load problem" `free-tier-plan` §3.7 warns about, so those
+  indexes must ship with the jobs. `audit_log` and `notifications` are monthly-partitioned and prune by
+  `DROP TABLE`; `events` is deliberately unpartitioned (7-day window) and prunes by batched `DELETE`.
+  `pg_cron` is already in `shared_preload_libraries`, so 021 can be applied from SQL rather than needing a
+  dashboard restart.
