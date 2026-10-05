@@ -228,6 +228,7 @@ half-built surface.
 | `025_admin_money_config.sql` | `get_fee_rules_v1`, `set_fee_tier_v1`, `get_commission_v1`, `set_commission_rule_v1`, `freeze_wallet_v1`, `list_frozen_v1` | The six, first, because they are the named gap |
 | `026_admin_geo_vendor.sql` | `cities`, `areas`, `vendors`, `brands`, `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_schedules`, `vendor_holidays`, `vendor_staff` | Enough to load a real merchant |
 | `027_admin_menu.sql` | `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` | The catalog |
+| `027a_fix_admin_menu.sql` | The two repairs `027` needed. Not in the original plan | See §7a |
 | `028_admin_engagement_users.sql` | `promo_slots`, `notification_templates`, `vouchers`, `feature_flags`, `user_roles` | Config and moderation |
 | `029_reviews.sql` | `create_review_v1` (customer) and `admin_set_review_hidden_v1` (admin) | Reviews are unwritable by anyone today |
 | `030_admin_read_only.sql` | read RPCs for Tier 2 and the `riders` projection | Nothing to write, by design |
@@ -250,6 +251,52 @@ The 022 suite gains four checks, so a regression here fails the build rather tha
 Each migration is then executed by hand, in a rolled-back transaction, covering at minimum:
 the happy path · a non-admin caller refused · an unknown `p_patch` key refused · a soft-deleted row
 not editable · `events` written exactly once · `updated_at` bumped · money idempotency replayed.
+
+### 7a. Amended after `027` — an assertion must EXECUTE, not merely inspect
+
+**This subsection exists because `027` shipped applied, fully green, and unusable.** Two of its
+fifteen functions were broken and all four checks below were satisfied:
+
+- `admin_upsert_menu_item_v1` read `tags` with `(p_patch->'tags')::text[]`. PostgreSQL has no
+  `jsonb → text[]` cast, and the cast resolves at run time whether or not the key is present, so
+  **every** create and every update raised `cannot cast type jsonb to text[]`. The function had never
+  once succeeded.
+- The `item_options_read` policy it added named `public.item_options` inside its own `USING`
+  expression, so PostgreSQL refused to plan it: `42P17 infinite recursion detected in policy` on every
+  `SELECT` of `item_options` **and** `option_choices`, for `authenticated` and for admins alike.
+
+All thirteen of `027`'s assertions read `pg_proc` and `pg_policies` **as text**. None executed a
+function body. None executed a `SELECT`. `tests.run_all()` was 11/11 green throughout, because none
+of its eleven checks runs a policy either.
+
+**The rule, for `028`–`031` and every migration after:** an assertion that only inspects the catalog
+is not evidence that anything runs. A body that is syntactically perfect and semantically dead passes
+every text-shaped check there is. So each migration in this plan must carry, in addition to the four
+checks above:
+
+1. **An executed read.** Switch to `authenticated` inside the assertion block and actually issue the
+   `SELECT` against every table the migration adds or amends a policy on. Assert the statement
+   *returns*. For any policy added or replaced, assert it does not name its own table — stated over
+   `pg_policies` as a general guard, with a negative test in both directions.
+2. **An executed write.** Inside a subtransaction, create the minimum fixture the function needs, call
+   it, assert the observable effect, then roll back by raising a sentinel exception, and finally assert
+   that the probe leaked no rows. The probe must seed its own fixture rather than borrow one: an
+   assertion that quietly skips when the table it needs is empty is a fail-open, which is the defect it
+   exists to catch.
+
+Two traps, both hit while writing `027a`, and both now recorded in that file because each produces an
+assertion that passes for the wrong reason:
+
+- **A policy's qual is rendered against `search_path`, so a self-reference appears unqualified**
+  (`FROM item_options io`), never as `public.item_options io`. A detector written with the schema
+  prefix will not match a real self-reference, and its own negative test will not match either.
+- **`tags = []` is `cardinality = 0`, not `array_length = 0` and not `array_to_string = NULL`.**
+  `array_length('{}')` is NULL and `array_to_string('{}', ',')` is `''`, so a `coalesce` written
+  against either never fires. Only `cardinality` distinguishes cleared from absent.
+
+And the discipline `027` already got right, repeated because it is what let the negative tests exist
+at all: **a regex that cannot fail is not a check.** Three earlier versions of `026`'s no-`DELETE`
+assertion matched nothing and each shipped green. Every pattern above carries a negative test.
 
 ## 8. Resolved by decision
 

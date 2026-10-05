@@ -8,7 +8,8 @@ RPC in fact exists.
 This file exists so Checklist A step 6 has somewhere to add a line, and so nobody has to guess what
 exists.
 
-Legend: ⬜ not started · 🟡 in progress · ✅ shipped · ❌ cut
+Legend: ⬜ not started · 🟡 in progress · ✅ shipped · ❌ cut · DB ready = the database capability exists and
+is verified, but no user-facing surface can call it yet, because no application code exists
 
 ---
 
@@ -24,7 +25,7 @@ Legend: ⬜ not started · 🟡 in progress · ✅ shipped · ❌ cut
 | C-06 | **Multi-vendor cart**, grouped and totalled per vendor, max 3 vendors | ⬜ | FR-C-04 |
 | C-07 | Cart survives app restart, device change and offline | ⬜ | FR-C-05 |
 | C-08 | Live price quote with the vendor-count uplift shown in plain language | ✅ | FR-C-06, §2.5 |
-| C-09 | Voucher application, scoped per vendor or order-wide | ⬜ | FR-C-07 |
+| C-09 | Voucher application, scoped per vendor or order-wide | DB ready | FR-C-07 |
 | C-10 | Place an order, human-readable order number | ✅ | FR-C-08 |
 | C-11 | **Choose cash or wallet at delivery**, not at checkout | ⬜ | FR-C-09 |
 | C-12 | Cancel while allowed, policy-gated, reason recorded | ⬜ | FR-C-10 |
@@ -70,13 +71,47 @@ All vendor surfaces are **web dashboard** (Cloudflare Pages). There is no native
 | A-01 | Approve vendors; configure areas, zones, **fee tiers** and **rider pay rules** live | ⬜ | FR-A-01 |
 | A-02 | Verify riders and vendors, documents via signed URLs | ⬜ | FR-A-02 |
 | A-03 | Daily cash reconciliation, with a written explanation for any variance | ✅ | FR-A-03 |
-| A-04 | Create vouchers with scoping, caps and usage limits | ⬜ | FR-A-04 |
+| A-04 | Create vouchers with scoping, caps and usage limits | DB ready | FR-A-04 |
 | A-05 | Set, target and toggle feature flags without a release | ⬜ | FR-A-05 |
 | A-06 | Run and approve settlement and payout batches | ✅ | FR-A-06 |
 | A-07 | Live order monitor with intervention | ⬜ | FR-A-07 |
 | A-08 | Analytics: funnel, area performance, delivery-time percentiles | ⬜ | FR-A-08 |
 | A-09 | **Turn vendor commission on** when supply can absorb it | ⬜ | FR-A-09, ADR 3 |
 | A-10 | Adjust a vendor or rider wallet, mandatory reason, signed ledger entry | ✅ | FR-A-10 |
+
+**Database capability shipped, features still ⬜.** Three migrations provide the RPCs behind A-01
+(areas, zones, fee tiers, vendors), A-02 (vendor approval) and A-09 (turn vendor commission on), plus
+a wallet freeze that no feature row covers.
+
+| Migration | What it provides |
+|---|---|
+| `025_admin_money_config` | `get_fee_rules_v1`, `set_fee_tier_v1`, `get_commission_v1`, `set_commission_rule_v1`, `freeze_wallet_v1`, `list_frozen_v1` |
+| `026_admin_geo_vendor` | 30 functions over `cities`, `areas`, `vendors`, `brands`, `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_schedules`, `vendor_holidays`, `vendor_staff` — upsert, soft delete, restore |
+| `027_admin_menu` | 15 functions over `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` — upsert, soft delete, restore |
+| `036_voucher_scope_fix` | Makes C-09 possible. An empty `applies_to_vendor_ids` now means **every vendor** rather than none, so "all shops" stops being inexpressible and a voucher survives vendors onboarded later |
+| `037_voucher_admin_rpc` | A-04. `admin_upsert_voucher_v1`, `admin_delete_voucher_v1`, `admin_restore_voucher_v1` - the RPCs behind the voucher screen, which had none before |
+
+**Verified end-to-end against the live database.** `036` and `037` were proven by executing the
+surface, not by reading it. Scopes all behave: an empty list works everywhere, one vendor applies to
+that vendor, two vendors apply to either, and a mis-scoped code is still refused with
+`VOUCHER_NOT_APPLICABLE`. Two-vendor checkout money splits exactly - delivery fee 3000 split 1607 +
+1393, discount 5600 split 3000 + 2600. Driver claims, delivers and collects cash end to end. The
+reusable fixture is `specs/001-platform-foundation/e2e-fixture.json`.
+
+**One known gap.** Reviews never roll up: a 5-star review leaves `vendors.rating_avg` at 0.00 because
+nothing on `public.reviews` updates it. C-16 and every vendor rating surface are affected. Not fixed.
+A merchant **can** be loaded end-to-end — geography, identity and dishes — through `026`, `027` and
+`027a`, and does appear in the customer app. That was verified by execution, not inspection: 59
+behavioural probes plus the fifteen-function auth gate, all re-run against the live database after
+`027a`. The features stay ⬜ because **there is no application code** — no admin console exists to
+call any of it, and a ⬜ here means "a user cannot do this yet".
+
+`027` shipped applied and green, and was unusable for two days. Recorded because it is the general
+warning, not an anecdote about this file: **an assertion block that only reads `pg_proc` and
+`pg_policies` as text cannot tell working code from dead code.** All thirteen of `027`'s assertions
+passed, and so did `tests.run_all()` 11/11, while a function that had never once succeeded sat in the
+middle of the catalog. `admin-crud-plan.md` §7 has been amended to require executing a function body
+and a policy, not inspecting them, and `027a` ships the two assertions that would have caught both.
 
 ## Money
 
@@ -110,8 +145,19 @@ All vendor surfaces are **web dashboard** (Cloudflare Pages). There is no native
 | P-08 | Crashlytics with `app_role`, version and screen, hashed ids only | ⬜ | plan §5 |
 | P-09 | Firebase Analytics funnel, no PII | ⬜ | plan §5 |
 | P-10 | Durable Objects live tracking | ⬜ | Phase 8, flag off |
-| P-11 | Retention jobs: prune transients, archive order detail at 60 days | ⬜ | §9, T7.1 |
+| P-11 | Retention jobs: prune transients, archive order detail at 60 days | DB ready — half | §9, T7.1 |
 | P-12 | Nightly export to R2, with a restore test before launch | ⬜ | T6.9, T6.10 |
+
+**`035_retention_and_cron` covers the pruning half of P-11, and only that half.** `pg_cron` is
+installed and six jobs are scheduled and active: `prune_events` (7 d, hourly), `prune_order_eta_snapshots`
+(24 h, hourly), `prune_notifications` (30 d, daily), `prune_rider_location_pings` (30 d, daily),
+`ensure_partitions` (monthly, creating the current and next month so `notifications` cannot fail on the
+1st), and a nightly `VACUUM ANALYZE` on the four highest-churn tables. Each prune batches `limit 1000`
+with a `pg_sleep` between, and each has an index on its prune column.
+
+Two things P-11 still wants and `035` does not do: `audit_log` is partitioned for a 365-day window but
+**has no prune job**, and the 60-day order-detail archive does not exist. P-11 is also not marked ✅
+because the push-notification drain it partly exists to protect (`claim_events_v1`) is still missing.
 
 ---
 

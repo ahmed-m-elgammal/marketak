@@ -1,0 +1,454 @@
+{
+  "$comment": "Marketak end-to-end test fixture. 1 admin + 1 customer + 2 vendors + 1 rider. Every id is a deterministic uuid so re-runs are idempotent. Money is in piastres (EGP). Nothing here is secret; these are throwaway test identities.",
+  "version": "1.0.0",
+  "project_id": "erxxsebcqqcpkipzcdhg",
+  "currency": "EGP",
+
+  "actors": {
+    "admin": {
+      "auth_user_id": "00000000-0000-0000-0000-000000000001",
+      "email": "admin@marketak.test",
+      "phone": "+201000000001",
+      "user_role": "admin",
+      "note": "Only actor that may call admin_upsert_*. Insert into user_roles is what makes private.is_admin() true."
+    },
+    "customer": {
+      "auth_user_id": "00000000-0000-0000-0000-000000000002",
+      "email": "customer@marketak.test",
+      "phone": "+20111110001",
+      "first_name": "Sara",
+      "last_name": "Ahmed",
+      "preferred_language": "ar",
+      "note": "profile_completed_at must be set via complete_profile_v1 or place_order_v1 raises PROFILE_INCOMPLETE."
+    },
+    "vendor_staff": {
+      "auth_user_id": "00000000-0000-0000-0000-000000000003",
+      "email": "staff@marketak.test",
+      "staff_role": "manager",
+      "can_edit_menu": true,
+      "can_manage_orders": true,
+      "note": "One staff row per vendor; the SAME user_id may staff both vendors. private.vendor_ids_for() is what authorises transition_order_v1."
+    },
+    "rider": {
+      "auth_user_id": "00000000-0000-0000-0000-000000000004",
+      "riders_id": "00000000-0000-0000-0000-000000000004",
+      "email": "rider@marketak.test",
+      "phone": "+20111110002",
+      "first_name": "Rami",
+      "country_code": "EG",
+      "vehicle_type": "motorcycle",
+      "status": "available",
+      "is_verified": true,
+      "is_online": true,
+      "current_latitude": 30.0444,
+      "current_longitude": 31.2357,
+      "note": "status must be one of offline|available|assigned|on_break. 'online' is REJECTED by riders_status_check. is_verified must be true or claim_order_v1 raises RIDER_NOT_ELIGIBLE. Location must be set or get_available_orders_v1 raises RIDER_LOCATION_REQUIRED."
+    }
+  },
+
+  "geo": {
+    "city": {
+      "code": "CAI",
+      "name": "Cairo",
+      "name_ar": "القاهرة",
+      "country_code": "EG",
+      "timezone": "Africa/Cairo",
+      "center_lat": 30.0444,
+      "center_lng": 31.2357,
+      "is_primary": true
+    },
+    "area": {
+      "slug": "zamalek",
+      "name": "Zamalek",
+      "name_ar": "الزمالك",
+      "geohash_prefix": "u4pr",
+      "center_lat": 30.0444,
+      "center_lng": 31.2357,
+      "radius_km": 3.0
+    },
+    "delivery_zone": {
+      "name": "Zamalek Zone",
+      "name_ar": "منطقة الزمالك",
+      "delivery_base_fee": 2500,
+      "free_radius_km": 5.0,
+      "per_km_fee": 200,
+      "max_vendors_per_order": 3,
+      "min_order_value": 0,
+      "max_distance_km": 12
+    },
+    "fee_tiers": {
+      "$comment": "MANDATORY. compute_quote raises MISSING_FEE_TIER without a row for the vendor count. Must cover 1..max_vendors_per_order.",
+      "1": 10000,
+      "2": 12000,
+      "3": 14000
+    }
+  },
+
+  "rider_pay_rules": {
+    "$comment": "One active row per city. Without it claim_order_v1 still runs but has_pay_rule is false and pay is base-only.",
+    "per_trip_amount": 3000,
+    "per_km_amount": 150,
+    "pct_of_delivery_fee_bps": 10000,
+    "bonus_per_leg": 0
+  },
+
+  "vendors": [
+    {
+      "key": "pizza_place",
+      "slug": "pizza-place",
+      "name": "Pizza Place",
+      "name_ar": "بيتزا بليس",
+      "vertical_type": "food",
+      "latitude": 30.0444,
+      "longitude": 31.2357,
+      "geohash_prefix": "u4pr",
+      "contact_phone": "+201000000101",
+      "is_open": true,
+      "is_approved": true,
+      "prep_time_minutes": 15,
+      "prep_time_max_minutes": 30,
+      "categories": [
+        {
+          "key": "mains",
+          "name": "Mains",
+          "name_ar": "الرئيسيات",
+          "display_order": 1,
+          "items": [
+            {
+              "key": "margherita",
+              "name": "Margherita",
+              "name_ar": "بيتزا مارجريتا",
+              "description": "Tomato, mozzarella, basil",
+              "pricing_mode": "fixed",
+              "base_price": 18000,
+              "tags": ["pizza", "vegetarian"],
+              "allergens": ["gluten", "dairy"],
+              "is_featured": true,
+              "$comment": "CREATE FIXED, NOT SIZED. A row created in this transaction provably has no sizes yet, so creating it with pricing_mode=sized is refused with ITEM_SIZED_BUT_NO_SIZES. Seed order: create as fixed with base_price, add sizes, then PATCH {pricing_mode:'sized'}. base_price may equal the smallest size; it is discarded once the mode flips.",
+              "sizes": [
+                { "name": "Small", "name_ar": "صغير", "price": 18000, "display_order": 1, "is_default": true },
+                { "name": "Large", "name_ar": "كبير", "price": 26000, "display_order": 2, "is_default": false }
+              ],
+              "options": [
+                {
+                  "name": "Extra cheese",
+                  "name_ar": "جبان إضافية",
+                  "is_required": false,
+                  "min_selections": 0,
+                  "max_selections": 2,
+                  "choices": [
+                    { "name": "Cheddar", "name_ar": "شيدر", "price_modifier": 500, "is_default": true },
+                    { "name": "Mozzarella", "name_ar": "موزاريلا", "price_modifier": 400, "is_default": false }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "garlic_bread",
+              "name": "Garlic Bread",
+              "name_ar": "عيش بالثوم",
+              "pricing_mode": "fixed",
+              "base_price": 6000,
+              "tags": ["side"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "burger_house",
+      "slug": "burger-house",
+      "name": "Burger House",
+      "name_ar": "برجر هاوس",
+      "vertical_type": "food",
+      "latitude": 30.045,
+      "longitude": 31.236,
+      "geohash_prefix": "u4pr",
+      "contact_phone": "+201000000102",
+      "is_open": true,
+      "is_approved": true,
+      "prep_time_minutes": 12,
+      "prep_time_max_minutes": 25,
+      "categories": [
+        {
+          "key": "burgers",
+          "name": "Burgers",
+          "name_ar": "برجر",
+          "display_order": 1,
+          "items": [
+            {
+              "key": "classic_burger",
+              "name": "Classic Burger",
+              "name_ar": "برجر كلاسيك",
+              "pricing_mode": "fixed",
+              "base_price": 15000,
+              "tags": ["beef"],
+              "allergens": ["gluten"],
+              "options": [
+                {
+                  "name": "Extra patty",
+                  "name_ar": "قرص إضافي",
+                  "is_required": false,
+                  "min_selections": 0,
+                  "max_selections": 1,
+                  "choices": [
+                    { "name": "Beef patty", "name_ar": "قرص بقري", "price_modifier": 6000, "is_default": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "fries",
+              "name": "Fries",
+              "name_ar": "بطاطس",
+              "pricing_mode": "fixed",
+              "base_price": 5000,
+              "tags": ["side"]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "customer_address": {
+    "label": "home",
+    "geohash": "u4prqy",
+    "geohash_prefix": "u4pr",
+    "latitude": 30.05,
+    "longitude": 31.24,
+    "area_name": "Zamalek",
+    "is_default": true,
+    "$comment": "area_id MUST be set to the fixture area, and a delivery_zone MUST exist for that area, or quote_order_v1 raises NO_DELIVERY_ZONE."
+  },
+
+  "vouchers": [
+    {
+      "code": "SAVE10",
+      "name": "10% off",
+      "discount_type": "percentage",
+      "discount_value": 1000,
+      "min_order_value": 0,
+      "usage_limit_total": 100,
+      "usage_limit_per_user": 5,
+      "applies_to_vendor_ids": "ALL_VENDORS",
+      "is_active": true,
+      "$comment": "discount_value is BASIS POINTS: 1000 = 10.0%. An empty applies_to_vendor_ids array makes the code unusable - see KNOWN_BLOCKER below. Substitute both vendor uuids at seed time."
+    },
+    {
+      "code": "FREEDEL",
+      "name": "Free delivery",
+      "discount_type": "free_delivery",
+      "discount_value": 0,
+      "min_order_value": 10000,
+      "usage_limit_total": 50,
+      "usage_limit_per_user": 2,
+      "applies_to_vendor_ids": "ALL_VENDORS",
+      "is_active": true
+    },
+    {
+      "code": "PIZZAONLY",
+      "name": "Pizza only",
+      "discount_type": "percentage",
+      "discount_value": 1500,
+      "min_order_value": 0,
+      "usage_limit_total": 100,
+      "usage_limit_per_user": 5,
+      "applies_to_vendor_ids": ["pizza_place"],
+      "is_active": true,
+      "$comment": "Demonstrates vendor scoping. Fails with VOUCHER_NOT_APPLICABLE on a cart containing only burger_house."
+    }
+  ],
+
+  "scenarios": {
+    "$comment": "Each scenario is an independent run. Reset between scenarios.",
+
+    "A_single_vendor": {
+      "title": "Customer orders from one vendor only",
+      "actors": ["customer", "vendor_staff", "rider"],
+      "steps": [
+        { "as": "customer", "call": "cart insert", "items": [{ "vendor": "pizza_place", "item": "margherita", "size": "Large", "quantity": 1, "options": ["Extra cheese:Cheddar"] }] },
+        { "as": "customer", "call": "quote_order_v1", "voucher": "SAVE10", "rider_tip": 0, "delivery_type": "delivery", "grouping": "together" },
+        { "as": "customer", "call": "place_order_v1", "payment_method": "cash" },
+        { "as": "vendor_staff", "call": "transition_order_v1", "to": ["accepted", "preparing", "ready"] },
+        { "as": "rider", "call": "get_available_orders_v1", "radius_km": 10 },
+        { "as": "rider", "call": "claim_order_v1" },
+        { "as": "rider", "call": "begin_collection_v1", "payment_method": "cash", "channel": "cod" },
+        { "as": "rider", "call": "transition_order_v1", "to": ["picked_up", "delivering", "delivered"] },
+        { "as": "rider", "call": "complete_delivery_v1", "proof_path": "proof/A.jpg" },
+        { "as": "rider", "call": "collect_cash_v1", "reference": "REF-A" }
+      ],
+      "expect": {
+        "sub_order_count": 1,
+        "order_status": "delivered",
+        "payment_status": "collected",
+        "commission_amount": 0,
+        "vendor_net_payout_equals_subtotal": true
+      }
+    },
+
+    "B_two_vendors": {
+      "title": "Customer orders from two vendors in one checkout",
+      "actors": ["customer", "vendor_staff", "rider"],
+      "steps": [
+        { "as": "customer", "call": "cart insert", "items": [
+          { "vendor": "pizza_place", "item": "margherita", "size": "Large", "quantity": 1 },
+          { "vendor": "burger_house", "item": "classic_burger", "quantity": 2 }
+        ] },
+        { "as": "customer", "call": "quote_order_v1", "voucher": "SAVE10", "rider_tip": 0, "delivery_type": "delivery", "grouping": "together" },
+        { "as": "customer", "call": "place_order_v1", "payment_method": "cash" },
+        { "as": "vendor_staff", "call": "transition_order_v1", "to": ["accepted", "preparing", "ready"], "note": "call once per sub_order_id" },
+        { "as": "rider", "call": "get_available_orders_v1", "radius_km": 10, "note": "creates ONE assignment covering both vendors" },
+        { "as": "rider", "call": "claim_order_v1" },
+        { "as": "rider", "call": "begin_collection_v1", "payment_method": "cash", "channel": "cod" },
+        { "as": "rider", "call": "transition_order_v1", "to": ["picked_up", "delivering", "delivered"], "note": "call once per sub_order_id" },
+        { "as": "rider", "call": "complete_delivery_v1", "note": "requires ALL sub_orders delivered first, else SUB_ORDERS_INCOMPLETE" },
+        { "as": "rider", "call": "collect_cash_v1", "reference": "REF-B" }
+      ],
+      "expect": {
+        "sub_order_count": 2,
+        "one_delivery_assignment": true,
+        "multiplier_bps": 12000,
+        "delivery_fee_charged_once": true,
+        "discount_split_across_vendors": true
+      },
+      "assertions": [
+        "SUM(sub_orders.delivery_fee_share) == orders.delivery_fee",
+        "SUM(sub_orders.discount_share) == orders.voucher_discount",
+        "SUM(sub_orders.subtotal) == orders.subtotal",
+        "COUNT(delivery_assignments) == 1"
+      ]
+    },
+
+    "C_driver_earnings": {
+      "title": "Rider's own view of what they earned",
+      "steps": [
+        { "as": "rider", "call": "get_rider_earnings_v1", "from": "today", "to": "today" }
+      ],
+      "expect": { "rider_pay_total_matches_claim": true }
+    },
+
+    "D_admin_payout_view": {
+      "title": "Admin sees what each vendor and the rider are owed",
+      "steps": [
+        { "as": "admin", "call": "get_admin_metrics_v1" },
+        { "as": "admin", "call": "get_platform_float_v1" },
+        { "as": "admin", "call": "reconcile_day_v1" },
+        { "as": "admin", "call": "run_payout_v1", "payout_type": "vendor", "action": "preview" },
+        { "as": "admin", "call": "run_payout_v1", "payout_type": "rider", "action": "preview" }
+      ],
+      "assertions": [
+        "rider_pay_total + vendor_net_payouts + platform_revenue == orders.total",
+        "platform_revenue == SUM(ledger_entries.signed_amount) where account_type='platform'"
+      ]
+    }
+  },
+
+  "known_blockers": {
+    "$comment": "Superseded by known_blockers_remaining, which reflects post-036 state.",
+    "voucher_applies_to_vendor_ids_empty_array": {
+      "severity": "launch_blocker",
+      "location": "private.compute_quote",
+      "rule": "if v_voucher.applies_to_vendor_ids is not null and not (v_voucher.applies_to_vendor_ids && v_vendor_ids) then reject VOUCHER_NOT_APPLICABLE",
+      "problem": "The column is NOT NULL DEFAULT '{}'. An empty array overlaps nothing, so every voucher created with defaults is rejected on every cart.",
+      "workaround": "At seed time, populate applies_to_vendor_ids with the explicit vendor uuid list. The fixture uses the token ALL_VENDORS for this.",
+      "root_cause": "No representation exists for 'applies to all vendors', including vendors created after the voucher."
+    },
+    "vendor_rating_never_rolls_up": {
+      "severity": "high",
+      "problem": "No trigger on public.reviews updates vendors.rating_avg / rating_count. After inserting a 5-star review both stay 0.",
+      "symptom": "Every vendor shows as unrated forever."
+    },
+    "assignment_created_by_rider_feed": {
+      "severity": "informational",
+      "problem": "delivery_assignments rows are inserted by get_available_orders_v1, not by place_order_v1.",
+      "implication": "The rider app must call get_available_orders_v1 before claim_order_v1, or claim raises ASSIGNMENT_NOT_FOUND."
+    }
+  },
+
+  "seed_order": [
+    "1. create admin auth user + user_roles(admin)",
+    "2. as admin: city -> area -> vendor x2 -> vendor_area x2 -> category per vendor",
+    "3. as admin: create every item as pricing_mode=fixed WITH base_price (sized is refused at create time: ITEM_SIZED_BUT_NO_SIZES)",
+    "4. as admin: add sizes / options / choices to the items that need them",
+    "5. as admin: PATCH {pricing_mode:'sized'} on the items that have sizes",
+    "6. as admin: delivery_zone + fee_tiers 1..max_vendors_per_order + rider_pay_rules",
+    "7. as admin: vouchers (substitute the ALL_VENDORS token with the explicit uuid list)",
+    "8. as customer: complete_profile_v1 -> addresses row (area_id must match the seeded area)",
+    "9. as vendor_staff: vendor_staff row per vendor",
+    "10. as rider: riders row with status='available' (NOT 'online'), is_verified=true, location set",
+    "11. run scenario A, reset, run scenario B, reset"
+  ],
+
+  "verified_against_live_database": {
+    "date": "2026-10-05",
+    "project_id": "erxxsebcqqcpkipzcdhg",
+    "scenario_A_single_vendor": "PASS",
+    "scenario_B_two_vendors": "PASS",
+    "money_split_two_vendors": {
+      "subtotal": 56000,
+      "delivery_fee": 3000,
+      "multiplier_bps_used": 12000,
+      "delivery_fee_share_sum": 3000,
+      "voucher_10pct": 5600,
+      "discount_share_sum": 5600,
+      "total": 53400,
+      "commission": 0
+    },
+    "driver_claim_and_delivery": {
+      "one_assignment_for_two_vendors": true,
+      "rider_pay_total": 3134,
+      "platform_revenue": 600,
+      "distance_km": 0.894,
+      "cash_collected": 53400,
+      "cash_held_by_rider": 53400
+    },
+    "scoped_voucher_PIZZAONLY": {
+      "subtotal": 26000,
+      "discount_15pct": 3900,
+      "total": 24600
+    },
+    "traps_encountered_and_hardened": [
+      "riders.status='online' is rejected; allowed set is offline|available|assigned|on_break",
+      "rider must be is_verified=true or claim_order_v1 raises RIDER_NOT_ELIGIBLE",
+      "rider must share a location or get_available_orders_v1 raises RIDER_LOCATION_REQUIRED",
+      "delivery_assignments rows are created by get_available_orders_v1, NOT by place_order_v1; the rider app must open the feed before claiming",
+      "transition_order_v1 requires the sub_order_id for multi-vendor orders; passing NULL raises SUB_ORDER_NOT_FOUND",
+      "two-vendor order needs a fee tier row for vendor_count=2 or the quote raises MISSING_FEE_TIER",
+      "complete_delivery_v1 requires EVERY sub_order already delivered or it raises SUB_ORDERS_INCOMPLETE",
+      "cash collection channel must be 'cod' for cash payment; 'cash' raises PAYMENT_CHANNEL_INVALID",
+      "select id from sub_orders limit 1 and offset 1 are NOT guaranteed to differ; order by sequence to pick distinct sub_orders"
+    ]
+  },
+
+  "known_blockers_remaining": {
+    "vendor_rating_never_rolls_up": {
+      "severity": "high",
+      "problem": "No trigger on public.reviews updates vendors.rating_avg / rating_count. After inserting a 5-star review both stay 0.00 and 0.",
+      "symptom": "Every vendor shows as unrated forever.",
+      "status": "NOT FIXED - separate migration required"
+    },
+    "no_voucher_admin_rpc": {
+      "severity": "medium",
+      "problem": "Zero public functions match '%voucher%'. Vouchers can only be created by direct SQL.",
+      "status": "NOT FIXED - the voucher fix in 036 makes the scope usable, but there is still no dashboard path to create one"
+    },
+    "voucher_scope_fix": {
+      "severity": "was launch_blocker",
+      "status": "FIXED in 036_voucher_scope_fix - empty applies_to_vendor_ids now means ALL vendors",
+      "fixture_note": "The ALL_VENDORS token in this file is still needed because vouchers have no admin RPC; seed time must write the explicit uuid list."
+    }
+  },
+
+  "reset": {
+    "$comment": "Every actor uses a fixed uuid, so reset is a delete by id, not by pattern. Run inside a transaction that you roll back for read-only assertions.",
+    "statements": [
+      "delete from auth.users where id in ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000004')"
+    ],
+    "cascades_from_auth_users": [
+      "identities", "sessions", "mfa_factors", "one_time_tokens", "oauth_authorizations",
+      "oauth_consents", "webauthn_credentials", "webauthn_challenges", "scim_users",
+      "users", "settings", "feature_flags", "commission_rules", "mfa_recovery_code_sets"
+    ]
+  }
+}

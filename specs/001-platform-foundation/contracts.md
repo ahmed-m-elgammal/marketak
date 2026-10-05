@@ -150,7 +150,6 @@ section** while `data-model.md` §15.2 assigned it to `017`. Its signature is de
 
 ### 1.6 Vendor
 
-
 | Function | Returns | Notes |
 |---|---|---|
 | `list_vendor_orders_v1(p_status text)` | open sub-orders for the caller's vendor | The source behind `BranchInbox` |
@@ -250,17 +249,45 @@ Wallets exist for **vendors and riders only**. There is no customer wallet and n
 |---|---|---|
 | `get_wallet_v1(p_owner_type text, p_owner_id uuid)` | balance, status, recent entries | Vendor or rider. RLS limits the caller to their own |
 | `adjust_wallet_v1(p_owner_type, p_owner_id, p_amount, p_reason, p_reference, p_idempotency_key)` | new balance, ledger entry id | Admin only. `p_reason` is mandatory. Writes a signed `adjustment` entry |
-| `freeze_wallet_v1(p_owner_type, p_owner_id, p_reason)` | void | Blocks further payouts pending investigation |
-| `list_frozen_v1()` | frozen wallets with reasons | Admin |
+| `freeze_wallet_v1(p_owner_type, p_owner_id, p_reason, p_idempotency_key)` | wallet row + `frozen` flag | Blocks further payouts pending investigation. **Shipped by `025`**, which added the fourth `p_idempotency_key` argument: a retry is the one case where a replayed call could otherwise produce a second freeze-shaped effect |
+| `list_frozen_v1()` | frozen and under-review wallets with reasons and balances | Admin. **Shipped by `025`** |
 | `get_platform_float_v1(p_from date, p_to date)` | daily float with `variance` | The only cash exposure |
 | `reconcile_day_v1(p_date date)` | expected vs banked vs owed, per account | **Must return zero unexplained variance** |
 | `run_vendor_payout_v1(p_vendor_id, p_period)` | `payout_id` | `payable → in_payout` in one transaction |
 | `run_rider_payout_v1(p_rider_id, p_period)` | `payout_id` | Includes cash remittance, zeroes `cash_held` |
 | `approve_payout_v1(p_payout_id, p_approve, p_method, p_reference)` | new status | |
-| `get_commission_v1(p_scope, p_target_id)` | effective rules | Read-only. Returns the **active rider cut** and the **inactive vendor row** |
-| `set_commission_rule_v1(p_rule_id, p_value, p_is_active)` | the rule | Admin. Sets `effective_from = now()`, so activation is never retroactive |
-| `get_fee_rules_v1(p_zone_id uuid)` | base fee, free radius, per-km, `max_vendors`, all tiers | Read-only, for the admin console and for support |
-| `set_fee_tier_v1(p_zone_id, p_vendor_count, p_multiplier_bps)` | the tier | Admin. Basis points, so no float ever enters the fee |
+| `get_commission_v1(p_scope, p_target_id)` | effective rules | Read-only. Returns the **active rider cut** and the **inactive vendor row**. **Shipped by `025`** |
+| `set_commission_rule_v1(p_scope, p_applies_to, p_value_bps, p_effective_from, p_target_id, p_commission_type)` | the new rule + the id it superseded | Admin. **Shipped by `025`, and this signature REPLACES the one in the table above it**, which said `(p_rule_id, p_value, p_is_active)`. See the note below |
+| `get_fee_rules_v1(p_zone_id uuid)` | base fee, free radius, per-km, `max_vendors`, all tiers | Read-only, for the admin console and for support. **Shipped by `025`** |
+| `set_fee_tier_v1(p_zone_id, p_vendor_count, p_multiplier_bps)` | the tier, + `created` | Admin. Basis points, so no float ever enters the fee. **Shipped by `025`**, as an upsert on `delivery_fee_tiers_pkey` |
+
+**`025` also introduces the two `events` types this catalogue was missing: `fee_tier.set` and
+`wallet.frozen`**, both admin audit events. `wallet.frozen` deliberately carries the reason in its
+payload: a freeze notification without its reason is not actionable, and §3 forbids secrets and PII
+beyond ids, neither of which an investigation note is.
+
+**`set_commission_rule_v1` — why the signature changed, and it is not a rename.** The row this table
+originally carried, `(p_rule_id, p_value, p_is_active)`, edits an existing rule in place.
+`admin-crud-plan.md` §5 specifies `(p_scope, p_applies_to, p_value_bps, p_effective_from)` and inserts a
+new dated rule, closing the previous one with `effective_until`. **Decided, asked rather than assumed:
+the plan wins**, even though this file outranks the plan under `data-model.md` §16, because in-place
+editing cannot satisfy constitution I.9's auditability — overwriting the row makes "what was the rate
+last month" unanswerable, and I.9 exists precisely so a retroactive commission is a *detectable* bug
+rather than a silent one. `commission_rules` already carries `effective_from`, `effective_until`,
+`commission_type`, `applies_to`, `min_amount` and `max_amount`: it is a versioned rule, not a mutable
+preference, and `admin-crud-plan.md` §4a independently reaches the same conclusion by refusing
+`deleted_at` on this table for the same reason.
+
+Two date rules, and the second was found by executing rather than by reading:
+
+- A `p_effective_from` **before today** is refused with `EFFECTIVE_FROM_IN_PAST`. Not clamped —
+  clamping would report success for a request the caller did not make.
+- A `p_effective_from` **at or before the rule it would supersede** is refused with
+  `EFFECTIVE_FROM_INVALID`. `current_date` is midnight and the rule being superseded was inserted
+  during the day, so "same-day" is not the same instant; without this check the caller gets a raw
+  `commission_rules_window_valid` violation on a row they never wrote.
+
+Omitting `p_effective_from` takes `now()` and is the correct way to say "activate this immediately".
 
 ### 1.8.1 What `019` actually shipped, and what it did not
 
@@ -272,10 +299,13 @@ artefact, not eight missing behaviours: `run_payout_v1` absorbs `run_vendor_payo
 
 | Not built | Consequence today |
 |---|---|
-| `freeze_wallet_v1`, `list_frozen_v1` | `wallets.status` accepts `'frozen'` and `'review'` and `wallets_status_reason_required` already demands a reason for either, but **no function can set one**. A wallet can only be frozen by editing the row directly |
-| `get_commission_v1`, `set_commission_rule_v1` | constitution I.9 requires vendor commission to be switchable by an `update`, never a migration. There is no RPC to do it, so it needs raw SQL |
-| `get_fee_rules_v1`, `set_fee_tier_v1` | same for constitution I.7's other configurable constants |
+| ~~`freeze_wallet_v1`, `list_frozen_v1`~~ | **Shipped by `025`.** `wallets.status` accepts `'frozen'` and `'review'` and `wallets_status_reason_required` already demands a reason, but nothing could set one — a wallet could only be frozen by editing the row directly, bypassing the audit trail the constraint exists to create. Both now exist, admin-only, and both write an `events` row |
+| ~~`get_commission_v1`, `set_commission_rule_v1`~~ | **Shipped by `025`.** constitution I.9 requires vendor commission to be switchable by an `update`, never a migration; it no longer needs raw SQL. Note the signature change recorded above |
+| ~~`get_fee_rules_v1`, `set_fee_tier_v1`~~ | **Shipped by `025`.** Same for constitution I.7's other configurable constants |
 | `get_wallet_v1` | implemented as `get_wallet_balance_v1`, per §15.2. The naming split is unresolved |
+
+`025` also introduces the two `events` types this catalogue was missing: `fee_tier.set` and
+`wallet.frozen`.
 
 Three decisions `019` had to make where this section and `data-model.md` were silent:
 
@@ -314,6 +344,46 @@ JWT, so a service-role call writes nothing. Verified by execution, not by inspec
 | `mark_events_delivered_v1(p_ids uuid[])` | void | One call per batch, never per event |
 | `claim_undelivered_events_v1(p_limit int)` | event batch | Retry path |
 | `archive_orders_v1(p_before date, p_limit int)` | archived count | Moves items and history to R2 |
+
+#### 1.9.1 Voucher admin surface (shipped in `037`)
+
+Before this there were **zero** voucher functions in `public`: `count(*) from pg_proc where proname
+ilike '%voucher%'` was 0. Every other admin entity has an upsert, a soft delete and a restore.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `admin_upsert_voucher_v1(p_patch jsonb, p_id uuid)` | uuid | Create or update. Admin only |
+| `admin_delete_voucher_v1(p_id uuid, p_reason text)` | void | Soft delete. Reason mandatory |
+| `admin_restore_voucher_v1(p_id uuid, p_reason text)` | void | Clears `deleted_at`. Does **not** change `is_active` |
+
+Accepted keys: `code`, `name`, `discount_type`, `discount_value`, `min_order_value`,
+`max_discount_cap`, `usage_limit_total`, `usage_limit_per_user`, `applies_to_vendor_ids`,
+`vertical_type`, `first_order_only`, `valid_from`, `valid_until`, `is_active`.
+
+`usage_count` is **not** accepted. It is system state; a writable usage limit is a limit that can be
+reset.
+
+Three conventions a caller must know, none of which the type signature carries:
+
+| Thing | Rule |
+|---|---|
+| `discount_value` for `percentage` | **Basis points**, so `1000` = 10.0%. Range 1..10000 |
+| `applies_to_vendor_ids` | A uuid array, **or** the literal string `"ALL_VENDORS"`, stored as the empty array |
+| `max_discount_cap`, `valid_until` | An **absent** key means leave alone. An explicit jsonb `null` means clear |
+
+The absent-vs-null rule is not cosmetic. `p_patch ? 'k'` is true for both, and
+`jsonb_typeof('{}'->'k')` is SQL NULL rather than the string `'null'`, so the obvious
+`case when p_patch ? 'k' and jsonb_typeof(...) <> 'null'` conflates them and an explicit null
+silently keeps the old value. Only a three-way test separates absent from null.
+
+Since `036` an empty `applies_to_vendor_ids` means **every vendor**, not none. Before that a voucher
+created with schema defaults was rejected on every cart.
+
+Error codes: `AUTH_REQUIRED`, `NOT_AUTHORIZED`, `PATCH_EMPTY`, `UNKNOWN_KEY`, `KEY_REQUIRED`,
+`PATCH_INVALID`, `VENDOR_NOT_FOUND`, `DISCOUNT_TYPE_INVALID`, `DISCOUNT_PERCENTAGE_INVALID`,
+`DISCOUNT_VALUE_INVALID`, `VOUCHER_CODE_TAKEN` (case-insensitive, matches `compute_quote`),
+`VOUCHER_WINDOW_INVALID`, `VOUCHER_LIMIT_INVALID`, `VOUCHER_CAP_INVALID`, `VERTICAL_TYPE_INVALID`,
+`NOT_FOUND`, `ALREADY_DELETED`, `NOT_DELETED`, `REASON_REQUIRED`.
 
 ### 1.10 Sync
 
@@ -373,6 +443,8 @@ Every endpoint is idempotent. `webhooks/events` keys on `events.id_uuid`.
 | `payout.paid` | payout_id, owner_type, owner_id, amount | Batched 15 s | FCM to vendor or rider |
 | `rider.cash_limit_warning` | rider_id, cash_held, effective_cash_limit | Batched 15 s | FCM to the rider only |
 | `commission.activated` | scope, value, effective_from | Batched 15 s | Admin audit notification |
+| `fee_tier.set` | actor, vendor_count, multiplier_bps, created | Batched 15 s | Added by `025`. The catalogue had no fee-tier event, so a fee change was invisible to the outbox |
+| `wallet.frozen` | actor, owner_type, owner_id, reason, idempotency_key | Batched 15 s | Added by `025`. The reason is an admin audit note, not a customer push, so it travels in the payload |
 | `voucher.created` | voucher_id | Batched 15 s | None in v1 |
 | `user.profile_completed` | user_id | Batched 15 s | None in v1 — `auth_daily_stats` is the obvious future reader |
 | `user.profile_updated` | user_id, changed field **names** | Batched 15 s | None in v1 |

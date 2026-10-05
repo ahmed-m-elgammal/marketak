@@ -6,6 +6,592 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Added - `035_retention_and_cron`: `pg_cron`, four prunes, six schedules
+
+Applied to the live project as version `20261005211015`. **This was the only migration in
+`supabase/migrations/` that had never been applied** — 61 files, 60 applied, verified by diffing
+filenames against `supabase_migrations.schema_migrations` and then confirming each object in
+`pg_extension`, `pg_proc`, `pg_indexes` and `pg_class`. The prunes install now:
+
+| Piece | Window | Schedule |
+|---|---|---|
+| `private.prune_events` | 7 d, delivered only | `7 * * * *` |
+| `private.prune_order_eta_snapshots` | 24 h | `13 * * * *` |
+| `private.prune_notifications` | 30 d | `23 3 * * *` |
+| `private.prune_rider_location_pings` | 30 d | `41 3 * * *` |
+| `private.ensure_partitions` | current + next month | `10 0 1 * *` |
+| `vacuum (analyze)` on `events`, `orders`, `order_items`, `cart_items` | — | `37 4 * * *` |
+
+Every prune batches `limit 1000` with `pg_sleep(0.05)` between batches and returns the number of rows
+removed, so a cron run is observable. `order_eta_snapshots_computed_at` is added, because that table was
+the only one of the four without an index on its prune column.
+
+Three decisions worth recording:
+
+- **`events` stays unpartitioned.** `free-tier-plan.md` §3.7 priced both: 45 MB pruned by `DELETE`
+  against 239 MB partitioned, because a monthly partition cannot express a 7-day window.
+- **Only delivered events are pruned.** The predicate requires `delivered_at is not null`, so a stuck
+  event is never destroyed. A broken dispatcher would otherwise delete its own backlog, and §11 item 8
+  — "undelivered `events` older than 1 hour" — would have nothing left to count.
+- **`private.ensure_month_partition` was an orphan.** It existed since `001` with zero callers, which
+  meant `notifications` would have failed on 2026-12-01 when `notifications_2026_12` did not exist. It
+  is now wired up, called only for the two tables that are actually partitioned.
+
+All five maintenance functions are `revoke execute ... from public, anon, authenticated`, asserted by
+the migration. This matters more than usual: `create or replace function` re-grants EXECUTE to PUBLIC,
+so without the revoke any signed-in client could call `prune_notifications` and delete another user's
+inbox.
+
+**Verified by execution, not inspection.** The assertion block inserts aged rows, runs each prune, and
+checks both directions — the aged row is gone *and* the fresh row survives, plus an undelivered aged
+event survives. All four prunes passed, and the probe rolled itself back through a sentinel exception,
+so no test data reached the tables the jobs now delete from.
+
+### Fixed - `035`'s probe referenced three tables it could not have written, and had never been run
+
+`035` shipped with assertions that **could not execute**. It had never been applied, so the block had
+never run, and it would have failed on its first attempt. Both defects were in the probe, not the
+schema:
+
+1. It inserted into `order_eta_snapshots` and `rider_location_pings` with invented uuids. Both `order_id`
+   and `rider_id` are `not null` foreign keys. `rider_id` references `public.riders`, **not**
+   `auth.users` — a rider is onboarded through the verification flow, and `on_auth_user_created`
+   deliberately creates only `public.users` rows, so a probe user is not a rider row.
+2. It passed uuids for `rider_location_pings.id` and `notifications.id`. Both are `bigint` off a
+   sequence.
+
+The probe now creates a real `riders` row and a real `orders` row first — the latter needs a unique
+`order_number`, a live `user_id`, a non-null `address_snapshot`, and `orders_total_consistent`, which
+all-zero money satisfies — and reads both sequence ids back with `returning`. Applied on the third
+attempt; the two failures rolled back completely, leaving `pg_cron` itself uninstalled, which is the
+behaviour the file's own header argues for by relying on one implicit transaction per file.
+
+This is the `027` lesson again, in a different shape: a file can be reviewed repeatedly, be internally
+consistent, and still never have been executed against the database. Reading it is not testing it.
+
+### Found, not fixed - the event catalogue and the emitters disagree, and nothing maps events to templates
+
+Measured against the live database on 2026-10-05. **Documentation only - no migration was applied and
+nothing in the database was changed.** Method: every `<noun>.<verb>` string literal was extracted from
+`pg_proc.prosrc` across all 127 `public` + `private` functions and compared against
+`contracts.md` 3.1. The `events` table is empty, so `select distinct type from events` returns nothing;
+the names have to come from the code that writes them.
+
+| Measure | Count |
+|---|---|
+| Distinct event names emitted by live functions | **63** |
+| Names listed in `contracts.md` 3.1 | 18 |
+| Emitted under the exact same name | **10** |
+| **Never emitted by anything** | **8** |
+| Emitted but absent from the 3.1 catalogue | **53** |
+
+The eight catalogue names with no emitter:
+
+| Catalogue name | What the code actually emits |
+|---|---|
+| `driver.assigned` | `order.claimed` from `claim_order_v1`. Payload is a superset of what 3.1 promises |
+| `payment.collected` | `order.collected`, from **both** `collect_cash_v1` and `collect_wallet_v1`. One name for two methods, separated only by payload `method` / `channel` |
+| `menu.updated` | **Five** names: `menu_item.updated`, `menu_category.updated`, `menu_item_size.updated`, `item_option.updated`, `option_choice.updated`, plus 10 `.deleted` / `.restored` variants |
+| `vendor.rejected_sub_order` | nothing. A rejection is folded into `order.status_changed` with `to = 'rejected'` |
+| `driver.arrived` | nothing, and `delivery_assignments.arrived_at` / `arrived_vendor_at` are never written |
+| `rider.cash_limit_warning` | nothing, though `effective_cash_limit_v1` computes the number and a template key exists |
+| `voucher.created` | `voucher.updated` with `payload->>'created' = true`. Create and update share one name |
+| `vendor.earnings_rolled` | nothing. 3.1 marks it "None in v1" anyway |
+
+**The larger problem is three naming layers, and only the middle one is real.**
+
+| Layer | Example | Where |
+|---|---|---|
+| 1. Catalogue event type | `driver.assigned` | `contracts.md` 3.1 |
+| 2. Emitted `events.type` | `order.claimed` | the function body |
+| 3. `notification_templates.key` | `rider.order_assigned` | `public.notification_templates`, 19 keys |
+
+Layer 3 is fully populated - 19 keys, ar and en, every one a real template with declared variables.
+But **nothing maps layer 2 to layer 3**, and the names do not line up:
+
+- `order.claimed` -> `rider.order_assigned`. Same meaning, different name, nothing records it.
+- `order.status_changed` -> **seven** template keys (`order.vendor_accepted`, `order.vendor_rejected`,
+  `order.preparing`, `order.ready`, `order.picked_up`, `order.arriving`, `order.delivered`). The fan-out
+  rule is not written anywhere, and `order.delivered` **also** exists as its own event, so the customer
+  would be told twice without an explicit suppression rule.
+- `order.collected` -> **no template at all.** `contracts.md` 4.4 wants an FCM to the customer on
+  payment and there is no key to render.
+- `order.placed` -> `order.placed` and `vendor.new_order`. **The only clean 1:1 in the set.**
+
+**Why this blocks the Worker.** The dispatcher needs a lookup from an `events` row to a template key
+per recipient role. That lookup cannot be inferred, because one entry is one-to-many and another is
+one-to-none. It needs an ADR against `contracts.md` 3.1 and 4, and possibly small emitter changes.
+Writing the Worker against a guessed mapping would bake the guess into the routing.
+
+Recorded in full, with the per-name table and the decision list, in
+`specs/001-platform-foundation/push-notification-plan.md` section 7.
+
+### Fixed - no voucher could ever work, because an empty vendor scope meant "no vendors" (036)
+
+A voucher created with schema defaults was rejected on every cart. `private.compute_quote` tested the
+vendor scope with an array-overlap operator:
+
+    elsif v_voucher.applies_to_vendor_ids is not null
+       and not (v_voucher.applies_to_vendor_ids && v_vendor_ids) then
+      ... VOUCHER_NOT_APPLICABLE
+
+The column is `uuid[] NOT NULL DEFAULT '{}'`, so `is null` is never true and that first operand was
+dead code. An empty array overlaps nothing, `&&` is always false, `not false` is true, and the
+rejection fired unconditionally. Measured on the live database, same cart, same code, differing only
+in scope:
+
+| `applies_to_vendor_ids` | result |
+|---|---|
+| `{}` (the schema default) | `voucher_discount 0`, `VOUCHER_NOT_APPLICABLE` |
+| `[vendor_one]` | `voucher_discount 1000`, no rejection |
+
+So 100% of vouchers were refused rather than only mis-scoped ones, and because
+`place_order_v1` re-runs `compute_quote` inside the placing transaction (constitution 2), the customer
+could not even check out afterwards without dropping the code.
+
+`compute_quote` is the **only** function in the database that reads `applies_to_vendor_ids`, verified
+across all 127 public + private functions, so this one predicate was the entire behaviour of vendor
+scoping. The deeper gap was expressive: "applies to every vendor" could not be written at all, and
+enumerating ids at creation time would exclude every merchant onboarded later.
+
+One predicate:
+
+    elsif cardinality(v_voucher.applies_to_vendor_ids) > 0
+       and not (v_voucher.applies_to_vendor_ids && v_vendor_ids) then
+
+An empty list is now an unrestricted voucher and skips the check. A non-empty list still runs the
+overlap test, so single-vendor and multi-vendor scoping are unchanged. The dead `is not null` operand
+was removed rather than bypassed, because leaving it in place means dead code that reads as a guard.
+
+**This migration does not restate the function.** It reads the live body from `pg_proc.prosrc` and
+substitutes one substring, asserted to match exactly once, so a drifted guard fails the migration
+instead of silently producing a different pricing engine. Two earlier drafts retyped all ~400 lines;
+the first dropped the declaration of `v_discount` and failed to compile with an error far from the
+real cause. That is the same failure mode as the defect being fixed - a hand-maintained copy of a
+function that quietly stops matching the function it replaces.
+
+### Added - the voucher admin surface (037)
+
+`select count(*) from pg_proc where proname ilike '%voucher%'` in `public` returned **0** before this
+migration. Every other admin entity had an upsert, a soft delete and a restore; vouchers had none, so
+a discount code could only be created by writing SQL by hand - no `created_by`, no audit trail.
+
+| Function | Purpose |
+|---|---|
+| `admin_upsert_voucher_v1(p_patch jsonb, p_id uuid)` | Create or update. Returns the id |
+| `admin_delete_voucher_v1(p_id uuid, p_reason text)` | Soft delete. Reason mandatory |
+| `admin_restore_voucher_v1(p_id uuid, p_reason text)` | Clear `deleted_at`. Reason mandatory |
+
+Shapes and refusals are copied from `admin_upsert_area_v1` and friends rather than invented:
+`private.err(code, message)` for every refusal, an allow-list of patch keys, one `events` row per
+mutation in the same transaction, and a mandatory reason on both delete and restore.
+
+Three hazards the table does not explain:
+
+- **`usage_count` is not in the allow-list.** It is system state. A dashboard that could write it
+  would reset a usage limit by posting `{"usage_count":0}`.
+- **`percentage` is basis points, not percent.** 1000 means 10.0%. Repeated in the function so the
+  caller gets `DISCOUNT_PERCENTAGE_INVALID` instead of a raw constraint violation.
+- **`free_delivery` needs a positive `discount_value`** even though the number is never read for that
+  type, because `vouchers_discount_value_check` is `> 0`. The function substitutes 1.
+
+`applies_to_vendor_ids` accepts the string token `"ALL_VENDORS"` and stores the empty array, which is
+how a dashboard says "all shops" now that `036` established that empty means every vendor.
+
+`restore` deliberately does **not** flip `is_active`. Delete and disable are different acts, and a
+restore that re-enabled a voucher an admin had already switched off would undo the second decision.
+
+**One real security finding, caught by asserting rather than assuming.** This project's
+`pg_default_acl` for `public` functions grants EXECUTE to `anon`, so `CREATE OR REPLACE` grants it
+automatically and a `revoke` written *before* the create is undone by the create. All three functions
+were left callable by `anon`. Every pre-existing RPC is correctly denied to `anon`
+(`admin_upsert_area_v1`, `quote_order_v1`, `search_catalog_v1`, `place_order_v1` all `false`), so these
+would have been the only anonymous entry points into the admin surface. The admin gate inside still
+refused them at run time, so this was defence in depth rather than a live hole - but a granted EXECUTE
+on a `SECURITY DEFINER` function is never acceptable. Fixed by revoking *after* the create, adding
+`alter default privileges in schema public revoke execute on functions from anon`, and asserting the
+privilege is absent by reading it back from the catalog.
+
+`036` and `037` were proven by **executing** the surface, 28 checks across two phases, plus a full
+two-vendor checkout. Four defects were caught that reading the code would not have found: two real
+ones in the new function (`'ALL_VENDORS'::jsonb` is not valid JSON, so it raised `22P02`; and
+`case when p_patch ? 'k' and jsonb_typeof(...) <> 'null'` conflates an absent key with an explicit
+null, so `{"max_discount_cap":null}` silently kept the old value) and two in the probe harness itself.
+
+### Known gaps, not fixed
+
+- **Reviews never roll up.** No trigger on `public.reviews` updates `vendors.rating_avg` or
+  `rating_count`, so a 5-star review leaves a vendor at `0.00` / `0` forever. Reproduced on the live
+  database. Affects C-16 and every vendor rating surface. Needs a trigger.
+- **No `claim_events_v1`,** so the bulk push dispatcher described in `free-tier-plan.md` has nothing to
+  call. `claim_order_v1` exists; the event counterpart does not.
+- **The blanket `anon=X` default ACL** is a standing trap for any new function in `public`. `037`
+  corrected it for the default going forward, but `storage`, `graphql` and `graphql_public` still
+  carry it.
+
+### Fixed - the catalog was unusable, and every assertion said it was fine (027a)
+
+`027_admin_menu` was applied and green, and the catalog could not be used. Two independent defects,
+both shipped behind a fully passing assertion block.
+
+**`admin_upsert_menu_item_v1` had never once succeeded.** It read the patch's `tags` with
+`coalesce((p_patch->'tags')::text[], ...)`. PostgreSQL has **no `jsonb → text[]` cast** — there is no
+`pg_cast` entry and no assignment cast; `jsonb_array_elements_text` is the only route. The cast
+resolves when the statement runs, not when the key is looked up, so the failure was unconditional:
+`create, no tags key → cannot cast type jsonb to text[]`, `create, tags = [] → same`, and
+`update, {"name":…} → same`. Every create and every update of a menu item raised. The other
+fourteen functions were fine, which is why the file reads as healthy — fourteen working functions
+hide one dead one, and a catalog with no dishes still looks like a catalog until someone tries to add
+one.
+
+The irony is the point. `027:349-357` adds a dedicated `tags` validator whose stated reason is that
+"a jsonb scalar or an array of non-strings would fail the cast with a raw driver error instead of a
+code, so it is checked here." The guard was written, it is correct, and it passed. The line it was
+guarding could not execute at all.
+
+Fixed with `array(select jsonb_array_elements_text(p_patch->'tags'))`. The **update** branch needed a
+`case when p_patch ? 'tags'` rather than a `coalesce`, and that distinction is load-bearing: the new
+expression yields `{}` rather than NULL for an absent key, so a `coalesce` would have taken `{}` over
+`mi.tags` and silently cleared the tags of every item on every unrelated edit. The `case` encodes the
+three cases the column actually has — absent means LEAVE ALONE, present means REPLACE, `[]` means
+CLEAR — and it is the same shape the three `jsonb` columns immediately above it already used.
+
+**`item_options_read` referenced its own table, and took `option_choices` down with it.** The policy
+`027` added to fix `item_options` having no hiding lever wrote its vendor-staff branch as
+`exists (select 1 from public.item_options io join public.menu_items mi … )` — on the policy **on
+`public.item_options`**. A policy naming its own table in its own `USING` expression is a loop, and
+PostgreSQL refuses to plan it: `42P17 infinite recursion detected in policy for relation
+"item_options"` on every statement. Not a silent empty result — a hard error. `option_choices_read`
+was collateral, because it subqueries `item_options`, so expanding its policy expanded the broken one.
+Measured across all five catalog tables:
+
+| role | `item_options` | `option_choices` | `menu_categories` / `menu_items` / `menu_item_sizes` |
+|---|---|---|---|
+| `anon` | permission denied (no grant) | permission denied (no grant) | permission denied (no grant) |
+| admin | **42P17 infinite recursion** | **42P17 infinite recursion** | OK |
+| customer | **42P17 infinite recursion** | **42P17 infinite recursion** | OK |
+
+Two of five catalog tables — the item-customisation group and its choices — were unreadable to every
+signed-in client, admin console included. The three that survived are the tell: they reach
+`menu_items` through their own `item_id` and never name their own table. `027`'s header claimed the
+policy "mirrors `menu_item_sizes_read`", and mirroring it is precisely the fix.
+
+The six admin functions over those two tables kept working, and that is worth recording because it is
+*why* this shipped. They are `SECURITY DEFINER` and their owner bypasses RLS, so they never expand the
+policy. Their correctness depended on who owns the functions — an accident of deployment that no
+assertion checked and no test would have caught.
+
+**Why nothing caught either.** All thirteen of `027`'s assertions read `pg_proc` and `pg_policies`
+**as text**. None executed a function body. None executed a `SELECT`. Assertion 12 checked
+`item_options_read`'s qual for `%is_available%` and `%deleted_at%` — both substrings are present in a
+policy that raises on every use. `tests.run_all()` was 11/11 green throughout, because none of its
+eleven checks runs a policy either; it counts them.
+
+That is the general lesson and the reason this entry is here rather than a line about one file. **A
+green assertion block that only inspects the catalog is not evidence that anything runs.** A body that
+is syntactically perfect and semantically dead passes every text-shaped check there is. So `027a` ships
+the two assertions `027` needed:
+
+1. **Execute the policy.** Switch to a client role and actually issue `SELECT count(*)` against
+   `item_options` and `option_choices`; fail if the planner refuses. Stated over `pg_policies` as a
+   *general* guard — no policy in the database may name its own table — with the negative test in both
+   directions, because a regex that cannot fail is not a check. Validated against all 62 tables: it
+   flagged exactly the one offender and nothing else, and the lookbehind is what stops a qualified
+   column reference like `menu_item_sizes.item_id` from matching.
+2. **Execute the function.** A real admin, vendor, category and item created inside a subtransaction
+   that is rolled back by raising a sentinel, asserting tags written, tags preserved when the key is
+   absent, and tags cleared by `[]` — then a follow-up check that the probe leaked no rows. Unconditional
+   by construction: the probe seeds its own vendor rather than borrowing one, because an assertion that
+   quietly skips when the table it needs is empty is a fail-open, which is the defect this migration
+   exists to remove.
+
+**Three of my own assertions were wrong before the migration would apply**, all caught by
+fail-closed rather than by inspection, and all three are recorded in the file because each is a trap:
+
+- The self-reference negative test was written `public.item_options io`, which the lookbehind correctly
+  **rejects** — a dot in front of the name means it is a column reference, not a `FROM` item. PostgreSQL
+  renders policy quals against `search_path`, so a real self-reference appears unqualified. The probe
+  was fighting its own pattern.
+- `tags = []` was asserted with `coalesce(array_to_string(tags, ','), '<empty>')`. An empty array
+  renders as the empty **string**, not NULL, so the coalesce never fired.
+- The same check then used `array_length`, which returns **NULL** for `{}` rather than 0, so a
+  `coalesce` against 0 never fired either. Only `cardinality` distinguishes cleared from absent:
+  `cardinality('{}')` is 0, `cardinality(NULL)` is NULL.
+
+An assertion that cannot tell "cleared" from "absent" passes for the wrong reason, which is the same
+failure mode as a regex that cannot fail. `admin-crud-plan.md` §7 has been amended to say so.
+
+**Re-verified after the fix**, all against the live project in rolled-back transactions: **59
+behavioural probes pass, 0 fail**, and the fifteen-function auth gate is 30/30 — `anon` refused on all
+fifteen at the GRANT layer, and a signed-in non-admin refused with `NOT_AUTHORIZED` on all fifteen,
+never reaching an argument check. `tests.run_all()` remains 11/11. No fixture rows leaked; the
+database is as empty as it was.
+
+### Added - the catalog write surface (027)
+
+Fifteen functions over `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options` and
+`option_choices` — five upserts, five soft deletes, five restores — completing the "load a merchant
+and take an order" minimum of `admin-crud-plan.md` §6 alongside `026`.
+
+**Read this entry together with `027a` above.** `027` shipped applied, passed its own thirteen
+assertions, passed `tests.run_all()` 11/11, and was unusable: one of its fifteen functions had never
+succeeded and two of its five tables could not be read by any client. The fourteen working functions
+are real and are unchanged by `027a`.
+
+**Soft delete means something different on each of the five tables, and this is the finding that
+shaped the file.** `menu_categories_read` and `menu_items_read` filter `deleted_at`, so `deleted_at`
+alone hides them. `menu_item_sizes_read` and `option_choices_read` do **not** filter it, and
+`item_options` had no lever at all before this migration. So the three deletes set
+`is_available = false` as well as `deleted_at`: a delete that set only `deleted_at` would have
+returned success, written its `events` row, and changed nothing a customer can see.
+`admin_restore_*` clears `deleted_at` and nothing else — archive is not a covert publish, so a vendor
+who unpublished something on purpose does not find that choice reversed by a restore.
+
+**`item_options` gains the column it never had**: `is_available boolean not null default true`, plus
+a replacement read policy. Existing rows default to visible, so applying this changed nothing until an
+admin wrote. That policy's first draft is what `027a` had to repair.
+
+**Two refusals that prevent data the checkout cannot handle.** `option_selections_sane` only enforces
+`max_selections >= min_selections`, which permits `is_required = true` with `max_selections = 0` — a
+group the customer must choose from and may choose nothing from. The same contradiction is reachable by
+deleting choices until fewer remain than `max_selections` promises, or by raising `max_selections` above
+the number of live choices. `OPTION_REQUIRED_UNSATISFIABLE` and `OPTION_UNSATISFIABLE` refuse all three,
+which keeps every option satisfiable — the difference between an admin mistake caught in the console and
+an `OPTION_UNAVAILABLE` raised against a customer holding a cart.
+
+**Parents are refused while children are live.** `CATEGORY_NOT_EMPTY`, `ITEM_NOT_EMPTY`,
+`OPTION_NOT_EMPTY`. This is not tidiness: `menu_items_read` does not check the parent category, and
+`menu_item_sizes_read` / `option_choices_read` do not check the parent item, so a soft-deleted parent
+with live children would leave those children directly readable. Rather than amend three applied read
+policies for a hole no admin action could reach, the admin surface refuses the state that produces it.
+Subtrees go dark in reverse order, which is also the order an admin thinks in.
+
+**`menu_items.vendor_id` is not admin-writable and that is the truth, not an omission.**
+`sync_menu_item_vendor` is a BEFORE INSERT OR UPDATE trigger that overwrites it from the parent
+category's vendor, so the column is derived; passing `vendor_id` returns `UNKNOWN_KEY`. Moving a
+*category* between vendors is refused outright with `IMMUTABLE_FIELD` rather than merely left off the
+allowlist, because the trigger recomputes every item's vendor from its category — re-homing one
+category silently re-homes all forty of its items to a different merchant's storefront, with a different
+rating, different reviews and a different payout ledger. Delete and recreate instead.
+
+**Money is in piastres and always was.** `base_price`, `menu_item_sizes.price` and
+`option_choices.price_modifier` are integer columns passed through untouched; an admin sending `250`
+means 2.50 EGP. The file contains no currency literal and no conversion. A dashboard that renders "250"
+as "250 EGP" is a dashboard bug, and one that sends a float here is a rejected insert.
+
+### Added - the admin write surface for geography and vendors (026)
+
+Thirty functions over the ten tables `admin-crud-plan.md` §6 assigns to `026`. **A real merchant now
+loads end-to-end through this surface and appears in the customer app** — verified by execution.
+
+Ten upserts, ten soft deletes, ten restores. The six rules from `admin-crud-plan.md` §3 are applied
+uniformly: the table name is a **literal** in every function body, `p_patch` is validated against an
+explicit key allowlist, `private.is_admin()` is the **first** statement, every name is fully qualified
+under `search_path = ''`, one `events` row per mutation in the same transaction, and every function
+refuses to touch a soft-deleted row except through its matching restore.
+
+**Verified end to end by execution.** A full merchant — Cairo, a Zamalek area, a brand, a cuisine, a
+vendor, an area mapping with a 15–25 minute ETA, a cuisine mapping, two split shifts on the same
+weekday, a holiday and a staff owner — created through the RPCs in twelve calls. A customer session
+then saw exactly one approved vendor, "Koshary Abdel Rahman". The Arabic `name_normalized` generated
+column auto-filled as `كشري عبد الرحمن`, confirming the 015 search plumbing still works on a row this
+surface created.
+
+**What the allowlists deliberately refuse**, and why it matters: `vendors.rating_avg`,
+`rating_count` and `menu_version` are all rejected with `UNKNOWN_KEY`. `menu_version` is bumped by the
+`005b` catalog triggers and an admin setting it would desynchronise the R2 snapshot pointer from the
+catalog — the same class of bug `014a` fixed. The generated `*_normalized` columns are rejected too,
+which is the correct answer since no caller can set them, including this function.
+
+**The lifecycle is real, and reversible.** Deleting a vendor set `deleted_at` **and** `is_active`
+(two flags disagreeing about one intent is how a vendor reappears after deletion). The row survived —
+soft delete, never `DELETE`. The customer's approved-vendor count went 1 → 0 → 1 across
+delete/restore. Editing a soft-deleted row returned `NOT_FOUND`, deleting twice returned
+`ALREADY_DELETED`, restoring a live row returned `NOT_DELETED`, and a customer attempting any of the
+three got `NOT_AUTHORIZED` before reaching a single argument check. Restore re-activates but does
+**not** re-approve, because publishing to the customer app is a separate decision.
+
+**23 rejection paths verified individually**, each returning its own code rather than a raw
+constraint violation: `UNKNOWN_KEY`, `PATCH_EMPTY`, `NOT_AUTHORIZED`, `REASON_REQUIRED`, `KEY_REQUIRED`,
+`NOT_FOUND`, `ALREADY_DELETED`, `NOT_DELETED`, `ETA_RANGE_INVALID`, plus the schema's own CHECKs
+catching `closes_at <= opens_at`, `day_of_week = 9` and an invalid `staff_role`. The
+`eta_maxutes > eta_minutes` rule is checked **in the function** because there is no CHECK on
+`vendor_areas` for it, and an inverted range would silently produce nonsense delivery promises.
+
+**Role matrix.** `anon` refused on all 30 by GRANT. Customer, vendor staff and rider refused with
+`NOT_AUTHORIZED` on all 30. Admin permitted. Crucially, `is_admin()` runs *before* the allowlist
+check, so a non-admin never learns whether a column exists — confirmed by the refusal reason being
+`NOT_AUTHORIZED` and never `UNKNOWN_KEY` for a non-admin.
+
+**Two assertion bugs I shipped and caught, both the same class.** Assertion 8 (no admin function
+issues a `DELETE`) shipped with the regex `\melete\b`, which matches the literal word "elete" and
+therefore **nothing** — it passed because it could not fail. The obvious repair,
+`\mdelete\s+from\b`, also matched nothing, because the trailing `\b` does not behave as expected in
+that position on this Postgres 17 build. The pattern that works is `(^|[^a-z_])delete\s+from`, which
+matches a real `DELETE` and ignores the `deleted_at` column this file is full of. Both a
+positive and a negative test now run inside the migration, because a regex that cannot fail is not a
+check — the same defect `022c` was written about.
+
+### Added - the two missing lifecycle columns (024)
+
+Constitution II.17 was violated in two directions, and `023` closed only one of them.
+
+- **`deleted_at timestamptz`** (nullable) on the 14 tables that genuinely archive. This was the
+  blocking prerequisite: 8 of the 10 tables in `026` are among them, so no admin delete function could
+  be written without it. The nine tables whose lifecycle is superseded, frozen, hidden or
+  hard-deleted **deliberately do not get one**, and an assertion checks their absence — a future
+  migration that "helpfully" added `deleted_at` to `commission_rules` would destroy the dated history
+  constitution I.9 depends on.
+- **`updated_at timestamptz not null default now()`** plus the `set_updated_at` trigger on the five
+  tables that owned no such column: `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_holidays`,
+  `vendor_staff`. This **closes open question 3.31**, recorded yesterday. Five of the ten tables in
+  `026` are among them, so before this an admin edit to a staff grant or a holiday moved no timestamp
+  at all.
+
+One index, `vendor_areas_live`. The other eighteen tables here are small configuration, and fifteen
+partial indexes on tables that will never need them is fifteen things to maintain; `vendor_areas` is
+the exception because it grows with (vendors × areas). `cuisines`, `vendor_areas` and
+`vendor_cuisines` deliberately get **no** `created_at`: a cuisine is a code and a `vendor_cuisines` row
+is a pair of ids, so a creation timestamp on them is a second thing to keep true.
+
+Six assertion groups, and the suite's own `updated_at_trigger_offenders()` is called rather than a
+second hand-rolled predicate, so the migration and the suite cannot disagree about what "has the
+trigger" means. Result: **27 tables own `deleted_at`, 41 own `updated_at`, 41 triggers, zero
+offenders.**
+
+### Added - the six unbuilt money functions (025)
+
+Closes **open question 3.30**. `contracts.md` §1.8 names thirteen money functions; five shipped in
+`019`. The eight-name gap was a naming artefact — `run_payout_v1` absorbs three and `get_wallet_v1`
+ships as `get_wallet_balance_v1` — and six capabilities genuinely had no writer. All six now exist.
+
+**The hole this closes was live, not theoretical.** `wallets_status_reason_required` already demands
+a reason for any non-active status and `wallets_status_check` already accepted `frozen` and
+`review`, but **nothing could set one**. The only way to freeze a wallet was a direct `UPDATE` — which
+is precisely the audit-trail bypass the constraint was written to prevent. `freeze_wallet_v1` is
+admin-only, requires a non-blank reason, and writes a `wallet.frozen` event in the same transaction.
+
+| Function | What it does |
+|---|---|
+| `get_fee_rules_v1(p_zone_id)` | Zone fee config + every tier, one row per tier, plus the service-fee settings. Not admin-gated: `014` already publishes those tables and a customer is quoted from them |
+| `set_fee_tier_v1(p_zone_id, p_vendor_count, p_multiplier_bps)` | Upsert one tier. **Basis points only** — an integer, never a float or a percentage string. Admin. Writes `fee_tier.set` |
+| `get_commission_v1(p_scope, p_target_id)` | Commission rules with `is_effective_now` computed by **the same predicate `private.resolve_pay` prices with**, so an admin read cannot disagree with a delivery |
+| `set_commission_rule_v1(p_scope, p_applies_to, p_value_bps, p_effective_from, p_target_id, p_commission_type)` | Insert a **new dated rule**, closing the previous one. Admin. Writes `commission.activated` |
+| `freeze_wallet_v1(p_owner_type, p_owner_id, p_reason, p_idempotency_key)` | Freeze a vendor or rider wallet. Bumps `version`, never touches `balance`. Admin. Writes `wallet.frozen` |
+| `list_frozen_v1()` | Frozen **and** under-review wallets with reasons and balances. Admin — a freeze reason is an investigation note, not public configuration |
+
+**Two decisions, asked rather than assumed, and both recorded in `contracts.md` §1.8:**
+
+- `set_commission_rule_v1` **supersedes** rather than editing in place. `contracts.md` originally gave
+  it `(p_rule_id, p_value, p_is_active)`; `admin-crud-plan.md` §5 gives it the dated-insert form. The
+  plan wins, even though `contracts.md` outranks it under `data-model.md` §16, because in-place editing
+  cannot satisfy constitution I.9's auditability — overwriting the row makes "what was the rate last
+  month" unanswerable, and I.9 exists so a retroactive commission is a *detectable* bug rather than a
+  silent one. `admin-crud-plan.md` §4a independently reaches the same conclusion by refusing
+  `deleted_at` on this table for the same reason.
+- `freeze_wallet_v1` gained a fourth `p_idempotency_key` argument, which §1.8's three-argument form
+  lacks. A replay returns `frozen = false` and writes **nothing** — no second event, no version bump,
+  `updated_at` untouched. Verified by execution.
+
+**Rule 9 is enforced by refusal, not by clamping.** A `p_effective_from` before today raises
+`EFFECTIVE_FROM_IN_PAST`. Clamping would report success for a request the caller did not make.
+A second, distinct refusal was found by executing and not by reading: `current_date` is **midnight**,
+and the rule being superseded was inserted during the day, so closing the old rule at midnight
+violated `commission_rules_window_valid` (`effective_until > effective_from`, strictly greater) **on
+the old row, which the caller never touched**. That now raises `EFFECTIVE_FROM_INVALID` carrying the
+timestamp to compare against. Omitting the argument takes `now()` and is the right way to say
+"activate now".
+
+**One omission the migration's own assertion caught on the first apply.** The `grant execute ...
+to authenticated` lines were written without their paired `revoke ... from public, anon`. Postgres
+grants EXECUTE to `PUBLIC` by default, so the grant *added* a holder rather than transferring one and
+`anon` could call all six. Every existing RPC pairs the two (`019:961-965`, `020:323`, `016:333`);
+assertion 5 in the closing `DO` block now checks `anon` holds no EXECUTE, which is what surfaced it.
+The `service_role` grant that `019b` lost the same way is noted there.
+
+**Verified against the live database, in rolled-back transactions.** 40 behavioural assertions across
+the six functions, plus a role matrix over `anon` / `customer` / `vendor_staff` / `rider` / `admin`:
+`anon` refused on all six by grant; the two configuration readers callable by every signed-in role as
+designed; the four mutating functions refused with `NOT_AUTHORIZED` to customer, vendor staff and
+rider, and permitted to admin. Fee tiers: insert then upsert in place, never a duplicate row,
+`created_at` survives an edit, exactly one `events` row per call (measured 1:1 across six calls), and
+every rejection path (`VENDOR_COUNT_INVALID` at 0 and 11, `MULTIPLIER_INVALID` at -1 and 100001,
+`ZONE_NOT_FOUND` for null and unknown, `NOT_AUTHORIZED`). Commission: supersede confirmed — the old row
+is closed and retained, windows contiguous, exactly one rule open at a time, the rider seed untouched
+by a vendor-scope change, and the three refused calls wrote zero events. Wallet: freeze sets status
+and reason, `version` 3→4, **`balance` unchanged at 50000** (it moves only with the ledger), replay is
+inert, escalation from `review` is legal, and `list_frozen_v1` returns both wallets with reasons and
+balances. Suite **11 of 11**. Database left exactly as found: every fixture table at 0, `settings` at
+its seeded 13, `commission_rules` still the two seed rows with the rider cut active and the vendor row
+inactive.
+
+### Fixed - constitution II.17 on 17 tables (023)
+
+`updated_at timestamptz not null default now()` was declared on 36 tables between `002` and `012`.
+Nineteen got a `set_updated_at` trigger. **Seventeen did not** — a live rule 17 violation across
+`001`–`015`, and open question 3.20 since `016`.
+
+**Why it survived ten migrations.** Almost every one of those tables is mutated only through an RPC
+that assigns `updated_at = now()` in the same `SET` list as the data it changes. That hides the
+missing trigger rather than compensating for it: the timestamp is right, so nothing looks broken.
+`016` found the gap while reviewing `users`, and correctly refused to fix one arbitrary table in a
+migration assigned three functions. `023` adds all 17 together.
+
+**No behaviour change anywhere.** Every write that moved `updated_at` before still moves it, by the
+same mechanism. This closes a constitution violation and makes an invariant true; it does not fix a
+user-visible bug, because there was no user-visible bug.
+
+**What shipped**
+- 17 `set_updated_at` BEFORE UPDATE row triggers. `public.set_updated_at()` already existed from
+  `006_cart.sql:17` and is deliberately **not** redefined — 19 triggers already depend on it.
+- `tests.updated_at_trigger_offenders()`, the suite's **eleventh** check, plus the runner rebuilt
+  around it. `admin-crud-plan.md` §7 defers all suite work to `031`; this one exception was decided
+  rather than assumed, because the guard for an invariant belongs with the migration that establishes
+  it. Without it the next table that declares the column and forgets the trigger reproduces this
+  defect silently — which is how these 17 accumulated.
+- A closing `DO` block asserting four postconditions: exactly 17 triggers created against a baseline
+  captured at the top of the file, all 17 present **by name** (so a trigger on the wrong table fails
+  rather than balancing the count), the suite's own check reporting zero offenders, and
+  `set_updated_at()` still non-`SECURITY DEFINER` with a pinned `search_path`.
+
+**Four explicit assignments are now redundant, and are not edited.** `005a`/`005b` set
+`updated_at = now()` on `vendors` inside `bump_version_for_*`; `016:516` and `016:820` do the same on
+`users`. All four now assign the same value twice and the two agree, because `now()` is the
+transaction timestamp and both writers see it in the same statement. `data-model.md` §15.1 rule 3
+forbids editing an applied migration, so the redundancy stands and `016`'s comment predicting this
+exact outcome is now historical rather than current.
+
+**Verified by hand against the live database**, in rolled-back transactions. `settings` is the only
+one of the 17 with rows (13 seeded), so it carries the behavioural tests: a no-op `UPDATE` moves
+`updated_at`; an explicit `updated_at = now()` and the trigger produce the identical value; and a
+deliberately backdated `updated_at` is overwritten, so no caller can backdate a row. Coexistence was
+tested on all three tables that already had a trigger — `menu_items` still derives `vendor_id`
+correctly with two BEFORE row triggers present, and one `UPDATE` both re-derives the vendor and bumps
+`updated_at`; `vendors` still takes exactly one `menu_version` bump per statement, asserted as a
+delta from a captured baseline rather than an assumed number; `delivery_fee_tiers` updates one tier
+without disturbing the other two, with the deferred `trg_fee_tiers_monotonic` constraint trigger
+still clean. `users` was tested with the `016` update shape and with
+`trg_user_contact_to_rider` firing alongside. Suite: **11 of 11 pass**. Negative test: dropping
+`trg_brands_updated_at` makes check 11 fail and name `public.brands` — the check is not a tautology.
+All test rows rolled back; `cities`, `menu_items`, `users`, `vendors` and `auth.users` all at 0.
+
+**Three corrections made during the work, all caught by checking rather than assuming:**
+- The first `tgtype` bitmask was wrong (`ROW`/`BEFORE`/`INSTEAD` read as 1/2/8 instead of 1/2/64).
+  Caught by querying the 19 existing triggers before applying anything: they report `tgtype = 19`.
+- The header comment claimed 35 tables and "eighteen" pre-existing. The catalog says 36 and 19.
+- `menu_version = 4` looked like a double-bump and was not: three prior `INSERT`s had already bumped
+  it. The assertion became a delta from a captured baseline.
+
+**Not fixed, and recorded as open question 3.31.** `cuisines`, `vendor_areas`, `vendor_cuisines`,
+`vendor_holidays` and `vendor_staff` have **no `updated_at` column at all**, so no trigger could be
+added to them. All five are Tier 1 in `admin-crud-plan.md` §4 and all five are written by `026`, so
+rule 17 is still violated on tables the admin surface writes — and `024` makes that easy to miss,
+because it gives four of them a `deleted_at` and `vendor_staff` already has one, so each looks
+lifecycle-complete while owning no `updated_at`. Decided: `023` stays triggers-only. Two further
+classes are recorded there too — `favorites`, `favorite_items`, `device_tokens` and `driver_shifts`
+are mutable and own no `updated_at` (Tier 2/3), and `user_roles` owns no timestamp of any kind as the
+consequence of two recorded decisions in the admin plan.
+
 ### Fixed - stock on the checkout path (017a, 017b)
 
 Two real defects in `017_rpc_core.sql`, both found by executing the purchase path rather than reading it.
