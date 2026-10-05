@@ -1,8 +1,9 @@
 # Admin write surface + the six money functions — implementation plan
 
-**Status:** plan only. No code written. This document exists so the shape of the work is agreed
-before a migration is authored, after the `017a` lesson that a verified file is worth nothing if the
-wrong bytes reach the database.
+**Status: LOCKED.** Agreed and closed. No further design questions outstanding; the three that were open
+in §8 are answered below. This document exists so the shape of the work is agreed before a migration is
+authored, after the `017a` lesson that a verified file is worth nothing if the wrong bytes reach the
+database.
 
 **Decisions taken (asked, not assumed, per `AGENTS.md` rule 9):**
 
@@ -32,13 +33,18 @@ Loaded for this task: `.specify/memory/constitution.md` (rules 1, 5, 9, 16, 17, 
 ## 2. The blocking prerequisite: `updated_at` triggers
 
 Rule 17 requires `updated_at` on every business table. **17 tables have none** — and 15 of them are
-tables this plan must write:
+tables this plan writes:
 
 ```
 cities, areas, delivery_zones, delivery_fee_tiers, settings,
 vendors, brands, menu_categories, menu_items, menu_item_sizes, item_options, option_choices,
 users, addresses, feature_flags, vendor_schedules, vendor_earnings_daily
 ```
+
+**All 17 get the trigger**, decided. Not only the 15 Tier 1 tables: `addresses` is Tier 2 read-only but
+a support dashboard will want to see when a customer last changed their address, and
+`vendor_earnings_daily` is a machine-written rollup where uniformity is easier to keep true than a
+carve-out nobody remembers six months later.
 
 Without this first, an admin edit to `menu_items` would not move `updated_at`, which breaks:
 
@@ -121,6 +127,36 @@ its indexes and its RLS are all correct and entirely unused. `create_review_v1` 
 `admin_set_review_hidden_v1`, and FR-C-16 rates the vendor and the rider separately, so both are needed
 before launch.
 
+### 4a. Soft delete — only where archiving is the real lifecycle
+
+Rule 17 says "soft delete plus `updated_at` on every business table". Checked: **23 of the 27 Tier 1
+tables have no `deleted_at` column at all.** Only `vendors`, `menu_categories`, `menu_items` and
+`vendor_staff` have one. So the rule was being applied to a schema that does not follow it, and taking
+it literally would put a meaningless `deleted_at` on tables whose lifecycle is something else.
+
+**`deleted_at` is added to these 14** — entities that are genuinely archived rather than ended:
+
+`cities`, `areas`, `brands`, `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_schedules`,
+`vendor_holidays`, `menu_item_sizes`, `item_options`, `option_choices`, `promo_slots`,
+`notification_templates`, `vouchers`
+
+**These 9 keep their own lifecycle, and `deleted_at` is deliberately not added:**
+
+| Table | Its real lifecycle | Why not a soft delete |
+|---|---|---|
+| `commission_rules` | **superseded** by a new dated rule | rule 9 says commission changes are an `update` that never applies retroactively. Soft-deleting a rule destroys the dated history that makes that auditable |
+| `rider_pay_rules` | superseded, same reasoning | same |
+| `delivery_zones`, `delivery_fee_tiers` | `is_active` | a retired zone is inactive, not deleted |
+| `wallets` | **frozen** via `freeze_wallet_v1` | deleting a wallet destroys the balance history rule 1 requires to stay computable |
+| `reviews` | `is_hidden` | the mechanism already exists and the rating index is already partial on `not is_hidden` |
+| `user_roles` | hard delete | a join table. A revoked role that is merely soft-deleted still reads as present |
+| `settings`, `feature_flags` | hard delete | key/value. A removed key means the key does not exist |
+
+**This amends rule 17** and needs its own ADR, because "every business table" is wrong as written for
+money configuration, wallets and join tables. Recorded rather than silently reinterpreted: the rule's
+*purpose* — archiving, snapshot invalidation and incremental export all need a soft delete — is fully
+honoured for every table where those three actually apply.
+
 ### Tier 2 — READ ONLY. The admin dashboard sees these; the system owns every write.
 
 `users` sits here by decision: the dashboard reads a customer, it does not edit one. Name, phone and
@@ -187,15 +223,19 @@ half-built surface.
 
 | # | Migration | Contents |
 |---|---|---|
-| `023_updated_at_triggers.sql` | `set_updated_at` triggers on the 17 tables | Prerequisite for everything |
-| `024_admin_money_config.sql` | `get_fee_rules_v1`, `set_fee_tier_v1`, `get_commission_v1`, `set_commission_rule_v1`, `freeze_wallet_v1`, `list_frozen_v1` | The six, first, because they are the named gap |
-| `025_admin_geo_vendor.sql` | `cities`, `areas`, `vendors`, `brands`, `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_schedules`, `vendor_holidays`, `vendor_staff` | Enough to load a real merchant |
-| `026_admin_menu.sql` | `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` | The catalog |
-| `027_admin_engagement_users.sql` | `promo_slots`, `notification_templates`, `vouchers`, `reviews`, `users`, `user_roles` | Moderation and people |
-| `028_rls_tests_admin.sql` | Extend the 022 suite | See §7 |
+| `023_updated_at_triggers.sql` | `set_updated_at` triggers on all 17 tables | Prerequisite for everything |
+| `024_soft_delete_columns.sql` | `deleted_at timestamptz` on the 14 tables in §4a that archive | Prerequisite for the admin delete functions |
+| `025_admin_money_config.sql` | `get_fee_rules_v1`, `set_fee_tier_v1`, `get_commission_v1`, `set_commission_rule_v1`, `freeze_wallet_v1`, `list_frozen_v1` | The six, first, because they are the named gap |
+| `026_admin_geo_vendor.sql` | `cities`, `areas`, `vendors`, `brands`, `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_schedules`, `vendor_holidays`, `vendor_staff` | Enough to load a real merchant |
+| `027_admin_menu.sql` | `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` | The catalog |
+| `028_admin_engagement_users.sql` | `promo_slots`, `notification_templates`, `vouchers`, `feature_flags`, `user_roles` | Config and moderation |
+| `029_reviews.sql` | `create_review_v1` (customer) and `admin_set_review_hidden_v1` (admin) | Reviews are unwritable by anyone today |
+| `030_admin_read_only.sql` | read RPCs for Tier 2 and the `riders` projection | Nothing to write, by design |
+| `031_rls_tests_admin.sql` | extend the 022 suite | See §7 |
 
-`025` and `026` together are the smallest set that lets you load a merchant and take an order. `027` is
-independent of them.
+`026` and `027` together are the smallest set that lets you load a merchant and take an order. `025` is
+independent and comes first because it is the named gap. `023` and `024` are both additive and reversible,
+so they are safe to land before anything depends on them.
 
 ## 7. Verification — and how it differs from the last pass
 
@@ -211,42 +251,44 @@ Each migration is then executed by hand, in a rolled-back transaction, covering 
 the happy path · a non-admin caller refused · an unknown `p_patch` key refused · a soft-deleted row
 not editable · `events` written exactly once · `updated_at` bumped · money idempotency replayed.
 
-## 8. Resolved by decision, and the one finding that came out of it
+## 8. Resolved by decision
 
-Asked and answered, recorded here so the reasoning survives:
+Asked and answered, recorded so the reasoning survives:
 
 | # | Question | Answer |
 |---|---|---|
 | 1 | `vouchers` — admin-creatable, or read plus soft-delete? | **Read and write.** Full CRUD. A voucher is money-adjacent, so it gets the same care as a fee tier: `idempotency_key` on create, an `events` row, and no retroactive `effective_from` |
-| 2 | `reviews` — how far does "write" go? | **Read and write**, scoped to `is_hidden`. Not the rating, not the comment |
+| 2 | `reviews` — how far does "write" go? | **`is_hidden` only.** Not the rating, not the comment |
 | 3 | `users` — which fields? | **Read only.** Roles move via `user_roles` |
 | 4 | `vendor_staff` | **Read and write.** Admin adds and removes staff |
 | 5 | Should admin edits *also* write `audit_log`? | **No.** The `events` row in the same transaction is the record, per rule 16. `audit_log` stays append-only and admin reads it |
+| 6 | `deleted_at` on the 23 tables that lack it? | **Add to the 14 that archive; amend rule 17** for the 9 whose lifecycle is superseded, frozen, hidden or hard-deleted. See §4a |
+| 7 | Should customers be able to leave a review? | **Yes — `create_review_v1` is in scope** |
+| 8 | `updated_at` triggers: all 17 or just the Tier 1 ones? | **All 17** |
 
 ### The finding that came out of question 2
 
-`reviews` has **no create path at all** — not for a customer, not for an admin. `update_profile_v1` is the
+`reviews` had **no create path at all** — not for a customer, not for an admin. `update_profile_v1` is the
 only write RPC in the entire database. So the table, its partial index on `not is_hidden`, and its RLS
-are all built, correct, and completely unused.
-
-Two functions are therefore missing rather than merely unwritable, and both are needed before launch:
+are all built, correct, and completely unused. Both functions are now in scope as `029_reviews.sql`:
 
 - `create_review_v1(p_sub_order_id, p_vendor_rating, p_rider_rating, p_comment)` — customer path.
   FR-C-16 rates vendor and rider **separately**, and the CHECK `reviews_rider_rating_needs_rider`
   already enforces that a rider rating needs a rider.
 - `admin_set_review_hidden_v1(p_review_id, p_hidden, p_reason)` — moderation, writes `events`.
 
-The moderation lever needs no new schema and no aggregate rebuild. That is worth knowing given the
-reason review control was wanted: hiding a bad review removes it from the rating immediately, because
-`reviews_vendor_created` is already partial on `not is_hidden`.
+The moderation lever needs no new schema and no aggregate rebuild. Hiding a bad review removes it from
+the rating immediately, because `reviews_vendor_created` is already partial on `not is_hidden`. That is
+worth knowing given the reason review control was wanted.
 
-### Still open
+### Not assumed
 
-1. **Vendor replies to reviews.** There is no `vendor_response` column. If a merchant should be able to
-   answer a bad review publicly, that is a schema change plus a write function. Not assumed here.
-2. **`voucher_redemptions`** is Tier 2 read-only. If vouchers are admin-writable, confirm an admin
-   never needs to void or refund a redemption directly — the correction path would be a new voucher, not
-   an edit to history.
+**Vendor replies.** There is no `vendor_response` column and none is being added — reviews are hide-only
+as decided. If a merchant should answer a bad review publicly, that is a separate migration and a
+separate decision.
+
+**`voucher_redemptions`.** Tier 2 read-only. An admin never voids or refunds a redemption directly; the
+correction is a new voucher, not an edit to history.
 
 ## 9. ADRs at risk
 
