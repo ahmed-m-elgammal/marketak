@@ -98,17 +98,40 @@ classified three ways.
 | Table | Admin may | Admin may **not** |
 |---|---|---|
 | `wallets` | `status` via `freeze_wallet_v1` / unfreeze, with a reason | **never touch `balance`.** It moves only with its ledger rows, in one transaction. `019c` exists because a direct write desyncs the books |
-| `users` | display name, and roles via `user_roles` | **never `phone_number`** (belongs to the user, constitution 18) or any identity column |
-| `reviews` | soft-delete to moderate | **never create or edit the rating.** A review is the customer's |
+| `reviews` | `is_hidden` only — moderate, with a reason | **never `vendor_rating`, `rider_rating` or `comment`.** Those are the customer's score and words. See below |
 | `user_roles` | grant/revoke `admin`, `vendor_staff` | never grant themselves a role they are removing in the same call |
 
+**`reviews` moderation is one column, and the schema already supports it.** `is_hidden` exists
+(`010:54`), the rating index is already partial on `not is_hidden` (`010:68`), and RLS already lets an
+admin see hidden rows while hiding them from everyone else (`014_rls.sql:364`). So hiding a review
+already removes it from any rating aggregate — no recompute, no cache to invalidate. The only missing
+piece is an RPC to set it, because clients hold no `UPDATE`.
+
+The one thing this plan will **not** build is an admin path that rewrites a rating or edits a comment.
+Your stated reason for wanting review control is that early users posting bad reviews cost you
+merchants, and hiding is the direct answer to that. Rewriting someone's score does not solve it and
+costs the one thing a review table has: that the number on it means something. If you want a lever
+against a hostile reviewer that is *not* falsification, the honest options are a vendor reply field
+(the schema has no `vendor_response` column yet) and weighting by order value. Say the word and I will
+add either.
+
+**Found while answering this: `reviews` has no create path at all.** `update_profile_v1` is the only
+write RPC in the database, so no customer can leave a review and no admin can moderate one. The table,
+its indexes and its RLS are all correct and entirely unused. `create_review_v1` is missing alongside
+`admin_set_review_hidden_v1`, and FR-C-16 rates the vendor and the rider separately, so both are needed
+before launch.
+
 ### Tier 2 — READ ONLY. The admin dashboard sees these; the system owns every write.
+
+`users` sits here by decision: the dashboard reads a customer, it does not edit one. Name, phone and
+identity are the user's, and `handle_new_user` plus `update_profile_v1` own them. Roles are still
+writable, through `user_roles` in Tier 1.
 
 | Group | Tables | Who writes |
 |---|---|---|
 | Order lifecycle | `orders`, `sub_orders`, `order_items`, `order_status_history`, `order_modifications`, `order_eta_snapshots`, `delivery_assignments` | `place_order_v1`, `transition_order_v1`, `cancel_order_v1`, rider RPCs |
 | Money records | `payouts`, `payout_lines`, `ledger_entries`, `platform_float`, `voucher_redemptions` | `run_payout_v1`, `collect_*`, `adjust_wallet_v1`, `reconcile_day_v1` |
-| Customer state | `addresses`, `carts`, `cart_items`, `favorites`, `favorite_items`, `notifications`, `device_tokens` | the customer's own RPCs |
+| Customer state | `addresses`, `carts`, `cart_items`, `favorites`, `favorite_items`, `notifications`, `device_tokens`, **`users`** | the customer's own RPCs |
 | Operations | `events`, `audit_log`, `driver_shifts` | append-only triggers and the outbox |
 | Analytics rollups | `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `vendor_earnings_daily`, `rider_earnings_daily` | nightly jobs |
 
@@ -188,19 +211,42 @@ Each migration is then executed by hand, in a rolled-back transaction, covering 
 the happy path · a non-admin caller refused · an unknown `p_patch` key refused · a soft-deleted row
 not editable · `events` written exactly once · `updated_at` bumped · money idempotency replayed.
 
-## 8. Open questions this plan does not resolve
+## 8. Resolved by decision, and the one finding that came out of it
 
-Recorded rather than guessed, per rule 9:
+Asked and answered, recorded here so the reasoning survives:
 
-1. **`vouchers` and `reviews`** — should admin CRUD include *creating* these, or read plus soft-delete
-   only? A voucher is money-adjacent (rule 7), so creating one may deserve the same care as a fee tier.
-2. **`users` writable by admin** — which fields? Certainly not `phone_number` or identity columns, which
-   belong to the user and to `auth`. Proposal: display name and `user_roles` only.
-3. **Audit trail for admin writes** — rule 16 puts an `events` row in the same transaction, but that is
-   an event stream for consumers, not an audit log for humans. Should admin edits *also* write
-   `audit_log`, which is retained 365 days precisely for this?
-4. **`vendor_staff`** — admin-only per the decision above, but a vendor owner must eventually manage
-   their own staff. Confirming that is deferred, not forgotten.
+| # | Question | Answer |
+|---|---|---|
+| 1 | `vouchers` — admin-creatable, or read plus soft-delete? | **Read and write.** Full CRUD. A voucher is money-adjacent, so it gets the same care as a fee tier: `idempotency_key` on create, an `events` row, and no retroactive `effective_from` |
+| 2 | `reviews` — how far does "write" go? | **Read and write**, scoped to `is_hidden`. Not the rating, not the comment |
+| 3 | `users` — which fields? | **Read only.** Roles move via `user_roles` |
+| 4 | `vendor_staff` | **Read and write.** Admin adds and removes staff |
+| 5 | Should admin edits *also* write `audit_log`? | **No.** The `events` row in the same transaction is the record, per rule 16. `audit_log` stays append-only and admin reads it |
+
+### The finding that came out of question 2
+
+`reviews` has **no create path at all** — not for a customer, not for an admin. `update_profile_v1` is the
+only write RPC in the entire database. So the table, its partial index on `not is_hidden`, and its RLS
+are all built, correct, and completely unused.
+
+Two functions are therefore missing rather than merely unwritable, and both are needed before launch:
+
+- `create_review_v1(p_sub_order_id, p_vendor_rating, p_rider_rating, p_comment)` — customer path.
+  FR-C-16 rates vendor and rider **separately**, and the CHECK `reviews_rider_rating_needs_rider`
+  already enforces that a rider rating needs a rider.
+- `admin_set_review_hidden_v1(p_review_id, p_hidden, p_reason)` — moderation, writes `events`.
+
+The moderation lever needs no new schema and no aggregate rebuild. That is worth knowing given the
+reason review control was wanted: hiding a bad review removes it from the rating immediately, because
+`reviews_vendor_created` is already partial on `not is_hidden`.
+
+### Still open
+
+1. **Vendor replies to reviews.** There is no `vendor_response` column. If a merchant should be able to
+   answer a bad review publicly, that is a schema change plus a write function. Not assumed here.
+2. **`voucher_redemptions`** is Tier 2 read-only. If vouchers are admin-writable, confirm an admin
+   never needs to void or refund a redemption directly — the correction path would be a new voucher, not
+   an edit to history.
 
 ## 9. ADRs at risk
 
