@@ -69,14 +69,20 @@ Rules, applied uniformly:
 5. **One `events` row per mutation**, same transaction, per rule 16.
 6. **`p_patch` never carries an `id` for updates on a row the admin cannot see** — every function
    checks `deleted_at` on read and refuses to touch a soft-deleted row except via `restore`.
+7. **Tier 2 and Tier 3 get read RPCs only, never write functions.** There is deliberately no
+   `admin_update_order_v1` to be careful with later. The absence is the safety property.
 
 Rejected: **one generic `admin_write_v1(p_table, p_op, p_payload)`.** Compact, but it is a dynamic
 dispatch surface where a client string selects the write. It would also be unauditable — 24 tables in
 one function body — and it would fail the 022 suite's spirit immediately.
 
-## 4. What is admin-writable, and what is not
+## 4. Access tiers — every table classified
 
-**Writable — 24 tables in 5 groups**
+"Not writable" and "not readable" are different permissions, and conflating them is how an admin
+dashboard ends up with raw `UPDATE` on `ledger_entries`. So all 58 tables (plus 4 partitions) are
+classified three ways.
+
+### Tier 1 — WRITE. Admin creates, edits, soft-deletes.
 
 | Group | Tables |
 |---|---|
@@ -84,20 +90,54 @@ one function body — and it would fail the 022 suite's spirit immediately.
 | Money configuration | `delivery_zones`, `delivery_fee_tiers`, `commission_rules`, `rider_pay_rules`, `settings` |
 | Vendor | `vendors`, `brands`, `cuisines`, `vendor_areas`, `vendor_cuisines`, `vendor_schedules`, `vendor_holidays`, `vendor_staff` |
 | Menu | `menu_categories`, `menu_items`, `menu_item_sizes`, `item_options`, `option_choices` |
-| Engagement & people | `promo_slots`, `notification_templates`, `vouchers`, `reviews` (soft delete only), `users`, `user_roles` |
+| Engagement | `promo_slots`, `notification_templates`, `vouchers` |
+| Feature flags | `feature_flags` |
 
-**Explicitly NOT writable — and why**
+**Hybrid within Tier 1 — writable, but only in one direction:**
 
-| Tables | Reason |
+| Table | Admin may | Admin may **not** |
+|---|---|---|
+| `wallets` | `status` via `freeze_wallet_v1` / unfreeze, with a reason | **never touch `balance`.** It moves only with its ledger rows, in one transaction. `019c` exists because a direct write desyncs the books |
+| `users` | display name, and roles via `user_roles` | **never `phone_number`** (belongs to the user, constitution 18) or any identity column |
+| `reviews` | soft-delete to moderate | **never create or edit the rating.** A review is the customer's |
+| `user_roles` | grant/revoke `admin`, `vendor_staff` | never grant themselves a role they are removing in the same call |
+
+### Tier 2 — READ ONLY. The admin dashboard sees these; the system owns every write.
+
+| Group | Tables | Who writes |
+|---|---|---|
+| Order lifecycle | `orders`, `sub_orders`, `order_items`, `order_status_history`, `order_modifications`, `order_eta_snapshots`, `delivery_assignments` | `place_order_v1`, `transition_order_v1`, `cancel_order_v1`, rider RPCs |
+| Money records | `payouts`, `payout_lines`, `ledger_entries`, `platform_float`, `voucher_redemptions` | `run_payout_v1`, `collect_*`, `adjust_wallet_v1`, `reconcile_day_v1` |
+| Customer state | `addresses`, `carts`, `cart_items`, `favorites`, `favorite_items`, `notifications`, `device_tokens` | the customer's own RPCs |
+| Operations | `events`, `audit_log`, `driver_shifts` | append-only triggers and the outbox |
+| Analytics rollups | `event_daily_stats`, `search_daily_stats`, `auth_daily_stats`, `vendor_earnings_daily`, `rider_earnings_daily` | nightly jobs |
+
+**Why the order lifecycle is read-only even though admins will want to "fix" an order.** An `UPDATE` on
+`sub_orders.status` would bypass the state machine's actor check, skip the `events` row that rule 16
+requires, and leave `order_status_history` inconsistent — the same class of damage `014a` fixed for
+vendor visibility. Corrections go through `transition_order_v1`, which is the only legal writer.
+`cancel_order_v1` is the admin's tool for a wrong order.
+
+**Why `ledger_entries` is read-only.** Append-only by trigger, and `009`'s rule is that a balance must be
+computable at any time. An admin correcting money writes an `adjust_wallet_v1` reversal, which keeps the
+sum derivable. Editing a ledger row breaks the one invariant the whole money design rests on.
+
+### Tier 3 — NOT ACCESSIBLE from the dashboard at all
+
+| Target | Why |
 |---|---|
-| `orders`, `sub_orders`, `order_items`, `order_status_history`, `order_modifications` | The state machine owns them. `transition_order_v1` is the only legal writer; an admin `update` would bypass the actor and event rules |
-| `payouts`, `payout_lines` | `run_payout_v1` owns them, with its approval gate and ledger coupling |
-| `ledger_entries` | Append-only by trigger, and `009`'s rule is that a balance must be computable at any time |
-| `platform_float` | `collect_*` and `reconcile_day_v1` own it. Admin editing a float row is exactly the drift `019c` exists to make visible |
-| `carts`, `cart_items`, `favorites`, `notifications`, `device_tokens` | Customer-owned and transient |
-| `events`, `audit_log` | Append-only. Admin **reads** them, never writes |
-| `search_daily_stats`, `event_daily_stats`, `auth_daily_stats`, `vendor_earnings_daily`, `rider_earnings_daily` | Nightly rollups. An admin write would desynchronise the aggregate from its source |
-| `riders` | ADR 20: not client-readable at all. Admin reads a projection or nothing |
+| `riders` (raw table) | ADR 20: not client-readable. Support needs name and phone, so it gets a **projection function**, never the table |
+| `user_auth_providers` | identity-provider data. Admin has no legitimate need and a large one to misuse it |
+| `auth` schema | `auth.users`, `auth.identities`. Supabase-owned |
+| `private` schema | no `USAGE` for any role. Never, by anyone — see the 022 suite |
+| `rider_location_pings` | live tracking is cut by ADR 6, so nothing writes it. There is nothing to read |
+
+### The invariant that makes this safe
+
+Tier 1 is writable **only through `SECURITY DEFINER` RPCs that check `private.is_admin()`**. No client
+role holds `INSERT`, `UPDATE` or `DELETE` on any table — 022's check 8 asserts it and must keep passing.
+That is what makes "admin may write 26 tables" compatible with "62 tables sit behind RLS": the
+permission is in the function, not in a grant.
 
 ## 5. The six money functions
 
