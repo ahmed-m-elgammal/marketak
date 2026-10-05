@@ -6,6 +6,130 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Fixed - `eta` had no source at all (`038g`)
+
+The plan stated `eta` "is computed by `compute_quote`, stored on `orders.promised_delivery_at`". **That was
+false.** Reading the emitters proved it: `private.compute_quote` returns no ETA key in its result object,
+`place_order_v1` inserts 30 columns into `orders` and not one of them is `promised_delivery_at`, and the only
+two functions that mention the column are `claim_events_v1` (reading it) and `get_admin_metrics_v1`
+(comparing it for the ETA-accuracy report). **Nothing writes it**, so it was permanently null, so
+`jsonb_strip_nulls` dropped `{eta}` entirely from `order.picked_up` — "Estimated arrival {eta}" would have
+reached the customer with the literal placeholder in the sentence.
+
+`038g` sources `eta` from `delivery_assignments.assigned_at + eta_minutes`, which `claim_order_v1` really
+does write at the moment a rider accepts, with the quote-time `promised_delivery_at` kept as a fallback for
+when T3.8 populates it. Formatted in `cities.timezone`, not UTC: the previous expression used
+`at time zone 'UTC'`, which would have told an Egyptian customer their food arrives at the wrong hour.
+Observed `"eta": "02:41"` against a real order.
+
+This was a **pre-existing gap in the emitters**, not something the drain introduced. The drain surfaced it
+by being the first code to actually need the value.
+
+### Added - `038h`: P1.7 passes, P1.4 characterised and measured
+
+Installs nothing; reads only. Closes the last two open Phase 1 items by observing behaviour rather than
+inspecting `pg_proc`, because four migrations in a row passed their own catalog assertions while shipping a
+function that could not run.
+
+**P1.7 PASSED.** Deactivating the one template `order.claimed` routes to, then claiming: 0 rows returned,
+the event stays `delivered_at IS NULL`, `attempts` stays 0, and — after reactivating the template — **the
+same event is claimable again**. That last step is the one that matters: a guard that skipped the event
+forever would pass the first three and be useless, swallowing the notification with no backlog entry and no
+alarm. Blocked, not destroyed.
+
+**P1.4 CHARACTERISED, NOT FIXED.** The plan asks for two concurrent `claim_events_v1` calls to return
+disjoint sets. That cannot hold, and no test can make it hold: `FOR UPDATE SKIP LOCKED` is a *transaction*
+lock, released when the claim transaction commits, which is before the Worker has sent anything. Measured
+overlap rather than described. `claim_order_v1` gets the same guarantee with no locking clause at all, via a
+guarded single-row `UPDATE ... where rider_id is null`; the push drain cannot use that shape because one
+notification spans N rows that must close together. Accepted for MVP with the trigger condition recorded: a
+lease becomes mandatory at the first second concurrent consumer.
+
+Also **Phase 2 — the payloads are real now.** 24 events read back from two orders driven end to end, and
+three of the plan's findings were corrected by observation:
+
+- `reason`, `refund_amount` and `rider_pay_total` were **already in the payloads**, written by
+  `cancel_order_v1` and `claim_order_v1`. Only `affected_items` is genuinely computed in the claim.
+- The `eta` claim above.
+- **`order.delivered` is emitted by `complete_delivery_v1`, not by `transition_order_v1`** — driving an
+  order to `delivered` through transitions alone produces no delivery notification, and the probe fails for
+  a reason that is not the one it is testing.
+
+### Added - `038`–`038f`: the push drain, and four functions that shipped broken
+
+The MVP push drain: token registration, a collapsing claim, and a partial-failure-aware mark. Applied to the
+live project as `20261005224620` (`038`), `20261005230103` (`038b`), `20261005230315` (`038a`),
+plus `038d`, `038e` and `038f`.
+
+| Migration | What it did |
+|---|---|
+| `038_push_drain` | `private.push_routing()` (7 MVP routes), `claim_events_v1`, `mark_events_delivered_v1`, `service_role`-only grants |
+| `038a_push_drain_assertions` | Corrected `register_device_token_v1`; P1.8 grant read-back |
+| `038b_push_drain_claim_fix` | `e.v_recipient` → `r.v_recipient`; `min(uuid)` → `select distinct` |
+| `038d_push_drain_template_variables` | Added `reason`, `refund_amount`, `rider_pay_total`, `affected_items` |
+| `038e_claim_restore_recipient_id` | Restored `recipient_id`; added the runtime call to every migration |
+| `038f_claim_vendor_name_for_rejection` | `vendor_name` on `order.vendor_rejected` |
+
+**Every one of `038`, `038a`, `038d` and `038e` applied successfully while shipping a function that could
+not run.** This is the single most important thing in this entry.
+
+| # | Symptom | Cause | Found by |
+|---|---|---|---|
+| 1 | `42703: column e.v_recipient does not exist` | `v_recipient` lives in the routing table, not on `events`; the CTE aliased it `r` | executing `claim_events_v1` |
+| 2 | `42883: function min(uuid) does not exist` | PostgreSQL has no `min(uuid)`; the vendor fan-out needed `select distinct` | executing it |
+| 3 | `42702: column reference "token" is ambiguous` | `returns table (token text, …)` OUT params shadowed the column in `on conflict (token)` | first registration call |
+| 4 | `42803: aggregate functions are not allowed in GROUP BY` | `038d` reordered the CTE and dropped `recipient_id`, so `group by 6` pointed at an aggregate | executing it |
+| 5 | `vendor_name` silently null on `order.vendor_rejected` | The customer is the recipient, so the vendor join cannot match — the one template naming a vendor while addressed to the customer | executing against a real rejection |
+
+The cause is identical in all five: **PostgreSQL does not validate a plpgsql body at `create function`
+time.** It parses the body into a syntax tree and defers every name and semantic check to first execution.
+A `create function` with a wrong column, a wrong group-by ordinal or a wrong aggregate is not an error — it
+is a valid function that fails when called.
+
+Three lessons are now encoded rather than just noted:
+
+1. **Every migration that touches a plpgsql function ends with a `perform * from fn(…)` call.** `038e`
+   makes this mandatory. Catalog assertions are kept because they check a different thing — `pg_proc`
+   proves the grants are right, the call proves the body is right — but only the call catches any of the
+   five defects above.
+2. **A fix and a probe never share a migration.** The first attempt put the `claim_events_v1` fix and a
+   700-line assertion block in one file; the probe failed for an unrelated reason and the transaction rolled
+   the fix back with it, leaving the database with the broken function and a migration history claiming
+   otherwise. `035` had already established this rule by having no `begin;`/`commit;`.
+3. **Read the emitters, do not assume.** `reason`, `refund_amount` and `rider_pay_total` were already in
+   the event payloads all along — `cancel_order_v1` and `claim_order_v1` wrote them. Only `affected_items`
+   is genuinely derived. Reading `prosrc` before writing the fix turned a three-migration debugging session
+   into a two-column change.
+
+**Verified by execution, not by inspection.** A real 3-vendor order driven through `quote_order_v1` →
+`place_order_v1` → `transition_order_v1` → `claim_order_v1` → `cancel_order_v1`, rolled back by a sentinel:
+
+| Check | Result |
+|---|---|
+| Collapse (P1.5) | 3 × `picked_up` → **1** notification carrying `picked_ids: 3`; all 3 marked |
+| Fan-out | `vendor_rows: 3`, `vendor_names: 3` — one row per vendor, not one row total |
+| Partial failure (P1.3) | `marked_ok: 1, still_open: 1` — the failure stays claimable |
+| Unrouted (P1.6) | 18-event census contains no `cancelled` and no `delivered` |
+| Grants (P1.8) | `anon_exec: false, auth_exec: false, svc_exec: true` on both drain RPCs |
+| Registration (P1.1) | token registered as rider, `language` read from `users.preferred_language` = `ar` |
+| `affected_items` | `3`, not `1` — sums `order_items.quantity`, not row count |
+| `vendor_name` | `"Kofta"` on the rejection, resolved through the rejected sub_order |
+
+`rider_pay_total` returned `0` and that is **correct**: `rider_pay_rules` is empty, so `private.resolve_pay`
+returns 0 with `has_pay_rule` false and the emitter recorded that honestly. Seeding pay rules is Phase 4
+configuration, and putting a money default in SQL would break constitution rule 4.
+
+**Not done, deliberately:** P1.4 concurrent disjoint claims. `FOR UPDATE SKIP LOCKED` releases when the claim
+transaction commits, but the Worker sends after that, so two concurrent drains would claim the same
+events. Accepted for MVP because there is one drain consumer and a 50-event drain finishes in well under a
+second; a crashed run is already safe, since events stay undelivered and are reclaimed next tick. A lease
+becomes mandatory at the first second concurrent consumer. Recorded in contracts §1.9.0.3.
+
+Also not done: P1.7's probe. The `private.notification_type_exists` guard is in the SQL and has never been
+executed against a missing or inactive template.
+
+`038c_push_drain_probe.sql` is written and **not applied**.
+
 ### Added - `035_retention_and_cron`: `pg_cron`, four prunes, six schedules
 
 Applied to the live project as version `20261005211015`. **This was the only migration in

@@ -584,3 +584,91 @@ to the fingerprint and is **not** decremented.
 - Accepted cost: overselling is still possible, and nothing decrements stock, so `stock_count` is a vendor
   setting rather than a system-owned counter. Revisit if a vendor complains or if overselling becomes
   measurable.
+
+## 23. Push notifications are a Postgres claim drained by one Worker, not a webhook
+
+**Status:** proposed. Not accepted by a human yet.
+
+**Context.** `tasks.md` T3.4 originally specified an `outbox-dispatcher` Worker with a *webhook* path for
+`order.placed`, `vendor.rejected_sub_order` and `driver.assigned`. That design assumed an external push
+service to POST to, and an event vocabulary that does not match what the schema actually emits. Two facts
+killed it:
+
+- The emitters write **`order.placed`, `order.status_changed`, `order.claimed`, `order.delivered`,
+  `order.cancelled`** and others, with the status carried in `payload->>'to'` — not
+  `vendor.rejected_sub_order` or `driver.assigned`. The original names appear nowhere in
+  `place_order_v1`, `transition_order_v1` or `claim_order_v1`. A webhook keyed on them would never fire.
+- There is no push vendor in v1. FCM HTTP v1 is called directly by the Worker, which means the Worker
+  already needs a claim-and-mark loop; a webhook is a second, redundant path.
+
+**Decision.** Notifications are collapsed in Postgres by `claim_events_v1` and drained by one
+`outbox-dispatcher` Worker that renders from `notification_templates` and calls FCM HTTP v1 directly. No
+webhook, no external push service.
+
+**Consequences.**
+
+- `contracts.md` §1.9 is corrected in three places. `mark_events_delivered_v1` takes `bigint[]`, not
+  `uuid[]` — `events.id` is `bigserial`, and while `events` does carry an `id_uuid`, every writer path and
+  the claim return `id`. It also returns `(marked, still_open)` rather than `void`, because a partial
+  failure must be visible to the Worker or it cannot know some sends failed. `claim_undelivered_events_v1`
+  is listed in §1.9 and **does not exist**; the retry path is the same claim, which re-selects anything
+  still `delivered_at is null`.
+- The MVP routes **7** of the 19 notification keys, collapsing a 3-vendor order's 17 candidate events into
+  7 pushes. `vendor.order_cancelled` and the five other unrouted keys stay unrouted deliberately; they are
+  Phase 4 work, and `038e`'s assertion is scoped to the routed set so their missing variables do not fail
+  the build.
+- `claim_events_v1` and `mark_events_delivered_v1` are the **first two functions in the repository not
+  granted to `authenticated`**. `events` has no INSERT or UPDATE policy, so a client able to call the
+  drain could suppress notifications while holding `attempts` flat, blinding the §11 item 8 backlog alarm.
+- **Accepted limitation: no claim lease.** `FOR UPDATE SKIP LOCKED` releases when the claim transaction
+  commits, but the Worker sends after that, so two concurrent drains would claim the same events. Accepted
+  for MVP because there is exactly one consumer and a 50-event drain finishes in well under a second; a
+  crashed run is already safe, since events stay undelivered and are reclaimed next tick, which is
+  at-least-once delivery and the right trade for push. A lease — `claimed_at` + `claim_token` on `events` —
+  becomes mandatory at the first second concurrent consumer and would contradict the plan's
+  `Schema changes: 0`, so it needs its own amendment at that point rather than being pre-built.
+- **Process rule adopted from four consecutive failures.** Four migrations in a row (`038`, `038a`, `038d`,
+  `038e`) applied successfully while shipping a plpgsql function that could not run, because PostgreSQL
+  does not validate a plpgsql body at `create function` time. Every migration that touches a plpgsql
+  function now ends with a `perform * from fn(…)` call. A fix and a probe never share a migration, because
+  a failing probe rolls the fix back with it. Both rules exist because the alternative was discovered
+  expensively, and `CHANGELOG.md` records all four failures rather than just the fixes.
+
+## 24. `eta` comes from the rider assignment, not from a quote-time promise
+
+**Status:** proposed.
+
+**Context.** Phase 2's job was to run a real order end to end and read the `events` rows it produced,
+because every payload in the notification plan had been read out of `prosrc` rather than observed. Three
+of the plan's claims were wrong.
+
+The load-bearing one: the plan stated `eta` "is computed by `compute_quote`, stored on
+`orders.promised_delivery_at` / `eta_minutes` / `eta_maxutes`". **No such writer exists.**
+`private.compute_quote` returns no ETA key at all. `place_order_v1` inserts 30 columns into `orders` and
+not one of them is `promised_delivery_at`. The only two functions in the schema that mention the column are
+`claim_events_v1`, which read it, and `get_admin_metrics_v1`, which compares it for the ETA-accuracy report.
+It was therefore permanently null, and `jsonb_strip_nulls` — correct in itself — dropped `{eta}` from the
+claim variables entirely, so `order.picked_up` ("Estimated arrival {eta}") would have sent a customer the
+literal placeholder.
+
+**Decision.** `eta` is `delivery_assignments.assigned_at + eta_minutes`, the value `claim_order_v1` writes at
+the moment a rider accepts, formatted in `cities.timezone`. `orders.promised_delivery_at` is retained as a
+fallback for when the ETA recomputation work populates it, but the rider estimate is preferred whenever
+both exist.
+
+**Consequences.**
+
+- A rider's live estimate now beats a promise computed before anyone had picked up the order. That is the
+  better number and the one the customer can act on.
+- **The timezone changed from UTC to the city's.** The previous expression formatted `at time zone 'UTC'`,
+  which would have told an Egyptian customer their food arrives at the wrong hour. Worth recording as a
+  class of bug: a correct-looking format string applied to the wrong timezone is silent, and v1 is one city
+  so it would never have been caught by testing against a second locale.
+- `orders.promised_delivery_at` remains **dead** until T3.8. It is not dead code to delete — it is the
+  intended home for a quote-time promise and the ETA-accuracy report already reads it — but no claim RPC
+  may depend on it again until something writes it.
+- Two smaller corrections from the same observation: `reason`, `refund_amount` and `rider_pay_total` were
+  **already in the event payloads**, written by `cancel_order_v1` and `claim_order_v1`, so the claim RPC
+  only had to read them rather than derive them. And `order.delivered` is emitted by `complete_delivery_v1`,
+  **not** by `transition_order_v1`, so a probe that drives an order to delivered through transitions alone
+  sees no delivery notification and appears to fail for an unrelated reason.

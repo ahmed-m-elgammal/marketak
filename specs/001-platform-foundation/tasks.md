@@ -230,10 +230,14 @@ produces a clear diff the customer must accept. **Gate: do not proceed until thi
       preserves §11's `id bigserial primary key` and `unique id_uuid` verbatim, which partitioning
       would have forced down to the weaker `(id_uuid, created_at)` — a real weakening of the
       "downstream idempotency key" that `contracts.md` §6 relies on in three places
-- [ ] **T3.4** `outbox-dispatcher` Worker, webhook path for `order.placed`,
-      `vendor.rejected_sub_order`, `driver.assigned`
+- [ ] **T3.4** `outbox-dispatcher` Worker: claim, render from `notification_templates` in
+      `users.preferred_language`, send via FCM HTTP v1, mark. **Replaces the webhook design below** —
+      there is no webhook and no external push service in v1; see ADR 23 and
+      `notification-routing-table.md` §8.9 P3.2
 - [ ] **T3.5** `pg_cron` batched event drain every 15 s, `claim_events_v1(50)`,
-      `mark_events_delivered_v1(ids)` — one mark per batch
+      `mark_events_delivered_v1(bigint[], jsonb)` — one mark per batch. **The database half is shipped
+      and verified in `038`–`038f`; what remains is `pg_net`, which is NOT installed on the project, so
+      the schedule cannot exist yet.** See `notification-routing-table.md` §8.9 P3.4
 - [ ] **T3.6** FCM via HTTP v1, WebCrypto JWT signing, Google access token cached 55 minutes
 - [ ] **T3.7** `transition_sub_order_v1` with the full state machine, validated in pgTAP
 - [ ] **T3.8** `orders.status` and ETA recomputation on every transition

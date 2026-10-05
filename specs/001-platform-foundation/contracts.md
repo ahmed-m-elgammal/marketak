@@ -340,9 +340,104 @@ JWT, so a service-role call writes nothing. Verified by execution, not by inspec
 | `record_event_v1(p_event, p_properties jsonb)` | void | Analytics → daily rollups, not raw rows |
 | `get_admin_metrics_v1(p_date)` | funnel, orders, revenue by line, cancellation, ETA accuracy | |
 | `get_eta_accuracy_v1(p_from date, p_to date)` | promised vs actual percentiles | |
-| `claim_events_v1(p_limit int)` | event batch | The `pg_cron` drain. `FOR UPDATE SKIP LOCKED` |
-| `mark_events_delivered_v1(p_ids uuid[])` | void | One call per batch, never per event |
-| `claim_undelivered_events_v1(p_limit int)` | event batch | Retry path |
+| `claim_events_v1(p_limit int)` | collapsed notification rows | The drain. **Shipped in `038b`/`038e`/`038f`**, signature below |
+| `mark_events_delivered_v1(p_ids bigint[], p_result jsonb)` | `(marked bigint, still_open bigint)` | One call per batch. **Shipped in `038`** |
+| `claim_undelivered_events_v1(p_limit int)` | event batch | Retry path. **Still does not exist** |
+
+#### 1.9.0 Push drain (shipped in `038`–`038f`)
+
+Three functions, all `security definer` with `set search_path = ''`.
+
+`claim_events_v1(p_limit int default 50)` returns
+`(event_ids bigint[], template_key text, recipient text, recipient_id uuid, order_id uuid,
+order_number text, variables jsonb, language text, oldest_event timestamptz)` — **collapsed**, one row
+per `(recipient, recipient_id, template_key, order_id)`, not one row per event.
+
+| Argument | Actual type | Why it differs from the draft |
+|---|---|---|
+| `mark_events_delivered_v1(p_ids uuid[])` | **`bigint[]`** | `events.id` is `bigserial`, not `uuid`. `events` carries both `id bigint` and `id_uuid uuid`; the writer paths and the claim return `id`, so the mark takes `bigint[]` |
+| `mark_events_delivered_v1` returns `void` | **`(marked, still_open)`** | A partial failure must be visible to the Worker. Void gave it no way to learn that some sends failed |
+| `register_device_token_v1` returns nothing | **`setof public.device_tokens`** | See below |
+
+`register_device_token_v1(p_token text, p_platform text, p_app_role text, p_app_version text default null)`
+upserts on **`(token)` alone** — `device_tokens_token_key` is `UNIQUE (token)` **globally**, there is no
+`(user_id, token)` index, and the constraint forbids what that key would imply since one token cannot
+belong to two users. `language` is read from `users.preferred_language` and **never accepted from the
+client**, so a caller cannot choose the language its own notifications arrive in.
+
+It returns `setof public.device_tokens` rather than a `returns table` list. The first version declared
+`returns table (id uuid, token text, ...)`; those OUT parameters share their names with the columns, so
+plpgsql resolved the unqualified `token` in `on conflict (token)` to the OUT PARAMETER and every call
+raised `42702 column reference "token" is ambiguous`. A conflict target cannot be schema-qualified, and
+renaming the OUT parameters would push odd names onto every client of an RPC whose signature is still
+being decided. Returning the row type gives the client the table's own column names with no collision.
+
+**Error codes added:** `AUTH_REQUIRED`, `TOKEN_REQUIRED`, `TOKEN_TOO_LONG`, `PLATFORM_INVALID`,
+`APP_ROLE_INVALID`, `TOKEN_ALREADY_REGISTERED`, `PROFILE_INCOMPLETE`, `IDS_REQUIRED`.
+
+#### 1.9.0.1 Grants — the first two exceptions in the repository
+
+| Function | `anon` | `authenticated` | `service_role` |
+|---|---|---|---|
+| `register_device_token_v1` | **no** | yes | yes |
+| `claim_events_v1` | **no** | **no** | yes |
+| `mark_events_delivered_v1` | **no** | **no** | yes |
+
+All 82 pre-existing `_v1` functions are `authenticated`-callable, and each is correct — a client asking for
+its own order to be placed is what they are for. The drain pair is different: `events` has exactly one
+policy, `events_admin_read`, a `SELECT` policy gated on `private.is_admin()`, and **no INSERT or UPDATE
+policy at all**. A client holding EXECUTE on `mark_events_delivered_v1` could mark arbitrary events
+delivered, suppressing notifications permanently, and could do it with `attempts` never rising — so the
+§11 item 8 backlog alarm could never fire. An alarm that cannot ring is worse than no alarm, because it
+reads as healthy. `anon` is revoked everywhere: `register_device_token_v1` reads `auth.uid()` and would
+raise anyway, but a function that only fails when called is one more trap for the next author.
+
+The pattern a future author will copy from the other 82 is
+`grant execute ... to authenticated, service_role`, which is why the revoke is asserted **after** every
+`create or replace`, in every one of these migrations.
+
+#### 1.9.0.2 `variables` — every placeholder a routed template needs
+
+`order_number`, `vendor_count`, `total`, `vendor_name`, `reason`, `refund_amount`, `rider_pay_total`,
+`affected_items`, `rider_name`, `stops`, `eta`, `payment_method`, `item_count`.
+
+`jsonb_strip_nulls` is applied, so a variable the join could not supply is **absent** rather than
+present-and-null. A missing key is a renderer error you can catch; a null is a silent empty string, which
+is how an Arabic message ends up with a hole in it.
+
+Three are Worker-owned **static** strings, deliberately not supplied here, because they have no per-order
+content and duplicating them into the database would give an admin one more place to edit a notification
+by mistake: `review_prompt`, `action_required`, `prep_deadline`.
+
+`eta` is `delivery_assignments.assigned_at + eta_minutes`, formatted in `cities.timezone`. **Not**
+`orders.promised_delivery_at`: that column has no writer anywhere in the schema, so it was permanently
+null and `{eta}` was permanently absent from `order.picked_up`. See ADR 24 and `038g`.
+
+`money is passed raw, never formatted` — `total` and `rider_pay_total` are both piastres. Formatting in SQL
+would put currency formatting in two places that must then agree, and the constitution makes every money
+constant configuration rather than a literal. The Worker formats both through one helper in
+`packages/shared`.
+
+`038e` adds a migration-time assertion that every placeholder named by a **routed** template is supplied
+by one of the two sides above, read from `notification_templates` rather than from frozen template bodies.
+Scoped by joining `private.push_routing()`: the 12 active push templates the MVP does not route want
+`{amount}`, `{period}` and similar that no emitter produces yet, which is Phase 4 work.
+
+#### 1.9.0.3 Known limitation: no claim lease
+
+`claim_events_v1` uses `FOR UPDATE SKIP LOCKED`, whose lock **ends when the claim transaction commits** —
+but the Worker sends *after* that. Two concurrent drains would therefore claim the same events.
+
+Accepted for MVP, with the trigger condition recorded rather than left implicit: MVP has exactly **one**
+drain consumer and a 50-event drain completes in well under a second, so overlap requires a run longer
+than the 15 s cron period. A crashed run is already safe — events stay undelivered and are reclaimed next
+tick, which is at-least-once delivery and the correct trade for push, where a retry beats a lost
+notification.
+
+**A lease becomes mandatory the moment there is a second concurrent consumer, or the drain is scaled
+horizontally.** It would be `claimed_at timestamptz` + `claim_token uuid` on `events`, with the claim
+writing both and refusing rows whose lease is live, and the mark clearing the lease. That contradicts the
+plan's `Schema changes: 0` and would require an ADR amendment under rule 6.
 | `archive_orders_v1(p_before date, p_limit int)` | archived count | Moves items and history to R2 |
 
 #### 1.9.1 Voucher admin surface (shipped in `037`)

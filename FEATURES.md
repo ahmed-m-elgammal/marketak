@@ -141,7 +141,7 @@ and a policy, not inspecting them, and `027a` ships the two assertions that woul
 | P-04 | Outbox via `events`, every state change in the same transaction | ⬜ | constitution II |
 | P-05 | R2 images, menu snapshots, archives, backups | ⬜ | plan §3 |
 | P-06 | Cloudflare Workers: outbox dispatcher, upload signer, snapshot builder, file access, export | ⬜ | plan §1 |
-| P-07 | FCM push, batched 15 s for non-critical events | ⬜ | contracts §3.1 |
+| P-07 | FCM push, batched 15 s for non-critical events | **Phases 1+2 done** — ⬜ shipped | contracts §1.9.0 |
 | P-08 | Crashlytics with `app_role`, version and screen, hashed ids only | ⬜ | plan §5 |
 | P-09 | Firebase Analytics funnel, no PII | ⬜ | plan §5 |
 | P-10 | Durable Objects live tracking | ⬜ | Phase 8, flag off |
@@ -156,8 +156,22 @@ installed and six jobs are scheduled and active: `prune_events` (7 d, hourly), `
 with a `pg_sleep` between, and each has an index on its prune column.
 
 Two things P-11 still wants and `035` does not do: `audit_log` is partitioned for a 365-day window but
-**has no prune job**, and the 60-day order-detail archive does not exist. P-11 is also not marked ✅
-because the push-notification drain it partly exists to protect (`claim_events_v1`) is still missing.
+**has no prune job**, and the 60-day order-detail archive does not exist. P-11 stays half-done for its own
+reasons, not because the drain is missing.
+
+**P-07 has its database half and its payload half.** `register_device_token_v1`, `claim_events_v1` and
+`mark_events_delivered_v1` are applied and verified against the live project (`038`–`038h`), and Phase 2
+confirmed every payload from **24 observed `events` rows** rather than from function source — see
+`CHANGELOG.md` and contracts §1.9.0. That phase also corrected the plan: `eta` was being read from a column
+with no writer anywhere in the schema, so `order.picked_up` would have sent a customer the literal
+placeholder. Fixed in `038g` (ADR 24).
+
+**What remains is Phase 3, and none of it exists:** the `outbox-dispatcher` Worker that renders from
+`notification_templates` and sends via FCM HTTP v1, and the `pg_cron` schedule. `pg_net` is **not
+installed** on the project, so the 15-second drain cannot be scheduled even by hand. **No push has ever been
+sent**, no device token has ever been registered against a real device, and this repository contains no
+application code at all — no `apps/`, no `package.json`, and therefore no `npm test`. Not ✅ for that
+reason, and nothing in this row may be described as having passed a test suite.
 
 ---
 

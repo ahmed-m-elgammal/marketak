@@ -2545,8 +2545,16 @@ Also confirmed correct as written, so not changed:
 
 - `claim_order_v1` uses a guarded single-row `UPDATE`, not `SKIP LOCKED`. The PK plus
   `where rider_id is null` is what guarantees one winner, and that is simpler to prove with pgTAP
-  than a locking clause.
-- `claim_events_v1` uses `for update skip locked`, which is correct for a multi-consumer drain.
+  than a locking clause. **This is the shape the push drain does *not* have** - see the
+  `claim_events_v1` correction below.
+- `claim_order_v1` uses a guarded single-row `UPDATE`, not `SKIP LOCKED` - see the note above, and note the
+  contrast with the push drain below.
+- `for update skip locked` on **`claim_events_v1` is NOT sufficient for a multi-consumer drain**, and this
+  line is corrected because it said otherwise. `SKIP LOCKED` releases when the claiming transaction
+  commits, but the drain *sends* after that commit, so two concurrent drains claim the same events.
+  Accepted for MVP with exactly one drain consumer and a sub-second drain; a lease
+  (`claimed_at timestamptz` + `claim_token uuid` on `events`) becomes mandatory at the first second
+  consumer. See ADR 23 and contracts §1.9.0.3.
 - Partial indexes on `is_active`, `is_open` and `settlement_status` are already the right shape for
   these access patterns.
 - Money columns are `integer`, never `numeric` or `float`.
