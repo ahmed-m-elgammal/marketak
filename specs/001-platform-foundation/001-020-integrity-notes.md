@@ -360,6 +360,57 @@ that a successful order should have moved `stock_count` 50 → 48 was **wrong**.
 *refusal*, not the decrement. Whether to go further and decrement atomically — which would actually prevent
 two customers buying the last unit — is a product decision, not a bug fix, and is **not** assumed here.
 
+## 7a-bis. The fix, and an incident worth keeping
+
+`017a_fix_stock_enforcement.sql` carries the two fixes: `stock_count` into the pricing CTEs with an
+`OUT_OF_STOCK` rejection, and the parenthesisation at the `CART_NOT_PLACABLE` raise. Refuse-only, per the
+decision taken after the finding; stock stays vendor-maintained and `null = unlimited` keeps its meaning.
+
+**Its live application was botched and corrected by `017b_restore_checkout_functions.sql`.** The file was
+verified on disk — bodies diffed against `017`, showing exactly the five intended edits — and then a
+**hand-typed copy** was sent to the database instead of the verified file. The retyping silently dropped
+code. Two things make this worth writing down rather than quietly repairing:
+
+- **The verification described a different artifact.** The diff was real and correct, and it was evidence
+  about a file that never reached production. Nothing compared what was applied against what was checked.
+- **A behaviour test would have caught it in one line.** After `apply_migration` returned success I ran a
+  structural grep, not `quote` + `place`. A single checkout asserting `delivery_fee = 2500` would have
+  failed immediately, because the dropped block left `v_base_fee` NULL.
+
+Lost from `compute_quote`: the whole zone/fee assignment block (`v_base_fee`, `v_free_radius`, `v_per_km`,
+`v_max_distance`, `v_max_vendors`), `CART_EMPTY`, six real error codes, the service-fee settings load, and
+the attributes — it was made `SECURITY DEFINER` and `STABLE` when it must be `SECURITY INVOKER` and
+`VOLATILE`. Lost from `place_order_v1`: **`IDEMPOTENCY_KEY_TAKEN`**, without which one customer's
+idempotency key returns another customer's order; plus `settlement_status`, `platform_fee_amount`,
+`image_path`, `special_instructions` and the correct `order.placed` event.
+
+Caught by an attribute probe (`sets_base_fee = false`) seconds after applying. Repaired in `017b`, which
+also carries the explicit `ALTER FUNCTION ... SECURITY INVOKER` that `CREATE OR REPLACE` cannot do.
+
+Verified after repair — attributes, then an acceptance checklist over every dropped element, then
+behaviour:
+
+| Probe | Result |
+|---|---|
+| `compute_quote` `prosecdef` / `provolatile` | `false` / `v` — correct |
+| `place_order_v1` `prosecdef` / `provolatile` | `true` / `v` — correct |
+| 11 dropped `compute_quote` elements present | all true |
+| 15 dropped `place_order_v1` elements present | all true |
+| `delivery_fee` on a 2 × 10,000 order | 2500 |
+| order `total` | 22500 |
+| `sub_orders.settlement_status` | `payable` |
+| `order_items.special_instructions` | preserved |
+| `events` row | `order.placed` |
+| another user's idempotency key | `IDEMPOTENCY_KEY_TAKEN` |
+| sold-out line, at quote | `OUT_OF_STOCK` |
+| sold-out line, at place | `CART_NOT_PLACABLE` |
+| unavailable line at place | `CART_NOT_PLACABLE` — **not 22P02** |
+
+No table was created or dropped: `public` held 62 tables before and after, all 62 traceable to a migration
+or to the partition functions in `010`/`014`, and the four `*_2026_10` / `*_2026_11` tables are genuine
+monthly range partitions of `audit_log` and `notifications`. Every fixture rolled back; only the three
+pre-existing seed tables remain populated.
+
 ## 8. Database state after the suite
 
 All fixtures rolled back. Every public table is empty except the three seeded by earlier migrations
