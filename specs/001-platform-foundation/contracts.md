@@ -474,7 +474,7 @@ edit** on a linked rider whose numbers have drifted.
 | `TOO_MANY_VENDORS` | Cart exceeds `max_vendors_per_order` | Name the vendors to remove |
 | `PRICE_CHANGED` | Quote fingerprint mismatch | Show the diff, require re-confirmation |
 | `ITEM_UNAVAILABLE` | Item disabled, deleted or out of stock | Remove it, show what changed |
-| `OUT_OF_STOCK` | `stock_count` exhausted | Offer a replacement or removal |
+| `OUT_OF_STOCK` | `stock_count` is zero or below. `null` still means unlimited | Offer a replacement or removal. **Shipped in `017a`**; until then no function raised it and a sold-out item could be bought |
 | `VENDOR_CLOSED` | Outside schedule, on holiday, or paused | Block that vendor's items |
 | `OUT_OF_RANGE` | Address outside `delivery_radius_km` | Block, suggest an area |
 | `BELOW_MINIMUM` | Below `minimum_order_value` | Show the shortfall |
@@ -487,7 +487,7 @@ edit** on a linked rider whose numbers have drifted.
 | `NO_PAY_RULE` | No active `rider_pay_rules` row for this rider or city | **Rider cannot claim.** An admin error, surfaced loudly, never a free delivery |
 | `CART_STALE` | Cart changed since quote | Re-quote and re-confirm |
 | `INVALID_TRANSITION` | Illegal state change | Refresh and retry |
-| `CART_NOT_PLACABLE` | Cart has lines that cannot be priced (retired, out of range, size required) | Return to the cart and drop the named vendor |
+| `CART_NOT_PLACABLE` | Cart has lines that cannot be priced (retired, out of range, size required, out of stock) | Return to the cart and drop the named vendor. **Reachable only since `017b`** — the raise itself was unreachable, because `\|\|` binds tighter than `->` in the message expression and the error became `22P02` before `private.err` was called |
 | `QUOTE_NOT_FOUND` | `quote_id` unknown, or already spent by a completed order | Re-quote |
 | `QUOTE_EXPIRED` | Quote older than its 5-minute TTL | Re-quote |
 | `CANCEL_WINDOW_CLOSED` | Customer tried to cancel after preparation started | Offer support; only admin may cancel |

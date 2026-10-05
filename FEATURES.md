@@ -2,8 +2,9 @@
 
 Every feature the platform is specified to have, and its real state. **No application code exists**; what
 is shipped below is database behaviour, verified by direct SQL. See `CHANGELOG.md` for the per-migration
-record. This table was last swept at `019`, so rows for earlier migrations may still read as not
-started where the RPC in fact exists.
+record. **Checkout (C-02, C-08, C-10) was swept at `017a`/`017b` and the rows above are live.** Every other
+row is still last swept at `019`, so rows for earlier migrations may still read as not started where the
+RPC in fact exists.
 This file exists so Checklist A step 6 has somewhere to add a line, and so nobody has to guess what
 exists.
 
@@ -16,15 +17,15 @@ Legend: ⬜ not started · 🟡 in progress · ✅ shipped · ❌ cut
 | # | Feature | State | Spec |
 |---|---|---|---|
 | C-01 | Sign in with Google or Apple | ⬜ | FR-C-01 |
-| C-02 | Profile completion gate — name, phone, first address. **No profile, no ordering** | ⬜ | FR-C-01, §1.2 |
+| C-02 | Profile completion gate — name, phone, first address. **No profile, no ordering** | ✅ | FR-C-01, §1.2 |
 | C-03 | Addresses with default, area label, landmark, delivery instructions | ⬜ | FR-C-02 |
 | C-04 | Browse vendors by area, vertical, open-now | ⬜ | FR-C-03 |
 | C-05 | Arabic + English search with tashkeel and alef/ya/ta-marbuta normalisation | ⬜ | FR-C-03 |
 | C-06 | **Multi-vendor cart**, grouped and totalled per vendor, max 3 vendors | ⬜ | FR-C-04 |
 | C-07 | Cart survives app restart, device change and offline | ⬜ | FR-C-05 |
-| C-08 | Live price quote with the vendor-count uplift shown in plain language | ⬜ | FR-C-06, §2.5 |
+| C-08 | Live price quote with the vendor-count uplift shown in plain language | ✅ | FR-C-06, §2.5 |
 | C-09 | Voucher application, scoped per vendor or order-wide | ⬜ | FR-C-07 |
-| C-10 | Place an order, human-readable order number | ⬜ | FR-C-08 |
+| C-10 | Place an order, human-readable order number | ✅ | FR-C-08 |
 | C-11 | **Choose cash or wallet at delivery**, not at checkout | ⬜ | FR-C-09 |
 | C-12 | Cancel while allowed, policy-gated, reason recorded | ⬜ | FR-C-10 |
 | C-13 | Order status and ETA | ⬜ | FR-C-11 |

@@ -18,7 +18,7 @@ If you were asked to build something, read the spec before writing a line of cod
 |---|---|---|---|
 | 1 | `.specify/memory/constitution.md` | 33 non-negotiable rules | **Always. First. Never skip.** |
 | 2 | `specs/001-platform-foundation/spec.md` | Business model, actors, order state machine, fee formula, revenue phasing, retention, risks | Planning or product questions |
-| 3 | `specs/001-platform-foundation/decisions.md` | 16 ADRs — what was decided, what was rejected, why | Before changing anything structural |
+| 3 | `specs/001-platform-foundation/decisions.md` | 22 ADRs — what was decided, what was rejected, why | Before changing anything structural |
 | 4 | `specs/001-platform-foundation/data-model.md` | Full Postgres schema, DDL, RLS matrix, 22 migrations | Writing migrations or RPCs |
 | 5 | `specs/001-platform-foundation/contracts.md` | Every RPC signature, error code, event type, push template | Writing an app or a Worker |
 | 6 | `specs/001-platform-foundation/plan.md` | Architecture, order-placement sequence, payment-at-delivery flow, build order | Implementing anything |

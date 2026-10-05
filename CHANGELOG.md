@@ -6,7 +6,63 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
-Nothing shipped. This project is specification-only.
+### Fixed - stock on the checkout path (017a, 017b)
+
+Two real defects in `017_rpc_core.sql`, both found by executing the purchase path rather than reading it.
+
+**A sold-out item could be bought.** With `stock_count = 0` on the only line in the cart,
+`quote_order_v1` issued a quote and `place_order_v1` completed the order. `stock_count` was not consulted
+anywhere on the purchase path: `005_catalog.sql:64` declares it with `null = unlimited`, the only other
+reference in any migration is `020_rpc_read.sql:528` *reading* it to hide sold-out items from browse, and
+the fingerprint at `017_rpc_core.sql:579-592` contains neither `is_available` nor `stock_count`. That
+contradicted `contracts.md:477` (`OUT_OF_STOCK`) and `spec.md:519`, which claimed availability *is*
+fingerprinted. `017a` carries `stock_count` into the `private.compute_quote` pricing CTEs and adds an
+`OUT_OF_STOCK` rejection with an Arabic message, in the same shape as the six already there.
+
+**The refusal was itself broken, so every rejection reached the client as a crash.** With `is_available`
+flipped false between quote and place the order was correctly not placed, but the error was
+`SQLSTATE 22P02 invalid input syntax for type json` instead of a `contracts.md` code. Cause: in
+`place_order_v1:809` `||` binds **tighter** than `->`, so
+`'cart has unpriceable lines: ' || v_q -> 'rejections'::text` concatenates the prose first and then hands
+it to `->` as JSON — `Token "cart" is invalid`, reproduced standalone. `private.err` was never entered,
+because the crash happens while evaluating its argument. So `ITEM_UNAVAILABLE`, `ITEM_RETIRED`,
+`VENDOR_UNAVAILABLE` and the rest have all been surfacing as opaque Postgres errors. Fixed by
+parenthesising; `CART_NOT_PLACABLE` is reachable for the first time.
+
+**Refuse only, no decrement** — ADR 22. Stock is not added to the fingerprint and is not decremented.
+`null = unlimited` keeps its meaning and stock stays vendor-maintained. **Known and accepted: two
+customers can still race for the last unit.** `spec.md:519` has been corrected, since it claimed the
+opposite mechanism.
+
+Verified after the repair: `delivery_fee` 2500 and order total 22500 on a 2 × 10,000 piastre basket,
+`settlement_status = payable`, `special_instructions` and `image_path` preserved, `order.placed` event
+written, another user's idempotency key refused with `IDEMPOTENCY_KEY_TAKEN`, a sold-out line refused
+`OUT_OF_STOCK` at quote and `CART_NOT_PLACABLE` at place, and an unavailable line refused with
+`CART_NOT_PLACABLE` rather than 22P02.
+
+### Fixed - `017a` was applied from the wrong bytes (017b)
+
+**`017a` was verified on disk and then a hand-typed copy was applied instead**, which silently dropped
+large parts of both function bodies. The diff was real evidence, but it described a file that never
+reached the database; nothing compared what was applied against what was checked.
+
+Lost from `compute_quote`: the block assigning `v_base_fee`, `v_free_radius`, `v_per_km`,
+`v_max_distance` and `v_max_vendors` from the delivery zone — so the spec 2.5 fee formula ran on NULLs —
+plus `CART_EMPTY`, six real error codes, the service-fee settings load, and the attributes, which were
+made `SECURITY DEFINER` and `STABLE` when they must be `SECURITY INVOKER` and `VOLATILE`. Lost from
+`place_order_v1`: **`IDEMPOTENCY_KEY_TAKEN`**, without which one customer's idempotency key returns
+another customer's order and the early return skips every later check, plus `settlement_status`,
+`platform_fee_amount`, `image_path`, `special_instructions` and the correct `order.placed` event.
+
+Caught by an attribute probe seconds after applying — not by a behaviour test, which is the part that
+should have run first; one `delivery_fee = 2500` assertion would have failed immediately. `017b` restores
+both bodies byte-identical to `017a` and adds the explicit
+`ALTER FUNCTION private.compute_quote(...) SECURITY INVOKER` that `CREATE OR REPLACE` cannot perform.
+Repaired and verified by attribute probe, an acceptance checklist over every dropped element, and the
+behavioural pass above. Full record in `specs/001-platform-foundation/001-020-integrity-notes.md` §7a-bis.
+
+No table, column or index was created or dropped at any point: `public` held 62 tables before and after,
+and all 62 trace to a migration or to the partition functions in `010`/`014`.
 
 ### Added
 

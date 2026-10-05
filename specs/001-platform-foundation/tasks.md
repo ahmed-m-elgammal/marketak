@@ -57,7 +57,9 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       **Remaining: 021–022, plus six unbuilt money functions** from `contracts.md` §1.8
       (open question 3.30 — `freeze_wallet_v1`, `list_frozen_v1`, `get_commission_v1`,
       `set_commission_rule_v1`, `get_fee_rules_v1`, `set_fee_tier_v1`; the other three contract names are
-      folded into `run_payout_v1`). `013` shipped `events`, `014`/`014a` shipped RLS, `015` shipped search,
+      folded into `run_payout_v1`). `017a` shipped stock enforcement on the checkout path and `017b`
+      restored both checkout functions after `017a`'s live application was made from a hand-typed copy —
+      see `001-020-integrity-notes.md` §7a-bis and ADR 22. `013` shipped `events`, `014`/`014a` shipped RLS, `015` shipped search,
       `016`/`020` shipped the profile and read RPCs in parallel, `017` shipped checkout, `018` shipped rider
       delivery, `018a` fixed its revenue calculation, and `019` shipped reconciliation and payouts with
       `019a`/`019b` fixing two defects found by executing it; `008` shipped

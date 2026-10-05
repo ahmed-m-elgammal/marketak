@@ -528,3 +528,59 @@ a way only execution revealed.
   individual line of the spec and break the invariant binding them. The wallet is **not** an accrual
   ledger: a payout credits it, and `adjust_wallet_v1` remains the only way money enters a wallet
   without one, which is what `spec.md` §3.4 means by funding being an admin adjustment.
+---
+
+## 22. Availability is refused, not fingerprinted; stock is never decremented
+
+**Status:** accepted · **Date:** 2026-10-05
+
+**Context.** `spec.md` 6.1 claimed that `is_available` and `stock_count` are caught "the same way" as
+voucher expiry and fee changes - by living in the price fingerprint. Executing the checkout path showed
+that claim was false in both directions. The fingerprint at `017_rpc_core.sql:579-592` contains neither
+column. `stock_count` was not consulted anywhere on the purchase path at all: with `stock_count = 0` on
+the only line in the cart, `quote_order_v1` issued a quote and `place_order_v1` completed the sale. The
+only reference to the column in any migration was `020_rpc_read.sql:528`, *reading* it to hide sold-out
+items from browse.
+
+Chasing that surfaced a second defect in the refusal path itself. With `is_available` flipped false
+between quote and place the order was correctly not placed, but the error was `22P02 invalid input syntax
+for type json` rather than a `contracts.md` code, because in
+`place_order_v1:809` `||` binds tighter than `->`: `'prose' || v_q -> 'rejections'::text` concatenates the
+prose first and hands it to `->` as JSON. `private.err` was never entered, so **every** rejection code in
+the quote - `ITEM_UNAVAILABLE`, `ITEM_RETIRED`, `VENDOR_UNAVAILABLE` and the rest - reached the client as
+an opaque Postgres error.
+
+**Decision.** `stock_count <= 0` is refused with a new `OUT_OF_STOCK` rejection, computed in
+`private.compute_quote` alongside the six rejections already there, and `null` still means unlimited.
+`place_order_v1` raises `CART_NOT_PLACABLE` with a readable message, parenthesised. Stock is **not** added
+to the fingerprint and is **not** decremented.
+
+**Alternatives rejected.**
+
+- *Put `is_available` and `stock_count` in the fingerprint.* This is what `spec.md` 6.1 actually claimed,
+  and it was rejected on consequence rather than principle: a vendor adjusting stock would invalidate every
+  customer's live checkout and show a "prices changed" sheet for an item whose price never moved. Price
+  consent and availability are different questions, and a price diff is the wrong instrument for the
+  second one.
+- *Decrement `stock_count` atomically inside `place_order_v1`.* The only option that prevents two
+  customers buying the last unit, and genuinely tempting. Rejected because it makes the column
+  authoritative, which needs a reversal path on cancel and refund, and removes the vendor's control over
+  a field the schema documents as theirs (`null = unlimited`). That is a product decision with operational
+  consequences, not a bug fix, and it was not taken here. **Known and accepted: overselling remains
+  possible until a vendor sets `stock_count` to zero.**
+- *Revoke `EXECUTE` on the checkout RPCs.* Irrelevant; they are the only way to order.
+
+**Consequences.**
+
+- A sold-out line can no longer be bought, and `OUT_OF_STOCK` is now a code the application can render.
+- `CART_NOT_PLACABLE` is reachable for the first time, so all seven rejection codes surface as domain
+  errors instead of `22P02`. This is the fix that made the stock fix safe to ship.
+- `spec.md` 6.1 has been corrected: it no longer claims availability is fingerprinted.
+- `contracts.md` 1.7 listed `OUT_OF_STOCK` all along and described a code that no function raised. It now
+  does.
+- Forward migrations `017a` and `017b`; `017` is applied and was not edited. `017b` exists only because the
+  live application of `017a` was made from a hand-typed copy that dropped code - recorded in
+  `001-020-integrity-notes.md` section 7a-bis.
+- Accepted cost: overselling is still possible, and nothing decrements stock, so `stock_count` is a vendor
+  setting rather than a system-owned counter. Revisit if a vendor complains or if overselling becomes
+  measurable.

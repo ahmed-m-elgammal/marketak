@@ -516,8 +516,14 @@ There are exactly three tiers of truth, and they have different jobs:
 - The cache needs no invalidation logic to be *correct*. It only needs to be invalidated to be
   *pleasant*. That is why `menu_version` and a menu snapshot exist — they are a performance
   feature, not a correctness feature.
-- Availability changes are caught the same way, via `is_available` and `stock_count` in the
-  fingerprint.
+- Availability is handled **differently** from the four above, and the difference is deliberate. A voucher
+  that expires or a fee that changes alters what the customer is charged, so it belongs in the fingerprint
+  and surfaces as a price diff. Availability does not alter the price — it removes the line — so it is
+  refused outright: `stock_count <= 0` raises `OUT_OF_STOCK`, and `is_available = false` raises
+  `ITEM_UNAVAILABLE`. Both surface in `quote_order_v1`'s `rejections`, one per vendor, which is what
+  spec 2.6's "one bad vendor never loses the whole basket" needs. **Stock is not in the fingerprint**, and
+  `stock_count` is never decremented — it is vendor-maintained and `null` means unlimited, so two customers
+  can still race for the last unit. See ADR 22.
 
 ### 6.2 What the offline cache stores
 
