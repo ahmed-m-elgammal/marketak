@@ -33,7 +33,8 @@
     "vouchers": "Vouchers",
     "taxonomy": "Brands & cuisines",
     "flags": "Feature flags",
-    "audit": "Audit log"
+    "audit": "Audit log",
+    "vendors": "Merchants"
   },
   "reconciliation": {
     "noData": "No takings recorded for this day",
@@ -117,7 +118,9 @@
     "deleted": "Deleted",
     "verified": "Verified",
     "online": "Online",
-    "offline": "Offline"
+    "offline": "Offline",
+    "balanced": "Balanced",
+    "unbalanced": "Does not reconcile"
   },
   "dashboard": {
     "title": "Today",
@@ -130,15 +133,15 @@
     "deliveryFees": "Delivery fees",
     "riderTips": "Rider tips",
     "commissionRate": "Completion rate",
-    "cancellationRate": "Cancellation rate",
-    "onTimeRate": "On-time rate",
+    "cancellationRate": "Cancelled",
+    "onTimeRate": "On time",
     "funnel": "Signups and search",
     "signups": "Signups",
     "logins": "Logins",
     "searches": "Searches with results",
     "zeroResultRate": "Searches with no results",
     "eta": "Delivery-time accuracy",
-    "etaAverage": "Average error",
+    "etaAverage": "Arrival error",
     "etaMedian": "Median error",
     "vendors": "Merchants",
     "vendorsActive": "Approved and active",
@@ -148,7 +151,23 @@
     "riders": "Riders",
     "ridersActive": "Active",
     "ridersOnline": "Online now",
-    "timezoneNote": "Times are in {{timezone}}, the city timezone."
+    "timezoneNote": "Times are in {{timezone}}, the city timezone.",
+    "activeTitle": "Active orders",
+    "activeEmpty": "No orders in flight right now.",
+    "todayTitle": "Today",
+    "capacityTitle": "Merchants and riders",
+    "analyticsTitle": "Analytics",
+    "revenue": "Platform revenue",
+    "completionRate": "Completed",
+    "etaSigned": "{{value}} min",
+    "etaAverageHint": "Average, late is positive",
+    "vendorsCount": "{{count}} merchants",
+    "dueBy": "Due {{time}}",
+    "cashRemitted": "Cash collected",
+    "cashRemittedHint": "Collected by riders",
+    "completedCountHint": "{{rate}} of today's orders",
+    "ridersVerified": "Verified riders",
+    "ridersVerifiedHint": "{{count}} verified and online now"
   },
   "variance": {
     "title": "Cash variance",
@@ -380,5 +399,33 @@
     "noResultsHint": "Try a shorter search, or clear the filters.",
     "loading": "Loading…",
     "loadFailed": "Could not load this. {{RETRY}}"
+  },
+  "attention": {
+    "title": "Needs attention",
+    "clearTitle": "Nothing needs attention",
+    "clearBody": "No late orders, no unaccepted merchants, and cash accounts for.",
+    "varianceTitle": "Cash does not reconcile",
+    "varianceDetail": "{{amount}} {{currency}} unexplained on {{date}}. Open reconciliation to record why.",
+    "lateOrder": "Order {{number}} is late",
+    "lateOrderDetail": "{{minutes}} min past its promise · {{amount}} {{currency}}",
+    "awaitingVendor": "Order {{number}} is not accepted yet",
+    "awaitingVendorDetail": "{{minutes}} min past its promise with no merchant acceptance",
+    "unpaidOrder": "Order {{number}} — cash not collected",
+    "unpaidOrderDetail": "{{amount}} {{currency}} still to be collected from the customer",
+    "pendingVendor": "{{name}} is awaiting approval",
+    "pendingVendorDetail": "Submitted {{minutes}} min ago",
+    "lateBy": "{{minutes}} min late"
+  },
+  "orderStatus": {
+    "pending": "Pending",
+    "partially_confirmed": "Partly confirmed",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "picked_up": "Picked up",
+    "delivering": "Delivering",
+    "delivered": "Delivered",
+    "partially_cancelled": "Partly cancelled",
+    "cancelled": "Cancelled",
+    "cash": "Cash"
   }
 }

@@ -1,59 +1,109 @@
 /**
- * `features/dashboard/DashboardPage` - A3.1 and A3.2.
+ * `features/dashboard/DashboardPage` - operations-first, rebuilt in A3.4.
  *
- * ## What one RPC returns
+ * ## What was wrong with the previous version
  *
- * `get_admin_metrics_v1` builds a single jsonb with six blocks - funnel, orders, revenue, cancellation, eta
- * accuracy, vendors, riders - and already derives its day boundary from `cities.timezone`. So this screen is
- * **one** request and no date picker: sending a date would override the RPC's own definition and could
- * disagree with it. `lib/city-date.ts` exists for the screens that *do* let an operator choose a day.
+ * It was twenty `MetricCard`s in five identical card groups. That shape has one fatal flaw: **every number had
+ * the same visual weight**, so an order stuck for forty minutes looked exactly like a sign-up count. An
+ * operator opening the console to answer "is anything on fire?" had to read twenty numbers and decide. That is
+ * a report, and a report is the wrong artefact for the first thirty seconds of a shift.
  *
- * ## `float_variance` is rendered whatever it says
+ * The fix is ordering by *urgency*, and matching each shape to its job:
  *
- * constitution I.10, and the RPC's own comment: the variance is surfaced deliberately and never filtered to
- * zero. The obvious dashboard behaviour - grey out a zero variance, show a colour only when non-zero - destroys
- * the signal the number exists to raise, because an operator can no longer tell "no difference" from "not
- * computed". So it is always shown, always labelled, and gets the warning tone whenever it is non-zero.
+ * 1. **Needs attention** - only rows that are wrong right now, cash first. Absent when nothing is wrong,
+ *    because an always-present red banner trains people to ignore it.
+ * 2. **Active orders** - a work queue, oldest wait first, as rows so orders compare down a column.
+ * 3. **Today** - the day's totals as one compact figure row, then rates as a definition list.
+ * 4. **Capacity** - merchants and riders, same treatment. These are context for the queues above.
+ * 5. **Analytics** - signups, logins, search. Product telemetry, last and collapsed.
+ *
+ * ## Two data sources, because they answer different questions
+ *
+ * `get_admin_metrics_v1` gives the day's counts and money as one jsonb. It cannot give the work: a count of
+ * four late orders does not say which four. `getOperationsSnapshot` reads the rows behind those counts through
+ * RLS. Both are awaited before anything renders - a half-loaded board would show zero pending merchants while
+ * the query was in flight, which is a false all-clear on the one screen whose job is to raise alarms.
+ *
+ * ## What is deliberately absent
+ *
+ * **Unassigned riders.** The spec asks for it. The schema cannot support it - `orders` has no rider column,
+ * `sub_orders` carries vendor and settlement data only, and there is no `order_deliveries` table. A row that
+ * is permanently zero because nothing can feed it is worse than an absent row: it reads as reassurance.
+ *
+ * **Cash variance is in the attention block, not in a card.** constitution I.10 - surfaced deliberately, never
+ * filtered to zero. It belongs with the late orders because to an operator it is the same class of thing:
+ * something wrong right now that will not resolve itself.
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Card, Col, Row } from "antd";
-import { formatRateBps } from "@marketak/shared";
-import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 
-import { MetricCard, MetricGrid } from "../../components/MetricCard.js";
 import { Money } from "../../components/Money.js";
 import { PageSkeleton } from "../../components/PageSkeleton.js";
 import { EmptyState, ErrorState } from "../../components/StateBlock.js";
 import { StatusTag } from "../../components/StatusTag.js";
+import { formatRateBps } from "@marketak/shared";
+import { cityDate } from "../../lib/city-date.js";
 import { intlTagFor } from "../../i18n/index.js";
 import { useLocale } from "../../i18n/use-locale.js";
 import { toFriendlyError } from "../../lib/errors.js";
-import { getAdminMetrics } from "../../lib/queries/metrics.js";
+import { getAdminMetrics, type MetricsPayload } from "../../lib/queries/metrics.js";
+import { getOperationsSnapshot, type OperationsSnapshot } from "../../lib/queries/operations.js";
+
+import {
+  AllClear,
+  AttentionSection,
+  Figure,
+  Measure,
+  OrderQueue,
+  Section,
+  buildAttention,  type Translate,
+} from "../operations/OperationsSections.js";
 
 export default function DashboardPage(): ReactElement {
   const { t } = useTranslation();
   const locale = useLocale();
+  const intl = intlTagFor(locale);
 
   const metrics = useQuery({
     queryKey: ["admin-metrics"],
     queryFn: getAdminMetrics,
+    // The board is a live operations surface, and its whole purpose is to be right *now*. Polling keeps it
+    // current without a reload; 30 s is a deliberate ceiling on staleness rather than a reflex, because a
+    // screen that refreshes every two seconds on a metered tablet connection costs more than it is worth.
+    refetchInterval: 30_000,
+  });
+  const operations = useQuery({
+    queryKey: ["admin-operations"],
+    queryFn: getOperationsSnapshot,
+    refetchInterval: 30_000,
   });
 
-  if (metrics.isPending) {
+  // Both feeds are needed before anything renders. See the file header for why a half-loaded board is worse
+  // than no board.
+  if (metrics.isPending || operations.isPending) {
     return <PageSkeleton />;
   }
 
-  if (metrics.isError) {
-    return <ErrorState error={toFriendlyError(metrics.error)} onRetry={() => void metrics.refetch()} />;
+  const error = metrics.error ?? operations.error;
+  if (error !== null && error !== undefined) {
+    return (
+      <ErrorState
+        error={toFriendlyError(error)}
+        onRetry={() => {
+          void metrics.refetch();
+          void operations.refetch();
+        }}
+      />
+    );
   }
 
-  const payload = metrics.data;
-
-  // No settlement row yet for today. Distinct from an error and from "everything is zero" - an operator
-  // looking at an empty day needs to be told the day has no data, not left staring at zeros.
-  if (payload === null) {
+  // Checked together rather than as two branches. React Query types `data` as `T | undefined`, so testing only
+  // `=== null` would leave `undefined` reaching a property read - and an undefined payload with no error is
+  // exactly the "no settlement row" case the RPC models as `null`.
+  const payload: MetricsPayload | null | undefined = metrics.data;
+  if (payload === null || payload === undefined) {
     return (
       <EmptyState
         title={t("empty.noResults")}
@@ -64,182 +114,166 @@ export default function DashboardPage(): ReactElement {
   }
 
   const { orders, revenue, vendors, riders, funnel, eta_accuracy, cancellation, timezone } = payload;
-  const intl = intlTagFor(locale);
+  // Non-null asserted through a named local rather than `!`. `operations.data` is only `undefined` while its
+  // query is pending or errored, both of which returned above, so the invariant holds - and a named binding says
+  // so where a `!` just asserts it silently.
+  const board: OperationsSnapshot = operations.data as OperationsSnapshot;
+  const liveOrders = board.liveOrders;
+
   const hasVariance = revenue.float_variance !== 0;
+
+  /**
+   * The city-local date the RPC measured.
+   *
+   * Recomputed here from the zone the RPC itself used rather than read from the tablet, so the variance row
+   * names the same day the figures are about. `cityDate` returns `undefined` for an unusable zone, and an
+   * unknown time cannot be formatted - so it is omitted from the sentence rather than printed as "undefined".
+   */
+  const businessDate = cityDate(new Date(), timezone);
+  const piastres = (amount: number): string =>
+    new Intl.NumberFormat(intl, {
+      style: "decimal",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount / 100);
+
+  const completion = formatRateBps(orders.completion_rate_bps, intl);
+  const onTime = formatRateBps(eta_accuracy.on_time_rate_bps, intl);
+  const cancelled = formatRateBps(cancellation.order_rate_bps, intl);
+
+  /**
+   * The work list, in the order an operator should work it.
+   *
+   * Cash first: a variance is money the platform cannot account for, and it is the one item here that does not
+   * resolve by itself. Then orders past their promise, then merchants who have not accepted, then uncollected
+   * cash, then unapproved merchants.
+   */
+  const attention = buildAttention({
+    // `businessDate` is `string | undefined` because `cityDate` refuses to guess at an unusable zone. The
+    // variance row is the one place a missing date would print "undefined" into a sentence an operator reads,
+    // so the empty string is passed and i18next omits the clause.
+    variance: {
+      hasVariance,
+      amount: revenue.float_variance,
+      currency: revenue.currency,
+      date: businessDate ?? "",
+    },
+    late: board.lateOrders,
+    awaiting: board.awaitingVendors,
+    unpaid: board.unpaidOrders,
+    pendingVendors: board.pendingVendors,
+    t,
+    format: piastres,
+  });
+
 
   return (
     <div className="page">
       <header className="page__header">
         <h1>{t("dashboard.title")}</h1>
-        {/* Named once rather than repeated per card: an operator should never have to guess which timezone
-            the screen is in, and the RPC derived its window from `cities.timezone`. */}
-        <span className="metric-card__hint">{t("dashboard.timezoneNote", { timezone })}</span>
+        {/* Named once, not per figure: the RPC derived its window from `cities.timezone`, and an operator should
+            never have to guess which day the screen describes. */}
+        <span className="muted-note">{t("dashboard.timezoneNote", { timezone })}</span>
       </header>
 
-      {/*
-        The variance alert, shown whenever the figure is non-zero. It is an Alert rather than a metric card
-        because it demands an action, and an operator scanning cards will not read a number that is quietly
-        coloured.
-      */}
-      {hasVariance ? (
-        <Alert
-          type="error"
-          showIcon
-          message={t("variance.warningTitle")}
-          description={t("variance.warningBody", {
-            expected: formatShort(revenue.cash_expected, intl),
-            remitted: formatShort(revenue.cash_remitted, intl),
-            variance: formatShort(revenue.float_variance, intl),
-          })}
-        />
-      ) : null}
+      {attention.length > 0 ? <AttentionSection entries={attention} /> : <AllClear />}
 
-      <section aria-label={t("nav.orders")}>
-        <MetricGrid>
-          <MetricCard label={t("dashboard.ordersPlaced")} value={orders.placed} />
-          <MetricCard label={t("dashboard.ordersDelivered")} value={orders.delivered} />
-          <MetricCard label={t("dashboard.ordersCancelled")} value={orders.cancelled} />
-          <MetricCard
-            label={t("dashboard.ordersOpen")}
-            value={orders.open}
-            hint={t("dashboard.completionRateHint", {
-              rate: formatRateBps(orders.completion_rate_bps, intl) ?? "—",
-            })}
+      <Section title={t("dashboard.activeTitle")} count={liveOrders.length}>
+        {liveOrders.length === 0 ? (
+          <p className="section__empty">{t("dashboard.activeEmpty")}</p>
+        ) : (
+          <OrderQueue orders={liveOrders} />
+        )}
+      </Section>
+
+      <Section title={t("dashboard.todayTitle")}>
+        <div className="figure-row">
+          <Figure label={t("dashboard.ordersPlaced")} value={orders.placed} />
+          <Figure label={t("dashboard.ordersDelivered")} value={orders.delivered} />
+          <Figure label={t("dashboard.ordersCancelled")} value={orders.cancelled} />
+          <Figure label={t("dashboard.ordersOpen")} value={orders.open} />
+          {/*
+            Platform revenue is deliberately absent: `get_admin_metrics_v1` returns cash expected, cash
+            remitted, the variance and rider tips, but no revenue figure. Showing cash remitted here would
+            label a rider-collected amount as revenue, which is the one confusion this screen must not create -
+            constitution I.10 keeps platform money distinct from the cash float.
+          */}
+          <Figure
+            label={t("dashboard.cashRemitted")}
+            value={<Money amount={revenue.cash_remitted} currency={revenue.currency} />}
+            hint={t("dashboard.cashRemittedHint")}
           />
-        </MetricGrid>
-      </section>
+          <Figure
+            label={t("dashboard.riderTips")}
+            value={<Money amount={revenue.rider_tips} currency={revenue.currency} />}
+          />
+        </div>
 
-      <Card title={t("variance.title")}>
-        <Row gutter={[16, 16]}>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("variance.cashExpected")}
-              value={<Money amount={revenue.cash_expected} currency={revenue.currency} />}
-            />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("variance.cashRemitted")}
-              value={<Money amount={revenue.cash_remitted} currency={revenue.currency} />}
-            />
-          </Col>
-          <Col xs={12} md={6}>
-            {/*
-              constitution I.10. Always rendered, never filtered to zero, and toned whenever non-zero - so
-              "no difference" and "not computed" cannot be mistaken for one another.
-            */}
-            <MetricCard
-              label={t("variance.variance")}
-              value={<Money amount={revenue.float_variance} currency={revenue.currency} />}
-              tone={hasVariance ? "warning" : "default"}
-              hint={hasVariance ? t("variance.unexplained") : t("variance.explained")}
-            />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("dashboard.riderTips")}
-              value={<Money amount={revenue.rider_tips} currency={revenue.currency} />}
-            />
-          </Col>
-        </Row>
-      </Card>
+        <dl className="measure-list">
+          <Measure
+            label={t("dashboard.completionRate")}
+            value={completion ?? "—"}
+            hint={completion === null ? undefined : t("dashboard.completedCountHint", { rate: completion })}
+          />
+          <Measure label={t("dashboard.onTimeRate")} value={onTime ?? "—"} />
+          <Measure label={t("dashboard.cancellationRate")} value={cancelled ?? "—"} />
+          <Measure
+            label={t("dashboard.etaAverage")}
+            value={etaMinutes(eta_accuracy.avg_signed_error_min, t)}
+            hint={t("dashboard.etaAverageHint")}
+          />
+        </dl>
+      </Section>
 
-      <Card title={t("dashboard.funnel")}>
-        <Row gutter={[16, 16]}>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.signups")} value={funnel.signups} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.logins")} value={funnel.logins} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.searches")} value={funnel.searches_with_clicks} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("dashboard.zeroResultRate")}
-              value={`${formatRateBps(funnel.zero_result_rate_bps, intl) ?? "—"}`}
-            />
-          </Col>
-        </Row>
-      </Card>
+      <Section title={t("dashboard.capacityTitle")}>
+        <dl className="measure-list">
+          <Measure label={t("dashboard.vendorsActive")} value={vendors.active_approved} />
+          <Measure label={t("dashboard.vendorsOpen")} value={vendors.open_now} />
+          <Measure label={t("dashboard.vendorsPaused")} value={vendors.paused} />
+          <Measure label={t("dashboard.ridersActive")} value={riders.active} />
+          <Measure label={t("dashboard.ridersOnline")} value={riders.online_now} />
+          <Measure
+            label={t("dashboard.ridersVerified")}
+            value={<StatusTag label={t("status.verified")} tone="success" />}
+            hint={t("dashboard.ridersVerifiedHint", { count: riders.verified_online })}
+          />
+        </dl>
+      </Section>
 
-      <Card title={t("dashboard.eta")}>
-        <Row gutter={[16, 16]}>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.onTimeRate")} value={formatRateBps(eta_accuracy.on_time_rate_bps, intl) ?? "—"} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("dashboard.etaAverage")}
-              value={eta_accuracy.avg_signed_error_min ?? "—"}
-              hint={t("dashboard.etaMinutes")}
-            />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.etaMedian")} value={eta_accuracy.p50_signed_error_min ?? "—"} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("dashboard.cancellationRate")}
-              value={formatRateBps(cancellation.order_rate_bps, intl) ?? "—"}
-            />
-          </Col>
-        </Row>
-      </Card>
-
-      <Card title={t("dashboard.vendors")}>
-        <Row gutter={[16, 16]}>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.vendorsActive")} value={vendors.active_approved} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.vendorsOpen")} value={vendors.open_now} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard label={t("dashboard.vendorsPaused")} value={vendors.paused} />
-          </Col>
-          <Col xs={12} md={6}>
-            <MetricCard
-              label={t("dashboard.vendorsPending")}
-              value={vendors.pending_approval}
-              {...(vendors.pending_approval > 0 ? { hint: t("dashboard.vendorsPendingHint") } : {})}
-            />
-          </Col>
-        </Row>
-      </Card>
-
-      <Card title={t("dashboard.riders")}>
-        <Row gutter={[16, 16]}>
-          <Col xs={12} md={8}>
-            <MetricCard label={t("dashboard.ridersActive")} value={riders.active} />
-          </Col>
-          <Col xs={12} md={8}>
-            <MetricCard label={t("dashboard.ridersOnline")} value={riders.online_now} />
-          </Col>
-          <Col xs={12} md={8}>
-            <MetricCard
-              label={t("dashboard.ridersVerified")}
-              value={<StatusTag label={t("status.verified")} tone="success" />}
-              hint={t("dashboard.ridersVerifiedHint", { count: riders.verified_online })}
-            />
-          </Col>
-        </Row>
-      </Card>
+      {/*
+        Analytics last, collapsed. Signups and search behaviour are product telemetry: interesting, but nothing
+        an admin must act on during service, and putting them above the queue is how a console gets ignored.
+      */}
+      <details className="analytics">
+        <summary className="analytics__summary">{t("dashboard.analyticsTitle")}</summary>
+        <dl className="measure-list">
+          <Measure label={t("dashboard.signups")} value={funnel.signups} />
+          <Measure label={t("dashboard.logins")} value={funnel.logins} />
+          <Measure label={t("dashboard.searches")} value={funnel.searches_with_clicks} />
+          <Measure
+            label={t("dashboard.zeroResultRate")}
+            value={formatRateBps(funnel.zero_result_rate_bps, intl) ?? "—"}
+          />
+        </dl>
+      </details>
     </div>
   );
 }
 
+
 /**
- * A compact number for prose inside an Alert description.
+ * Signed error in minutes, with the unit.
  *
- * `Money` is right for a figure in a card and wrong inside a sentence - it returns the full localised currency
- * string, and the sentence already names the currency. This keeps the sentence readable.
+ * The value is *signed* by design - positive means arriving late, negative early - so it is rendered with a
+ * leading `+` when positive. Dropping the sign would make "late by four minutes" and "early by four minutes"
+ * print identically, which is the single most misleading thing this figure could do.
  */
-function formatShort(amount: number, intl: string): string {
-  return new Intl.NumberFormat(intl, {
-    style: "decimal",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount / 100);
+function etaMinutes(
+  value: number | null | undefined,
+  t: Translate,
+): string {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  return t("dashboard.etaSigned", { value: value > 0 ? `+${value}` : value });
 }

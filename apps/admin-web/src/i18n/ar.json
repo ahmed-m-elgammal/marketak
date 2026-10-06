@@ -33,7 +33,8 @@
     "vouchers": "الكوبونات",
     "taxonomy": "العلامات والمطابخ",
     "flags": "أزرار التحكم",
-    "audit": "سجل العمليات"
+    "audit": "سجل العمليات",
+    "vendors": "التجار"
   },
   "reconciliation": {
     "noData": "لا توجد تحصيلات مسجلة لهذا اليوم",
@@ -117,7 +118,9 @@
     "deleted": "محذوف",
     "verified": "موثق",
     "online": "متصل",
-    "offline": "غير متصل"
+    "offline": "غير متصل",
+    "balanced": "متوازن",
+    "unbalanced": "غير متوازن"
   },
   "dashboard": {
     "title": "اليوم",
@@ -130,15 +133,15 @@
     "deliveryFees": "رسوم التوصيل",
     "riderTips": "حوافز السائقين",
     "commissionRate": "نسبة الإتمام",
-    "cancellationRate": "نسبة الإلغاء",
-    "onTimeRate": "نسبة الالتزام بالوقت",
+    "cancellationRate": "ملغاة",
+    "onTimeRate": "في الموعد",
     "funnel": "التسجيل والبحث",
     "signups": "حسابات جديدة",
     "logins": "عمليات دخول",
     "searches": "عمليات بحث بنتيجة",
     "zeroResultRate": "بحث بلا نتيجة",
     "eta": "دقة وقت التوصيل",
-    "etaAverage": "متوسط الخطأ",
+    "etaAverage": "فارق الوصول",
     "etaMedian": "الخطأ الوسيط",
     "vendors": "المحلات",
     "vendorsActive": "معتمد ونشط",
@@ -148,7 +151,23 @@
     "riders": "السائقون",
     "ridersActive": "نشط",
     "ridersOnline": "متصل الآن",
-    "timezoneNote": "الأوقات بتوقيت {{timezone}}، وهو توقيت المدينة."
+    "timezoneNote": "الأوقات بتوقيت {{timezone}}، وهو توقيت المدينة.",
+    "activeTitle": "الطلبات النشطة",
+    "activeEmpty": "لا توجد طلبات قيد التنفيذ حاليًا.",
+    "todayTitle": "اليوم",
+    "capacityTitle": "التجار والسائقون",
+    "analyticsTitle": "التحليلات",
+    "revenue": "إيراد المنصة",
+    "completionRate": "مكتملة",
+    "etaSigned": "{{value}} دقيقة",
+    "etaAverageHint": "المتوسط، والتأخير موجب",
+    "vendorsCount": "{{count}} تجار",
+    "dueBy": "الموعد {{time}}",
+    "cashRemitted": "الكاش المحصّل",
+    "cashRemittedHint": "حصّله السائقون",
+    "completedCountHint": "{{rate}} من طلبات اليوم",
+    "ridersVerified": "السائقون الموثّقون",
+    "ridersVerifiedHint": "{{count}} موثّق ومتاح الآن"
   },
   "variance": {
     "title": "فرق التحصيل",
@@ -324,7 +343,6 @@
     "tierForCount_two": "محلان",
     "tierForCount_few": "{{count}} محلات",
     "tierForCount_many": "{{count}} محلا",
-    "tierForCount_other": "{{count}} محل",
     "tierForCount_other": "{{count}} محلات",
     "monotonicWarning": "يجب ألا تقل المعاملات كلما زاد عدد المحلات."
   },
@@ -385,5 +403,33 @@
     "noResultsHint": "جرّب بحثا أقصر، أو امسح التصفية.",
     "loading": "جارٍ التحميل…",
     "loadFailed": "تعذر تحميل هذا. {{RETRY}}"
+  },
+  "attention": {
+    "title": "يحتاج إلى انتباه",
+    "clearTitle": "لا شيء يحتاج إلى انتباه",
+    "clearBody": "لا توجد طلبات متأخرة ولا تجّار لم يقبلوا، والكاش متساوٍ.",
+    "varianceTitle": "الكاش غير متوازن",
+    "varianceDetail": "{{amount}} {{currency}} غير مفسّرة في {{date}}. افتح التسوية لتسجيل السبب.",
+    "lateOrder": "الطلب {{number}} متأخر",
+    "lateOrderDetail": "متأخر {{minutes}} دقيقة عن موعده · {{amount}} {{currency}}",
+    "awaitingVendor": "الطلب {{number}} لم يُقبَل بعد",
+    "awaitingVendorDetail": "متأخر {{minutes}} دقيقة عن موعده دون قبول من التاجر",
+    "unpaidOrder": "الطلب {{number}} — لم يُحصَّل الكاش",
+    "unpaidOrderDetail": "متبقٍّ {{amount}} {{currency}} للتحصيل من العميل",
+    "pendingVendor": "{{name}} في انتظار الموافقة",
+    "pendingVendorDetail": "أُرسل منذ {{minutes}} دقيقة",
+    "lateBy": "متأخر {{minutes}} دقيقة"
+  },
+  "orderStatus": {
+    "pending": "قيد الانتظار",
+    "partially_confirmed": "مؤكد جزئيًا",
+    "preparing": "قيد التحضير",
+    "ready": "جاهز",
+    "picked_up": "تم الاستلام",
+    "delivering": "قيد التوصيل",
+    "delivered": "تم التوصيل",
+    "partially_cancelled": "ملغى جزئيًا",
+    "cancelled": "ملغى",
+    "cash": "كاش"
   }
 }

@@ -171,7 +171,369 @@
   gap: var(--space-2);
 }
 
-/* --- metric grid --- */
+/* --- sections ---
+ *
+ * A section is a heading, a rule, and content. No border, no fill, no shadow: the earlier design put every
+ * group of metrics in a bordered card, which gave the page four competing boxes and made a routine screen
+ * look like a stack of widgets. Rules and whitespace are enough to separate, and they cost no paint.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section__heading,
+.attention__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* A count beside a heading, so an operator reads "3" without counting rows. */
+.section__count,
+.attention__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 20px;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.section__empty {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 14px;
+}
+
+/* --- needs attention ---
+ *
+ * The only tinted region on the screen. Everything else is neutral, so when this section appears it is the
+ * only thing on the page that is coloured - which is the entire point of putting it first.
+ */
+
+.attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-status-danger);
+  border-radius: var(--radius-lg);
+  background: var(--color-wash-danger);
+}
+
+.attention__count {
+  background: var(--color-status-danger);
+  color: var(--color-surface-raised);
+}
+
+.attention__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+
+.attention__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+
+.attention__item:last-child {
+  border-block-end: 0;
+}
+
+.attention__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.attention__item-title {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.attention__detail {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+/* A label, not a colour: the tone already carries severity and the word confirms it for a colour-blind
+   operator or on a washed-out tablet screen. */
+.attention__item--danger .attention__item-title::before {
+  content: "";
+  display: inline-block;
+  inline-size: 6px;
+  block-size: 6px;
+  margin-inline-end: var(--space-2);
+  border-radius: 50%;
+  background: var(--color-status-danger);
+  vertical-align: middle;
+}
+
+.attention__item--warning .attention__item-title::before {
+  content: "";
+  display: inline-block;
+  inline-size: 6px;
+  block-size: 6px;
+  margin-inline-end: var(--space-2);
+  border-radius: 50%;
+  background: var(--color-status-warning);
+  vertical-align: middle;
+}
+
+.attention__action {
+  flex-shrink: 0;
+  color: var(--color-text-link);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.attention__action:hover,
+.attention__action:focus-visible {
+  text-decoration: underline;
+}
+
+/*
+ * The all-clear. Present when nothing is wrong, and deliberately quiet - it replaces a red banner rather than
+ * sitting above one, because a green box that is always there is the same noise as a red box that is always
+ * there.
+ */
+.all-clear {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.all-clear__mark {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  border-radius: 50%;
+  background: var(--color-wash-success);
+  color: var(--color-status-success);
+  font-weight: 600;
+}
+
+.all-clear__body {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+/* --- order queue ---
+ *
+ * A grid, not a stack of cards. Each row is one order and its attributes line up in columns across rows, which
+ * is the thing cards cannot do - with cards, comparing two orders means reading two separate boxes.
+ */
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+
+.queue__row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 9rem) 9rem minmax(6rem, 1fr) minmax(9rem, auto) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-subtle);
+  font-size: 14px;
+}
+
+.queue__number {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue__meta {
+  color: var(--color-text-subtle);
+  font-size: 13px;
+}
+
+.queue__eta {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* The one place on the board where colour carries meaning without a word beside it, because the row's status
+   tag already states the state - this only makes the breach visible while scrolling. */
+.queue__eta--late {
+  color: var(--color-status-danger);
+  font-weight: 600;
+}
+
+.queue__amount {
+  justify-self: end;
+}
+
+/* --- figures and measures --- */
+
+/*
+ * `.figure-row`
+ *
+ * One dense row of figures. Six at 1/6 width each reads as a summary line rather than six widgets, which is
+ * what today's totals are: context for the queues above, not a thing to be studied.
+ */
+.figure-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block: 1px solid var(--color-border-subtle);
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.figure__label {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+}
+
+.figure__value {
+  color: var(--color-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 28px;
+}
+
+/*
+ * `.measure-list`
+ *
+ * A two-column definition list. A rate is a number *and* what it means, and a card can only carry the number,
+ * so a card forces the operator to remember which metric a figure belonged to.
+ */
+.measure-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0 var(--space-6);
+  margin: 0;
+}
+
+.measure {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+
+.measure__label {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.measure__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.measure__hint {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* --- analytics ---
+ *
+ * Collapsed by default. Signups and search behaviour are product telemetry: useful, but nothing an admin must
+ * act on during service, and putting them above the queue is how a console gets ignored.
+ */
+
+.analytics {
+  border-block-start: 1px solid var(--color-border-subtle);
+  padding-block-start: var(--space-3);
+}
+
+.analytics__summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* A small note beside a heading - "in Africa/Cairo", "of 3 shops". */
+.muted-note {
+  color: var(--color-text-subtle);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  /* The queue's five columns cannot fit a phone, and a squeezed five-column row is unreadable rather than
+     compact. Each attribute drops to its own line instead. */
+  .queue__row {
+    grid-template-columns: 1fr auto;
+    row-gap: var(--space-2);
+  }
+
+  .queue__meta,
+  .queue__eta {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- reconciliation figures ---
+ *
+ * `.metric-grid` and `.metric-card` survive from the old dashboard, but only the **reconciliation** screen uses
+ * them now. That is deliberate rather than leftover: a cash reconciliation screen is four figures of one unit
+ * beside each other, and for that a small labelled card is the correct shape - they are peers, not a list to
+ * scan. The dashboard's twenty mixed-unit figures were the problem, not the card.
+ *
+ * A generic `.figure-row` / `.figure` would have been the tidier name, but renaming a class used by another
+ * screen to satisfy an aesthetic preference is churn, and `.metric-*` still describes what it renders.
+ */
 
 .metric-grid {
   display: grid;
