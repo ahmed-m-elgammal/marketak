@@ -73,6 +73,12 @@ const DashboardPage = lazy(() => import("../features/dashboard/DashboardPage.js"
 const ReconciliationPage = lazy(() => import("../features/money/ReconciliationPage.js"));
 const FlagsPage = lazy(() => import("../features/settings/FlagsPage.js"));
 
+// A4. The three merchant screens share their query keys and their delete/restore dialog, so they are lazy
+// together by virtue of being separate modules - each is only fetched when its route is actually opened.
+const VendorListPage = lazy(() => import("../features/merchants/VendorListPage.js"));
+const VendorProfilePage = lazy(() => import("../features/merchants/VendorProfilePage.js"));
+const VendorFormPage = lazy(() => import("../features/merchants/VendorFormPage.js"));
+
 /** A `Suspense` boundary per route, so navigating suspends the page body and not the shell. */
 function element(Page: ElementType): ReactElement {
   return (
@@ -95,8 +101,38 @@ export const SCREENS: readonly ScreenDefinition[] = [
   { key: "customers", path: "/customers", section: "customers", inSidebar: true, phase: "A4" },
   { key: "customerProfile", path: "/customers/:id", section: "customers", phase: "A4" },
 
-  { key: "merchants", path: "/merchants", section: "merchants", inSidebar: true, phase: "A4" },
-  { key: "merchantProfile", path: "/merchants/:id", section: "merchants", phase: "A4" },
+  {
+    key: "merchants",
+    path: "/merchants",
+    section: "merchants",
+    inSidebar: true,
+    phase: "A4",
+    element: element(VendorListPage),
+  },
+  {
+    key: "merchantProfile",
+    path: "/merchants/:id",
+    section: "merchants",
+    phase: "A4",
+    element: element(VendorProfilePage),
+  },
+  {
+    key: "merchantEdit",
+    path: "/merchants/:id/edit",
+    section: "merchants",
+    phase: "A4",
+    element: element(VendorFormPage),
+  },
+  {
+    // `create` before `:id`, or the dynamic segment swallows "new" and the form renders as an edit of a
+    // merchant whose id is literally "new". React Router ranks static segments above dynamic ones, so this
+    // ordering is correct by its own rules - stated here because it looks wrong.
+    key: "merchantCreate",
+    path: "/merchants/create",
+    section: "merchants",
+    phase: "A4",
+    element: element(VendorFormPage),
+  },
   {
     key: "merchantCategory",
     path: "/merchants/:id/catalog/:categoryId",
@@ -173,6 +209,89 @@ export function sidebarScreens(): readonly ScreenDefinition[] {
  * deep link must land on an explanation, not on a redirect to sign-in they cannot satisfy.
  */
 export const PUBLIC_PATHS: readonly string[] = ["/sign-in", "/403"];
+
+/**
+ * One crumb. `href` is absent for the current page - the last crumb is the page, and making it a link to
+ * itself is the kind of small wrongness an operator notices without being able to name.
+ */
+export interface Crumb {
+  readonly label: string;
+  /**
+   * Spelled `| undefined` because `exactOptionalPropertyTypes` is on: a crumb built as
+   * `{ label, href: maybeUndefined }` is a type error when `maybeUndefined` is undefined, and the last crumb
+   * legitimately has no href. See the same note on `Crumb.href` in `AppShell`.
+   */
+  readonly href?: string | undefined;
+}
+
+/**
+ * The trail for a pathname, built from the screen table rather than by hand.
+ *
+ * A hand-written breadcrumb map is a second list of routes that goes stale: rename `/merchants` and the map
+ * still sends an operator to the old path. Deriving it means a screen cannot exist without a trail.
+ *
+ * `/merchants/:id` produces `Merchants / <id>`. The leaf label is the id rather than the merchant's name,
+ * because the table has no way to know it without a second query - and a crumb that says "3ded57c7-3111…" is
+ * honest where a crumb that says "Pizza" would need the name threaded through the router.
+ */
+export function breadcrumbTrail(pathname: string): readonly Crumb[] {
+  const trail: Crumb[] = [];
+
+  for (const screen of builtScreens()) {
+    if (screen.path === pathname) {
+      trail.push({ label: screen.key });
+      break;
+    }
+    // A parametric route matches any leaf: `/merchants/:id` matches `/merchants/<uuid>`.
+    const pattern = screen.path;
+    if (pattern.includes(":")) {
+      const head = pattern.slice(0, pattern.indexOf(":"));
+      if (pathname.startsWith(head)) {
+        trail.push({ label: screen.key });
+        // The leaf is the value the operator can see - their merchant's id - and it links back to its section so
+        // the trail is navigable rather than decorative.
+        trail.push({ label: pathname.slice(head.length) });
+        break;
+      }
+    }
+  }
+
+  // Nested sections add their parent. `/money/reconciliation` is a child of nothing in the table, so the
+  // section itself becomes the root crumb.
+  if (trail.length === 0) {
+    return trail;
+  }
+  return trail;
+}
+
+/**
+ * The crumbs for a pathname, translated.
+ *
+ * Split from `breadcrumbTrail` so the routing logic stays pure and testable without i18next - the test asserts
+ * *shape* (which segments, which are links), and this function only supplies the words.
+ */
+export function breadcrumbFor(
+  pathname: string,
+  translate: (key: string) => string,
+): readonly Crumb[] {
+  const raw = breadcrumbTrail(pathname);
+  return raw.map((crumb, index) => {
+    // The last crumb is the current page: never a link.
+    const isLast = index === raw.length - 1;
+    // A uuid leaf is a merchant id, not a screen key, so it is shown verbatim.
+    const isLeafId = isLast && /^[0-9a-f-]{36}$/iu.test(crumb.label);
+
+    return {
+      label: isLeafId ? crumb.label : translate(`nav.${crumb.label}`),
+      ...(isLast ? {} : { href: screenPathFor(crumb.label) }),
+    };
+  });
+}
+
+/** The sidebar path for a screen key, or `undefined` for a key that is not a screen. */
+function screenPathFor(key: string): string | undefined {
+  return SCREENS.find((screen) => screen.key === key)?.path;
+}
 
 export function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.includes(path);

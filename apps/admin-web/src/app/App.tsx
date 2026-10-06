@@ -40,13 +40,14 @@ import AuthCallbackPage from "../features/auth/AuthCallbackPage.js";
 /**
  * Wraps the app routes, so navigating between screens never re-renders the shell — which is what keeps the
  * sidebar from flashing and the operator's scroll position intact.
+ *
+ * `AppShell` now renders its own `<Outlet />`: it owns the breadcrumbs, and a breadcrumb trail that needs the
+ * shell's header to be inside it cannot be rendered by a caller that sits outside. `Shell` is kept as the
+ * route element because `<Route element>` needs a component, and a component that renders `<AppShell />` and
+ * nothing else is clearer than inlining the shell at the call site.
  */
 function Shell(): ReactElement {
-  return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
-  );
+  return <AppShell />;
 }
 
 /**

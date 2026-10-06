@@ -153,8 +153,30 @@ Highest value per screen, and it needs no writes at all — pure RLS reads.
       window from `cities.timezone`; a browser in UTC silently shows the wrong day
 - [ ] **A3.5** Flags: `get_flags_v1` — the T6.2 surface
 
-**Exit:** an operator opens the console, sees today's numbers, and they match `reconcile_day_v1` for the
-same date.
+**Exit:** an operator opens the console, sees today's numbers, and they match `reconcile_day_v1` for the same
+date.
+
+**Done 2026-10-06.** Four screens exist: dashboard, reconciliation, feature flags, sign-in. The dashboard is
+operations-first rather than a card grid — a *Needs attention* list, an active-order board with the
+longest-waiting order promoted, then today's figures, capacity, and collapsed analytics.
+
+Two things A3.4 had to solve beyond "use the city's timezone":
+
+- **`reconcile_day_v1(p_date, …)` has no default for `p_date`.** `pg_get_function_arguments` renders the
+  signature as `p_date date, p_explanation text DEFAULT NULL::text`, so the `DEFAULT` looks like it covers both
+  parameters. It covers only `p_explanation`; the body raises `DATE_REQUIRED` on a null date. Only `prosrc`
+  gives a reliable answer, so the console computes the date itself via `cityToday`.
+- **A bodiless `POST /rpc/f` only routes to a zero-argument function.** A defaulted parameter is not optional at
+  the routing layer, so `rpc("reconcile_day_v1")` returned `PGRST202` — an error blaming the schema cache for a
+  function the database plainly has. `rpc-arguments.test.ts` now asserts every call names its parameters,
+  against signatures read from `pg_proc`.
+
+**Not built, deliberately:** an "unassigned riders" row. Rider-to-order assignment does not exist in the schema
+(`orders` has no rider column, `sub_orders` carries vendor and settlement data only, there is no
+`order_deliveries`). A row permanently reading zero because nothing can feed it is worse than an absent row.
+
+Still unverified: the **OAuth callback round trip**. The provider reaches Google's credential prompt, but
+completing it needs a human click.
 
 ### A4 — Catalog and vendor CRUD
 

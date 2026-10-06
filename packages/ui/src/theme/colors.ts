@@ -233,6 +233,11 @@ export function toCssVariables(): Record<string, string> {
     "--color-text-subtle": text.subtle,
     "--color-text-disabled": text.disabled,
     "--color-text-on-dark": text.onDark,
+    // The secondary text colour *on the chrome surface*. Needed because the sidebar is chrome, and 4.80:1 on
+    // white is not the same figure as on near-black - a value that passes AA on the page can fail on the nav,
+    // which is where a low-contrast label hides longest.
+    "--color-text-on-dark-secondary": text.onDarkSecondary,
+    "--color-brand-primary-text": brand.primaryText,
     "--color-status-success": status.success,
     "--color-status-warning": status.warning,
     "--color-status-danger": status.danger,

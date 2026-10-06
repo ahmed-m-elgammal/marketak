@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A — The Dispatch Desk · Marketak Admin</title>
+<style>
+/* Tokens from packages/ui/src/theme/{colors,tokens}.ts */
+:root{
+  --ink:#1C1917; --ink-2:#57534E; --ink-3:#78716C; --on-dark:#FFFFFF; --on-dark-2:#D6D3D1;
+  --canvas:#FFFFFF; --sunken:#F9FAFB; --hover:#F3F4F6; --wash:#FEF6F2;
+  --line:#EAEAEA; --line-2:#D6D3D1;
+  --accent:#B54708; --accent-hover:#93370D;
+  --ok:#067647; --warn:#B54708; --bad:#B42318; --info:#175CD3;
+  --r-ctl:6px; --r-badge:4px;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s6:24px;--s8:32px;
+  --ff:"IBM Plex Sans","IBM Plex Sans Arabic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:400 14px/20px var(--ff);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;font-weight:600}
+a{color:var(--accent);text-decoration:none}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── frame ─────────────────────────────────────────────── */
+.shell{display:grid;grid-template-columns:232px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
+.side{grid-row:1/3;background:#1C1917;color:var(--on-dark);display:flex;flex-direction:column;
+  border-inline-end:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:var(--s3);padding:var(--s4) var(--s5);
+  border-block-end:1px solid #292524;text-decoration:none;color:inherit}
+.mark{display:grid;place-items:center;inline-size:28px;block-size:28px;border-radius:var(--r-ctl);
+  background:var(--accent);font-weight:600;font-size:14px}
+.brand b{font-weight:600;letter-spacing:.01em}
+.nav{padding:var(--s2) 0;overflow:auto}
+.nav .grp{padding:var(--s4) var(--s5) var(--s1);color:var(--on-dark-2);font-size:12px;font-weight:500}
+.nav a{display:flex;align-items:center;gap:var(--s3);min-height:44px;padding-inline:var(--s5);
+  color:var(--on-dark-2);text-decoration:none;font-size:14px}
+.nav a:hover{background:#292524;color:var(--on-dark)}
+.nav a[aria-current]{background:var(--wash);color:var(--ink);font-weight:500;
+  box-shadow:inset 3px 0 0 var(--accent)}   /* leading bar, not a slab */
+
+.top{grid-column:2;display:flex;align-items:center;justify-content:space-between;
+  gap:var(--s4);padding-inline:var(--s6);border-block-end:1px solid var(--line);background:var(--canvas)}
+.crumbs{color:var(--ink-2);font-size:13px}
+.crumbs i{font-style:normal;color:var(--ink-3);padding-inline:6px}
+.who{display:flex;align-items:center;gap:var(--s2);color:var(--ink-2);font-size:13px}
+.who .av{display:grid;place-items:center;inline-size:28px;block-size:28px;border-radius:50%;
+  background:var(--sunken);border:1px solid var(--line);font-weight:600;font-size:12px;color:var(--ink-2)}
+
+main{grid-column:2;display:grid;grid-template-columns:340px 1fr;gap:0;min-inline-size:0}
+
+/* ── A: the queue is a permanent instrument ─────────────── */
+.queue-pane{border-inline-end:1px solid var(--line);padding:var(--s6);min-inline-size:0}
+.pane-h{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
+  padding-block-end:var(--s2);margin-block-end:var(--s3);border-block-end:1px solid var(--line)}
+.pane-h h2{font-size:16px}
+.pane-h span{font-size:12px;color:var(--ink-3)}
+
+.item{padding:var(--s3) 0;border-block-end:1px solid var(--line)}
+.item:last-child{border:0}
+.item-t{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3)}
+.item-t b{font-weight:600;font-size:14px}
+.item-d{color:var(--ink-2);font-size:13px;margin-block-start:2px}
+.item-d .q{color:var(--ink)}
+.item a{font-size:13px;font-weight:500}
+
+/* dot = liveness. This is the ONE place the system spends colour. */
+.dot{inline-size:7px;block-size:7px;border-radius:50%;display:inline-block;flex:none}
+.d-bad{background:var(--bad)} .d-warn{background:var(--warn)} .d-ok{background:var(--ok)}
+.d-info{background:var(--info)} .d-off{background:var(--line-2)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:1px 7px;border-radius:var(--r-badge);
+  font-size:12px;font-weight:500;border:1px solid currentcolor;white-space:nowrap}
+.b-ok{color:var(--ok);background:#ECFDF3} .b-warn{color:var(--warn);background:#FFFAEB}
+.b-bad{color:var(--bad);background:#FEF3F2} .b-info{color:var(--info);background:#EFF8FF}
+.b-neut{color:var(--ink-2);background:#F5F5F4}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);white-space:nowrap}
+
+.board-pane{padding:var(--s6);min-inline-size:0;display:flex;flex-direction:column;gap:var(--s6)}
+
+/* the live order: the largest object on the page */
+.live{border:1px solid var(--line);border-radius:var(--r-ctl);padding:var(--s5);background:var(--canvas)}
+.live-h{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap}
+.live-h b{font-size:17px;font-weight:600}
+.live-t{display:flex;align-items:baseline;gap:var(--s6);margin-block-start:var(--s3)}
+.promise{font-size:28px;line-height:34px;font-weight:600}
+.promise.bad{color:var(--bad)}
+.promise small{display:block;font-size:12px;line-height:16px;font-weight:400;color:var(--ink-3)}
+
+/* ledger: a ruled list, not cards */
+.ledger{display:flex;flex-direction:column}
+.ledger dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 var(--s6)}
+.lrow{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
+  padding-block:10px;border-block-end:1px solid var(--line)}
+.lrow dt{color:var(--ink-3);font-size:13px}
+.lrow dd{margin:0;font-weight:600;font-size:14px}
+.lrow.bad dd{color:var(--bad)}
+
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:minmax(7rem,9rem) 8rem 1fr 8rem auto;align-items:center;gap:var(--s4);
+  padding-block:11px;border-block-end:1px solid var(--line)}
+.row:hover{background:var(--hover)}
+.row .no{font-weight:600}
+.row .mt{color:var(--ink-3);font-size:13px}
+.row .eta{font-size:13px;color:var(--ink-2)}
+.row .eta.bad{color:var(--bad);font-weight:600}
+.row .amt{justify-self:end;font-weight:600}
+.rowlink{display:contents}
+
+h3.sec{font-size:16px;padding-block-end:var(--s2);border-block-end:1px solid var(--line);margin-block-end:var(--s1)}
+details{margin:0}
+summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding-block:var(--s2);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";display:inline-block;margin-inline-end:8px;
+  border-block:4px solid transparent;border-inline-start:6px solid currentcolor;transition:transform .12s}
+details[open] summary::before{transform:rotate(90deg)}
+summary .hint{color:var(--ink-3);font-size:12px;margin-inline-start:var(--s3)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+@media (max-width:1024px){ .shell{grid-template-columns:1fr} .side{display:none}
+  main{grid-template-columns:1fr} .queue-pane{border-inline-end:0;border-block-end:1px solid var(--line)} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="#"><span class="mark" aria-hidden="true">M</span><b>Marketak admin</b></a>
+    <nav class="nav">
+      <div class="grp">Overview</div>
+      <a href="#" aria-current="page">Dashboard</a>
+      <div class="grp">Operations</div>
+      <a href="#">Merchants</a><a href="#">Orders</a><a href="#">Riders</a>
+      <div class="grp">Money</div>
+      <a href="#">Reconciliation</a><a href="#">Wallets</a><a href="#">Payouts</a>
+      <div class="grp">Settings</div>
+      <a href="#">Feature flags</a>
+    </nav>
+  </aside>
+
+  <header class="top">
+    <nav class="crumbs" aria-label="Breadcrumb">Dashboard</nav>
+    <div class="who"><span class="av" aria-hidden="true">A</span>ahmedmelgamal6@gmail.com</div>
+  </header>
+
+  <main>
+    <!-- The queue is a fixed instrument. It does not appear and disappear; it is always on the left, and
+         its count is the first number on the page. -->
+    <section class="queue-pane" aria-labelledby="qh">
+      <div class="pane-h">
+        <h2 id="qh">Needs attention</h2>
+        <span class="num">6 items</span>
+      </div>
+
+      <article class="item">
+        <div class="item-t"><b>Cash does not reconcile</b><span class="badge b-bad">Variance</span></div>
+        <p class="item-d"><span class="q num">EGP 350.00</span> short of expected · 6 Oct</p>
+        <a href="#">Open reconciliation</a>
+      </article>
+
+      <article class="item">
+        <div class="item-t"><b>Order #1042 is late</b><span class="badge b-bad">Late</span></div>
+        <p class="item-d">31 min past promise · <span class="q num">EGP 184.00</span></p>
+        <a href="#">Open order</a>
+      </article>
+
+      <article class="item">
+        <div class="item-t"><b>Order #1051 is late</b><span class="badge b-bad">Late</span></div>
+        <p class="item-d">14 min past promise · <span class="q num">EGP 96.50</span></p>
+        <a href="#">Open order</a>
+      </article>
+
+      <article class="item">
+        <div class="item-t"><b>Order #1055 not accepted</b><span class="badge b-warn">Waiting</span></div>
+        <p class="item-d">12 min past promise, no merchant acceptance</p>
+        <a href="#">Open order</a>
+      </article>
+
+      <article class="item">
+        <div class="item-t"><b>Cash not collected on 3 orders</b><span class="badge b-info">In flight</span></div>
+        <p class="item-d"><span class="q num">EGP 412.00</span> to collect from customers</p>
+        <a href="#">Open orders</a>
+      </article>
+
+      <article class="item">
+        <div class="item-t"><b>3 merchants awaiting approval</b><span class="badge b-warn">Review</span></div>
+        <p class="item-d">Oldest submitted 2 h ago</p>
+        <a href="#">Open merchants</a>
+      </article>
+    </section>
+
+    <div class="board-pane">
+      <!-- The order that needs the operator most. Sized by the promise, because the promise is the number
+           they are working against. -->
+      <section class="live" aria-labelledby="lh">
+        <h2 id="lh" class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Longest-waiting live order</h2>
+        <div class="live-h">
+          <b>#1042</b>
+          <span class="badge b-info">Delivering</span>
+          <span class="state"><span class="dot d-bad" aria-hidden="true"></span>31 min late</span>
+        </div>
+        <div class="live-t">
+          <p class="promise bad num">14:35<small>Promised 14:04 · 31 min late</small></p>
+          <p class="promise num">EGP 184.00<small>Total · 3 merchants · cash</small></p>
+        </div>
+      </section>
+
+      <section aria-labelledby="oh">
+        <h3 class="sec" id="oh">Open orders <span style="font-weight:400;color:var(--ink-3)">· 19</span></h3>
+        <div class="rows">
+          <div class="row">
+            <span class="no">#1051</span>
+            <span class="badge b-warn">Preparing</span>
+            <span class="mt">1 merchant</span>
+            <span class="eta bad">14 min late</span>
+            <span class="amt num">EGP 96.50</span>
+          </div>
+          <div class="row">
+            <span class="no">#1055</span>
+            <span class="badge b-warn">Pending</span>
+            <span class="mt">2 merchants</span>
+            <span class="eta">Due 15:20</span>
+            <span class="amt num">EGP 240.00</span>
+          </div>
+          <div class="row">
+            <span class="no">#1057</span>
+            <span class="badge b-ok">Ready</span>
+            <span class="mt">1 merchant</span>
+            <span class="eta">Due 15:35</span>
+            <span class="amt num">EGP 158.00</span>
+          </div>
+          <div class="row">
+            <span class="no">#1058</span>
+            <span class="badge b-info">Picked up</span>
+            <span class="mt">4 merchants</span>
+            <span class="eta">Due 15:48</span>
+            <span class="amt num">EGP 312.75</span>
+          </div>
+          <div class="row">
+            <span class="no">#1059</span>
+            <span class="badge b-info">Delivering</span>
+            <span class="mt">2 merchants</span>
+            <span class="eta">Due 16:02</span>
+            <span class="amt num">EGP 129.00</span>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="th">
+        <h3 class="sec" id="th">Today so far</h3>
+        <div class="ledger">
+          <dl>
+            <div class="lrow"><dt>Orders placed</dt><dd class="num">214</dd></div>
+            <div class="lrow"><dt>Delivered</dt><dd class="num">186</dd></div>
+            <div class="lrow"><dt>Cancelled</dt><dd class="num">9</dd></div>
+            <div class="lrow"><dt>Completed</dt><dd class="num">92%</dd></div>
+            <div class="lrow"><dt>On time</dt><dd class="num">91%</dd></div>
+            <div class="lrow"><dt>Avg arrival error</dt><dd class="num">+3 min</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section aria-labelledby="mh">
+        <h3 class="sec" id="mh">Money and capacity</h3>
+        <div class="ledger">
+          <dl>
+            <div class="lrow bad"><dt>Cash variance</dt><dd class="num">−EGP 350.00</dd></div>
+            <div class="lrow"><dt>Cash expected</dt><dd class="num">EGP 12,450.00</dd></div>
+            <div class="lrow"><dt>Cash collected</dt><dd class="num">EGP 12,100.00</dd></div>
+            <div class="lrow"><dt>Rider tips</dt><dd class="num">EGP 780.00</dd></div>
+            <div class="lrow"><dt>Merchants open now</dt><dd class="num">11 of 24</dd></div>
+            <div class="lrow"><dt>Riders online</dt><dd class="num">12 of 18</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section>
+        <details>
+          <summary>Analytics <span class="hint">Product telemetry · not live operations</span></summary>
+          <div class="ledger"><dl>
+            <div class="lrow"><dt>Sign-ups</dt><dd class="num">31</dd></div>
+            <div class="lrow"><dt>Log-ins</dt><dd class="num">128</dd></div>
+            <div class="lrow"><dt>Searches with clicks</dt><dd class="num">264</dd></div>
+            <div class="lrow"><dt>Zero-result searches</dt><dd class="num">4.1%</dd></div>
+          </dl></div>
+        </details>
+      </section>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -21,6 +21,7 @@
 
 import { PostgrestQueryError } from "../postgrest.js";
 import { getSupabase } from "../supabase-client.js";
+import { DEMO_METRICS, isDemoMode } from "../demo.js";
 
 /** `cities.timezone` as the RPC resolved it, e.g. `Africa/Cairo`. */
 export interface MetricsPayload {
@@ -198,6 +199,9 @@ function narrowPayload(value: unknown): MetricsPayload | null {
  * number the RPC computed.
  */
 export async function getAdminMetrics(): Promise<MetricsPayload | null> {
+  if (isDemoMode()) {
+    return DEMO_METRICS;
+  }
   const supabase = getSupabase();
   // Destructured rather than accessed field by field: the rule flags any property read off an `any`, and
   // `rpc` is typed `any` because the return shape lives in the database. The two reads below are the whole

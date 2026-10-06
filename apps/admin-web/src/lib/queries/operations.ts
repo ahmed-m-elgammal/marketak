@@ -26,6 +26,8 @@
 import { getSupabase } from "../supabase-client.js";
 import { PostgrestQueryError } from "../postgrest.js";
 
+import { DEMO_OPERATIONS, isDemoMode } from "../demo.js";
+
 import {
   AWAITING_MERCHANT_STATUSES,
   TERMINAL_ORDER_STATUSES,
@@ -91,6 +93,9 @@ const TERMINAL: readonly string[] = TERMINAL_ORDER_STATUSES;
  * one, and `Promise.all` keeps it a single round-trip *cycle*.
  */
 export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
+  if (isDemoMode()) {
+    return DEMO_OPERATIONS;
+  }
   const db = getSupabase();
 
   const [live, late, awaiting, unpaid, vendors] = await Promise.all([

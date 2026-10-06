@@ -28,6 +28,136 @@ export const enAdditions = {
    * Keys referenced by existing screens but never defined. These rendered as their own names on screen - the
    * bug `tests/i18n-catalogue.test.ts` was written to stop recurring.
    */
+  errors: {
+    /**
+     * The soft-delete and restore trio. Each names a *state* rather than repeating "Something went wrong" -
+     * in every case the operator already knows what they did and needs to know what the record is now, and
+     * `alreadyDeleted` used to surface as the generic message after an operator clicked Delete twice.
+     */
+    reasonRequired: "Give a reason. It is recorded against this change and shown in the audit trail.",
+    alreadyDeleted: "This record is already deleted.",
+    notDeleted: "This record is not deleted, so there is nothing to restore.",
+    /**
+     * Written for an engineer, on purpose.
+     *
+     * `KEY_REQUIRED` fires when `p_id` arrives null, which in practice means the call omitted its named
+     * arguments and PostgREST could not route it. An operator cannot act on that, so the message hands it over
+     * and names the code - the same shape as the existing `unknownCode`.
+     */
+    keyRequired: "This action was refused (KEY_REQUIRED). Tell an engineer the code in brackets.",
+
+    /** The profile's 404 result. */
+    notFoundHint: "It may have been deleted, or the link is out of date.",
+  },
+
+  /** Column headers the vendor list adds to the shared `common` block. */
+  common: {
+    rating: "Rating",
+    createdAt: "Joined",
+  },
+
+  /** A4.1 - A4.3: the vendor list, the edit form, and the delete/restore dialogs. */
+  vendor: {
+    /** The form's and the dialogs' escape hatch. */
+    cancel: "Cancel",
+    title: "Merchants",
+    searchPlaceholder: "Search by name",
+    filterVertical: "Type",
+    filterApproved: "Approval",
+    filterState: "Showing",
+    stateActive: "Live only",
+    stateDeleted: "Deleted only",
+    stateAll: "Live and deleted",
+    approvedAll: "Any",
+    approvedYes: "Approved",
+    approvedNo: "Not approved",
+    verticalAll: "All types",
+    verticalFood: "Food",
+    verticalGrocery: "Grocery",
+    verticalPharmacy: "Pharmacy",
+    verticalFlowers: "Flowers",
+    verticalBakery: "Bakery",
+    verticalOthers: "Other",
+
+    add: "Add merchant",
+    edit: "Edit merchant",
+    open: "Open",
+    delete: "Delete",
+    restore: "Restore",
+
+    empty: "No merchants match these filters.",
+    emptyHint: "Try a different search, or widen the filters.",
+    showingRange: "{{from}}–{{to}} of {{total}}",
+    previous: "Previous",
+    next: "Next",
+    pageOf: "Page {{page}} of {{pages}}",
+
+    // Field labels. Each key matches the RPC whitelist exactly: `vendor.slug` is the `slug` column.
+    slug: "URL slug",
+    slugHint: "Lowercase letters, numbers and dashes. Used in links.",
+    name: "Name (English)",
+    nameAr: "Name (Arabic)",
+    legalName: "Legal name",
+    brand: "Brand",
+    verticalType: "Type",
+    city: "City",
+    area: "Area",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    geohash: "Geohash prefix",
+    geohashHint: "Short code for this location. Used to group nearby searches.",
+    deliveryRadius: "Delivery radius (km)",
+    isOpen: "Open now",
+    isBusy: "Marked busy",
+    autoOpen: "Opens automatically",
+    isApproved: "Approved",
+    isActive: "Active",
+    capacityPerSlot: "Orders per slot",
+    rejectRate: "Rejection rate",
+    deliveryFeeOverride: "Delivery fee override",
+    minimumOrderValue: "Minimum order value",
+    prepTimeMin: "Prep time (min)",
+    prepTimeMax: "Prep time (max)",
+    logoPath: "Logo path",
+    description: "Description (English)",
+    descriptionAr: "Description (Arabic)",
+    contactPhone: "Phone",
+    contactLandline: "Landline",
+
+    /**
+     * Group headings. The form has 28 fields; ungrouped it is a wall of inputs and nobody finds the one they
+     * came for. The order follows how a merchant is actually set up: name it, place it, set how it operates,
+     * how it is reached, then its numbers.
+     */
+    groupIdentity: "Identity",
+    groupLocation: "Location",
+    groupOperations: "Operations",
+    groupContact: "Contact",
+    groupPricing: "Numbers",
+
+    createTitle: "New merchant",
+    editTitle: "Edit {{name}}",
+    requiredOnCreate: "Required to create a merchant.",
+    noChange: "Nothing has changed yet.",
+    clear: "Clear",
+
+    /**
+     * Delete and restore. Both quote what will actually happen, because the two differ in a way an operator
+     * would otherwise get wrong: restoring puts `is_active` back but deliberately leaves `is_approved` alone,
+     * so a restored merchant is still invisible in the app until it is separately approved.
+     */
+    deleteTitle: "Delete {{name}}?",
+    deleteBody:
+      "This hides the merchant from the app straight away. Their orders are kept. The reason below is recorded with your name.",
+    restoreTitle: "Restore {{name}}?",
+    restoreBody:
+      "The merchant becomes active again but stays unapproved, so it will not appear in the app until you approve it.",
+    reasonLabel: "Reason",
+    reasonPlaceholder: "Why is this changing?",
+    reasonHint: "Recorded against this change. Be specific - it is the first thing anyone reads later.",
+    deletedOn: "Deleted",
+  },
+
   status: {
     /**
      * Reconciliation outcome. Distinct words rather than a shared "OK": an operator reading this needs to know
@@ -141,6 +271,111 @@ export const enAdditions = {
 } as const;
 
 export const arAdditions = {
+  errors: {
+    reasonRequired: "اذكر سببًا. يُسجَّل مع هذا التغيير ويظهر في سجل التدقيق.",
+    notFoundHint: "ربما حُذف، أو أن الرابط قديم.",
+    alreadyDeleted: "هذا السجل محذوف بالفعل.",
+    notDeleted: "هذا السجل غير محذوف، فلا يوجد ما يُستعاد.",
+    keyRequired: "رُفض هذا الإجراء (KEY_REQUIRED). أخبر مهندسًا بالرمز بين الأقواس.",
+  },
+
+  common: {
+    rating: "التقييم",
+    createdAt: "تاريخ الانضمام",
+  },
+
+  vendor: {
+    cancel: "إلغاء",
+    title: "التجار",
+    searchPlaceholder: "ابحث بالاسم",
+    filterVertical: "النوع",
+    filterApproved: "الموافقة",
+    filterState: "المعروض",
+    stateActive: "النشط فقط",
+    stateDeleted: "المحذوف فقط",
+    stateAll: "النشط والمحذوف",
+    approvedAll: "الكل",
+    approvedYes: "موافَق عليه",
+    approvedNo: "غير موافَق عليه",
+    verticalAll: "كل الأنواع",
+    verticalFood: "طعام",
+    verticalGrocery: "بقالة",
+    verticalPharmacy: "صيدلية",
+    verticalFlowers: "زهور",
+    verticalBakery: "مخبوزات",
+    verticalOthers: "أخرى",
+
+    add: "إضافة تاجر",
+    edit: "تعديل التاجر",
+    open: "فتح",
+    delete: "حذف",
+    restore: "استعادة",
+
+    empty: "لا يوجد تجار مطابقون لهذه المرشحات.",
+    emptyHint: "جرّب بحثًا آخر، أو وسّع المرشحات.",
+    showingRange: "{{from}}–{{to}} من {{total}}",
+    previous: "السابق",
+    next: "التالي",
+    pageOf: "صفحة {{page}} من {{pages}}",
+
+    slug: "المعرّف في الرابط",
+    slugHint: "حروف إنجليزية صغيرة وأرقام وشرطات. يُستخدم في الروابط.",
+    name: "الاسم (إنجليزي)",
+    nameAr: "الاسم (عربي)",
+    legalName: "الاسم القانوني",
+    brand: "العلامة التجارية",
+    verticalType: "النوع",
+    city: "المدينة",
+    area: "المنطقة",
+    latitude: "خط العرض",
+    longitude: "خط الطول",
+    // Transliterated, not translated: "جيوهاش" is the Arabic rendering of the term, and a partial word leaves
+    // Latin characters in the middle of an Arabic sentence - which the `i18n.test.ts` leak check catches, and
+    // which a bilingual operator reads as a typo.
+    geohash: "بادئة الجيوهاش",
+    geohashHint: "رمز قصير لهذا الموقع. يُستخدم لتجميع عمليات البحث القريبة.",
+    deliveryRadius: "نطاق التوصيل (كم)",
+    isOpen: "مفتوح الآن",
+    isBusy: "معلَّم كمشغول",
+    autoOpen: "يفتح تلقائيًا",
+    isApproved: "موافَق عليه",
+    isActive: "نشط",
+    capacityPerSlot: "طلبات لكل فترة",
+    rejectRate: "معدل الرفض",
+    deliveryFeeOverride: "تجاوز رسوم التوصيل",
+    minimumOrderValue: "أقل قيمة طلب",
+    prepTimeMin: "وقت التحضير (دقيقة)",
+    prepTimeMax: "أقصى وقت تحضير (دقيقة)",
+    logoPath: "مسار الشعار",
+    description: "الوصف (إنجليزي)",
+    descriptionAr: "الوصف (عربي)",
+    contactPhone: "الهاتف",
+    contactLandline: "هاتف أرضي",
+
+    groupIdentity: "الهوية",
+    groupLocation: "الموقع",
+    groupOperations: "التشغيل",
+    groupContact: "التواصل",
+    groupPricing: "الأرقام",
+
+    createTitle: "تاجر جديد",
+    editTitle: "تعديل {{name}}",
+    requiredOnCreate: "مطلوب لإنشاء تاجر.",
+    noChange: "لم يتغيّر شيء بعد.",
+    clear: "إفراغ",
+
+    deleteTitle: "حذف {{name}}؟",
+    deleteBody:
+      "يختفي التاجر من التطبيق فورًا. تُحفظ طلباته. يُسجَّل السبب أدناه مع اسمك.",
+    restoreTitle: "استعادة {{name}}؟",
+    restoreBody:
+      "يصبح التاجر نشطًا مرة أخرى لكنه يبقى غير موافَق عليه، فلن يظهر في التطبيق حتى توافق عليه.",
+    reasonLabel: "السبب",
+    reasonPlaceholder: "لماذا يتغيّر هذا؟",
+    reasonHint: "يُسجَّل مع هذا التغيير. كن محددًا — أول ما يقرأه أحد لاحقًا.",
+    deletedOn: "محذوف",
+  },
+
   status: {
     balanced: "متوازن",
     unbalanced: "غير متوازن",

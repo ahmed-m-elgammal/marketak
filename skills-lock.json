@@ -7,6 +7,18 @@
       "skillPath": "skills/accessibility/SKILL.md",
       "computedHash": "e671c9f1bda721f4818ed62984d8471aab33263ed3fc8331c42d51f4b070e407"
     },
+    "ant-design": {
+      "source": "ant-design/antd-skill",
+      "sourceType": "github",
+      "skillPath": "skills/ant-design/SKILL.md",
+      "computedHash": "4d0447d48fced080b2825ecc0fb4d7ca836c8015882899c643acca0b864d5179"
+    },
+    "antd": {
+      "source": "ant-design/antd-skill",
+      "sourceType": "github",
+      "skillPath": "skills/antd/SKILL.md",
+      "computedHash": "4295010f09f85855cab9e9de9ec7f96c14541474b4f3f9d6ef89006430931b94"
+    },
     "architecture-decision-records": {
       "source": "affaan-m/ECC",
       "sourceType": "github",

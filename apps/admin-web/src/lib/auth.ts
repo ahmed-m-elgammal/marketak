@@ -33,6 +33,7 @@
 import type { Session } from "@supabase/supabase-js";
 
 import { getSupabase } from "./supabase-client.js";
+import { DEMO_SESSION, isDemoMode } from "./demo.js";
 import { toFriendlyError, type FriendlyError } from "./errors.js";
 
 /** Where Google sends the browser back to. Must match Supabase → URL Configuration exactly. */
@@ -43,6 +44,9 @@ export type AuthStatus = "pending" | "signed-out" | "not-admin" | "admin";
 
 /** Reads the current session. Throws a `ConfigError` if the environment is missing the anon key. */
 export async function getSession(): Promise<Session | null> {
+  if (isDemoMode()) {
+    return DEMO_SESSION as unknown as Session;
+  }
   const { data, error } = await getSupabase().auth.getSession();
   // A failure here is not "signed out" - it is a misconfigured client, and reporting it as signed out
   // would show an operator a sign-in button that can never work.
@@ -75,6 +79,9 @@ export async function signInWithGoogle(redirectTo: string): Promise<void> {
 
 /** Signs out and clears the cached session. Used by the shell's sign-out control. */
 export async function signOut(): Promise<void> {
+  if (isDemoMode()) {
+    return;
+  }
   const { error } = await getSupabase().auth.signOut();
   if (error !== null) {
     throw error;

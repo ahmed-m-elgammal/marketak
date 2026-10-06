@@ -218,9 +218,17 @@ describe("the screen table", () => {
   it("lists only built screens in the sidebar", () => {
     // Detail pages have no sidebar entry; a list has one. And an unbuilt screen has nothing to navigate to,
     // so listing it would send an operator to a 404 from the sidebar itself.
+    //
+    // The specific `not.toContain` assertions below were *expected* absence as of A3: they pinned "merchants is
+    // declared but not yet built". A4 built it, so they now pin presence. Every remaining unbuilt screen is
+    // checked by the loop instead, which is what actually enforces the rule - a hand-maintained list of
+    // unbuilt screens is the part that goes stale.
     const sidebarKeys = sidebarScreens().map((screen) => screen.key);
     expect(sidebarKeys).toContain("dashboard");
-    expect(sidebarKeys).not.toContain("merchants");
+    expect(sidebarKeys).toContain("merchants");
+    // Still declared but unbuilt after A4: the money screens are A5 and the orders screens are A6.
+    expect(sidebarKeys).not.toContain("wallets");
+    expect(sidebarKeys).not.toContain("orders");
     for (const screen of sidebarScreens()) {
       expect(screen.element, `${screen.key} is in the sidebar but unbuilt`).toBeDefined();
     }

@@ -64,6 +64,22 @@ const CATALOGUE: Readonly<Record<string, string>> = {
   NOT_FOUND: "errors.notFound",
   ALREADY_EXISTS: "errors.alreadyExists",
 
+  // --- soft delete and restore ---
+  //
+  // These three are specific to the `admin_delete_*` / `admin_restore_*` pair, and each names a state the
+  // operator can act on. Collapsing them into `errors.generic` left an operator staring at "Something went
+  // wrong" after clicking Delete on a merchant they had already deleted themselves minutes earlier.
+  REASON_REQUIRED: "errors.reasonRequired",
+  ALREADY_DELETED: "errors.alreadyDeleted",
+  NOT_DELETED: "errors.notDeleted",
+
+  // --- required arguments on the admin RPCs ---
+  //
+  // Raised when `p_id` is null. In practice this means the *client* called the RPC without naming its
+  // arguments, because PostgREST will not route a bodiless call to a function that declares parameters. The
+  // message is written for an engineer rather than an operator for exactly that reason.
+  KEY_REQUIRED: "errors.keyRequired",
+
   // --- referential integrity, raised by the private.assert_* triggers ---
   FOREIGN_KEY_VIOLATE: "errors.foreignKeyViolate",
 

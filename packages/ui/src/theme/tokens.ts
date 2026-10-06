@@ -45,15 +45,41 @@ export type SpaceStep = keyof typeof space;
  * display type is wrong for 12px table text. Ant Design's own token names are reused here so
  * `theme/antd-theme.ts` is a mapping rather than a translation - a mapping can be diffed against antd's
  * docs, a translation cannot.
+ *
+ * ## Two corrections made for the bilingual work-tool brief
+ *
+ * **`pageTitle` is 24/32 at 600, and `display` is no longer the page heading.** The brief asks for a 24/32
+ * title at weight 600 and explicitly *not* 800 - 800 at 24px is a poster, and this is a console an operator
+ * reads for eight hours. `display` remains for the one place a large figure genuinely carries meaning (the
+ * dashboard's open-order count) and is not used as a heading anywhere.
+ *
+ * **`tableHeader` is 12/16 at 500, sentence case.** It is a distinct step rather than a reuse of `caption`
+ * because it is the only text in the console that must *not* be letter-spaced or uppercased - see
+ * `FONT_FAMILY` and the note on uppercase below.
  */
 export const typeScale = {
+  /** One large figure where the number itself is the message. Never a heading. */
   display: { size: 28, lineHeight: 36, weight: 600 },
-  title: { size: 20, lineHeight: 28, weight: 600 },
+  /** Page title. 24/32 at 600. */
+  pageTitle: { size: 24, lineHeight: 32, weight: 600 },
+  /** Section heading, with a divider above it. */
   heading: { size: 16, lineHeight: 24, weight: 600 },
-  body: { size: 14, lineHeight: 22, weight: 400 },
-  bodyStrong: { size: 14, lineHeight: 22, weight: 600 },
+  /** Body. 14/20 at 400 - the brief's figure, and the density a work tool needs. */
+  body: { size: 14, lineHeight: 20, weight: 400 },
+  bodyStrong: { size: 14, lineHeight: 20, weight: 600 },
+  /** A field label. */
+  label: { size: 13, lineHeight: 20, weight: 500 },
   small: { size: 13, lineHeight: 20, weight: 400 },
-  caption: { size: 12, lineHeight: 18, weight: 400 },
+  /**
+   * Table header. Sentence case at 500.
+   *
+   * The single clearest tell of a generated interface is a tracked-out ALL-CAPS header, and in a bilingual
+   * console it is also broken rather than merely ugly: **Arabic has no uppercase**, so `text-transform:
+   * uppercase` silently does nothing in Arabic while letter-spacing Arabic glyphs breaks the cursive joins
+   * and leaves gaps between joined letters. One rule, correct in both scripts.
+   */
+  tableHeader: { size: 12, lineHeight: 16, weight: 500 },
+  caption: { size: 12, lineHeight: 16, weight: 400 },
 } as const;
 
 export type TypeScaleStep = keyof typeof typeScale;
@@ -63,16 +89,60 @@ export type TypeScaleStep = keyof typeof typeScale;
  *
  * `sm` through `lg` map onto antd's `borderRadius`, `borderRadiusLG` and `borderRadiusSM` in that order.
  * Named by role rather than by size so a redesign does not have to find every call site.
+ *
+ * The brief asks for exactly three radii - a control, a badge, a pill - so `md` (8) is deliberately unused by
+ * the console and left in place only because antd's `borderRadiusLG` maps to it. Nothing in `apps/admin-web`
+ * reads `radius.lg`.
  */
 export const radius = {
   none: 0,
+  /** 4px. Badges and tags - a badge is a label, not a surface. */
   sm: 4,
+  /** 6px. Inputs, buttons, cards. The console's only control radius. */
   md: 6,
   lg: 8,
+  /** 9999px. Fully rounded pills, and the availability dot's ring. */
   pill: 9999,
 } as const;
 
 export type RadiusStep = keyof typeof radius;
+
+/**
+ * The one type family, Latin and Arabic.
+ *
+ * IBM Plex Sans and IBM Plex Sans Arabic, self-hosted through `@fontsource` rather than loaded from a CDN -
+ * the console's CSP is `font-src 'self' data:`, and an admin console has no business phoning a font CDN on
+ * every load to render its own interface.
+ *
+ * **One family, not two.** A bilingual operator reads both scripts all day, often in the same sentence on the
+ * merchant name row. Two unrelated faces produce a visible seam at every line boundary where the scripts
+ * meet, and that seam is the first thing that makes a translated interface feel machine-made. Plex Sans and
+ * Plex Sans Arabic share a skeleton, which is the entire reason this pair was chosen over, say, Inter plus
+ * Noto Sans Arabic.
+ *
+ * The Arabic face is named *second* on purpose: Latin is read first in the English UI, and the Arabic face
+ * only takes over for Arabic codepoints.
+ */
+export const FONT_FAMILY =
+  '"IBM Plex Sans", "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+/**
+ * Geometry that a layout decision needs and a scale cannot express.
+ *
+ * `labelColumn` and `measure` are here rather than in the page because they are the two numbers that make the
+ * merchant detail page line up: every section's values begin at the same x, and no section runs wider than a
+ * comfortable measure. A page that hardcodes `160px` in three places is a page that drifts.
+ */
+export const layout = {
+  /** Fixed label column in a detail grid. Every section's values align here. */
+  labelColumn: 160,
+  /** Content measure. A detail page is a form, not a document. */
+  measure: 960,
+  /** Sidebar width. */
+  sidebar: 232,
+  /** Header height. */
+  header: 56,
+} as const;
 
 /**
  * The minimum interactive row height.
@@ -83,6 +153,16 @@ export type RadiusStep = keyof typeof radius;
  * requires 48px touch targets, and this constant is where that requirement becomes enforceable.
  */
 export const MIN_TOUCH_TARGET = 48;
+
+/**
+ * The console's minimum interactive height.
+ *
+ * Separate from `MIN_TOUCH_TARGET` because they answer different questions. WCAG 2.2 SC 2.5.8 requires a
+ * 24px target; the tablet in an operator's hand justifies 48px for a *row*; and a dense work table still needs
+ * its controls at 36px so twelve of them fit on a 1024px screen without becoming a scrolling column of
+ * oversized buttons.
+ */
+export const MIN_CONTROL_HEIGHT = 36;
 
 /**
  * Durations in milliseconds, for the few transitions the console uses.

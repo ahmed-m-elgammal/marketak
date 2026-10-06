@@ -37,6 +37,9 @@ export {
 export {
   breakpoint,
   controlSize,
+  FONT_FAMILY,
+  layout,
+  MIN_CONTROL_HEIGHT,
   MIN_TOUCH_TARGET,
   motion,
   radius,

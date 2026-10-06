@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marketak admin · dashboard concepts</title>
+<style>
+:root{--ink:#1C1917;--ink-2:#57534E;--ink-3:#78716C;--canvas:#FFF;--sunken:#F9FAFB;
+  --line:#EAEAEA;--accent:#B54708;--wash:#FEF6F2;
+  --ff:"IBM Plex Sans","IBM Plex Sans Arabic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--sunken);color:var(--ink);font:400 15px/24px var(--ff);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.wrap{max-inline-size:1080px;margin-inline:auto;padding:48px 24px 80px}
+h1{font-size:28px;line-height:36px;font-weight:600;margin:0 0 8px}
+.lede{color:var(--ink-2);margin:0 0 8px;max-inline-size:62ch}
+.note{color:var(--ink-3);font-size:13px;margin:0 0 40px;max-inline-size:62ch}
+.cards{display:grid;gap:20px}
+.card{background:var(--canvas);border:1px solid var(--line);border-radius:6px;padding:24px;
+  display:grid;grid-template-columns:1fr 300px;gap:28px;align-items:start}
+.letter{display:grid;place-items:center;inline-size:32px;block-size:32px;border-radius:4px;
+  background:var(--accent);color:#fff;font-weight:600;margin-block-end:12px}
+h2{font-size:19px;line-height:26px;font-weight:600;margin:0 0 6px}
+.q{font-size:14px;color:var(--ink-2);margin:0 0 14px}
+.q b{color:var(--ink);font-weight:600}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px}
+dt{color:var(--ink-3);white-space:nowrap}
+dd{margin:0;color:var(--ink-2)}
+.spine{display:flex;gap:8px;margin-block-start:16px;flex-wrap:wrap}
+.spine span{font-size:12px;color:var(--ink-2);background:var(--sunken);padding:3px 8px;border-radius:4px}
+.open{display:inline-flex;align-items:center;gap:8px;margin-block-start:18px;color:var(--accent);
+  font-size:14px;font-weight:600;text-decoration:none}
+.open::after{content:"";inline-size:0;block-size:0;border-block:5px solid transparent;
+  border-inline-start:7px solid currentcolor;transition:transform .12s}
+.open:hover::after{transform:translateX(3px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Three dashboard structures</h1>
+  <p class="lede">Structurally different, not reskins. Same data — the real
+    <code style="font-size:14px">get_admin_metrics_v1</code> shape, plus the live-orders query. Same tokens
+    from <code style="font-size:14px">packages/ui</code>: burnt orange <b>#B54708</b>, IBM Plex Sans + Arabic.</p>
+  <p class="note">The figures are <b>sample peak-service values</b> so you can judge the design under load.
+    The live database currently holds 1 order and near-zero totals, which makes any dashboard look dead and
+    tells you nothing about the layout. Every number comes from a field that actually exists. Open each file
+    directly, or press a key to flip between them.</p>
+
+  <div class="cards">
+    <section class="card">
+      <div>
+        <span class="letter">A</span>
+        <h2>The Dispatch Desk</h2>
+        <p class="q">A permanent attention queue down the left, live orders as the centre. Answers
+          <b>"what is on fire, then what is running"</b> in that order, without scrolling.</p>
+        <div class="spine"><span>Attention first</span><span>Queue is always visible</span>
+          <span>Ledger, not cards</span></div>
+        <a class="open" href="a-dispatch-desk.html">Open A</a>
+      </div>
+      <dl>
+        <dt>Best for</dt><dd>Shift start and any time you are triaging</dd>
+        <dt>Cost</dt><dd>Attention column is 340px even when empty</dd>
+        <dt>Weakness</dt><dd>Weak at "how has the day gone"</dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <div>
+        <span class="letter">B</span>
+        <h2>The Day Ledger</h2>
+        <p class="q">Service time runs down a spine, hour by hour. Answers <b>"how has the day gone"</b> and
+          shows you <i>when</i> things went wrong, not just that they are.</p>
+        <div class="spine"><span>Time-ordered</span><span>One-line alarm</span>
+          <span>History is the shape</span></div>
+        <a class="open" href="b-day-ledger.html">Open B</a>
+      </div>
+      <dl>
+        <dt>Best for</dt><dd>Post-peak review and spotting a pattern in a bad hour</dd>
+        <dt>Cost</dt><dd>Scrolls; late orders are not at the top</dd>
+        <dt>Weakness</dt><dd>Six separate problems collapse to one alarm line</dd>
+      </dl>
+    </section>
+
+    <section class="card">
+      <div>
+        <span class="letter">C</span>
+        <h2>The Split Board</h2>
+        <p class="q">Two thirds is the queue you act on. One third is a permanent reference rail — money,
+          today, capacity — never scrolled. Answers <b>"act fast, know everything without moving"</b>.</p>
+        <div class="spine"><span>2/3 work · 1/3 reference</span><span>No scrolling for facts</span>
+          <span>Widest order rows</span></div>
+        <a class="open" href="c-split-board.html">Open C</a>
+      </div>
+      <dl>
+        <dt>Best for</dt><dd>A floor operator working the queue all shift</dd>
+        <dt>Cost</dt><dd>Rail is narrow — money figures need wrapping</dd>
+        <dt>Weakness</dt><dd>Attention list is inside the rail, below the fold of it</dd>
+      </dl>
+    </section>
+  </div>
+</div>
+<script>
+const files=["a-dispatch-desk.html","b-day-ledger.html","c-split-board.html"];
+let i=0;
+addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"){i=(i+1)%3;location.href=files[i]}
+  if(e.key==="ArrowLeft"){i=(i+2)%3;location.href=files[i]}
+});
+</script>
+</body>
+</html>

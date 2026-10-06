@@ -34,7 +34,7 @@
 import { theme as antdThemeApi, type ThemeConfig } from "antd";
 
 import { brand, border, status, surface, text, toCssVariables } from "./colors.js";
-import { motion, radius } from "./tokens.js";
+import { FONT_FAMILY, MIN_CONTROL_HEIGHT, MIN_TOUCH_TARGET, layout, motion, radius, space, typeScale } from "./tokens.js";
 
 /**
  * A `ThemeConfig` built entirely from our tokens.
@@ -106,26 +106,32 @@ export function buildAntdTheme(locale?: string): ThemeConfig {
       colorFillAlter: surface.sunken,
 
       // --- radii ---
+      // Only `radius.md` is mapped. `borderRadiusLG` is set to the same value deliberately: antd's large
+      // radius (8) exists for modals and drawers, and the brief's scale has three radii - control, badge,
+      // pill. A modal at 8 and an input at 6 is a fourth radius nobody chose.
       borderRadius: radius.md,
       borderRadiusSM: radius.sm,
-      borderRadiusLG: radius.lg,
+      borderRadiusLG: radius.md,
       borderRadiusXS: radius.sm,
 
       // --- type ---
-      fontFamily:
-        '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic", "Noto Sans", Roboto, Helvetica, Arial, sans-serif',
-      fontSize: 14,
-      fontSizeLG: 16,
-      fontSizeSM: 13,
-      fontSizeHeading1: 28,
-      fontSizeHeading2: 20,
-      fontSizeHeading3: 16,
-      fontSizeHeading4: 16,
-      lineHeight: 1.5714285714285714,
-      lineHeightLG: 1.5,
-      lineHeightSM: 1.5384615384615385,
+      //
+      // The font stack is `tokens.FONT_FAMILY` - IBM Plex Sans plus its Arabic sibling, self-hosted. Not a
+      // stack assembled here, because a second definition of the family is a second place for the two to
+      // disagree, and a console that renders Latin in one face and Arabic in another looks machine-translated.
+      fontFamily: FONT_FAMILY,
+      fontSize: typeScale.body.size,
+      fontSizeLG: typeScale.pageTitle.size,
+      fontSizeSM: typeScale.caption.size,
+      fontSizeHeading1: typeScale.pageTitle.size,
+      fontSizeHeading2: typeScale.heading.size,
+      fontSizeHeading3: typeScale.heading.size,
+      fontSizeHeading4: typeScale.heading.size,
+      lineHeight: typeScale.body.lineHeight / typeScale.body.size,
+      lineHeightLG: typeScale.pageTitle.lineHeight / typeScale.pageTitle.size,
+      lineHeightSM: typeScale.caption.lineHeight / typeScale.caption.size,
       lineWidth: 1,
-      fontWeightStrong: 600,
+      fontWeightStrong: typeScale.bodyStrong.weight,
 
       // --- motion ---
       motionDurationFast: String(motion.fast) + "ms",
@@ -145,11 +151,20 @@ export function buildAntdTheme(locale?: string): ThemeConfig {
       Table: {
         headerBg: surface.sunken,
         headerColor: text.secondary,
+        // One horizontal rule under the header, no vertical dividers anywhere. A dense work table reads faster
+        // with horizontal rhythm, and a vertical rule per column costs a decision on every row.
         headerSplitColor: border.subtle,
-        rowHoverBg: surface.hover,
-        cellPaddingBlock: 12,
-        cellPaddingInline: 12,
+        headerSortActiveBg: surface.hover,
+        headerSortHoverBg: surface.hover,
+        bodySortBg: surface.raised,
+        fixedHeaderSortActiveBg: surface.hover,
+        headerBorderRadius: radius.none,
         borderColor: border.subtle,
+        rowHoverBg: surface.hover,
+        rowSelectedBg: brand.primarySubtle,
+        cellFontSize: typeScale.body.size,
+        cellPaddingBlock: 10,
+        cellPaddingInline: space[4],
       },
       Button: {
         primaryShadow: "none",
@@ -159,15 +174,33 @@ export function buildAntdTheme(locale?: string): ThemeConfig {
       },
       Menu: {
         itemBg: surface.chrome,
-        subMenuItemBg: surface.chrome,
         itemColor: text.onDarkSecondary,
-        itemSelectedBg: brand.primary,
-        itemSelectedColor: text.onDark,
-        itemHeight: 48,
+        itemHoverColor: text.onDark,
+        itemSelectedBg: brand.primarySubtle,
+        itemSelectedColor: text.primary,
+        itemMarginInline: space[2],
+        itemBorderRadius: radius.md,
+        itemHeight: MIN_CONTROL_HEIGHT + 8,
+        // The light tokens above would be overridden by the `dark*` set whenever `theme="dark"` is passed, so
+        // the same values are declared twice rather than once. Declaring them once and relying on the caller
+        // not to pass `theme="dark"` is how a sidebar silently reverts to antd's dark defaults.
+        darkItemBg: surface.chrome,
+        darkItemColor: text.onDarkSecondary,
+        darkItemHoverBg: "#2A2725",
+        darkItemSelectedBg: brand.primarySubtle,
       },
       Layout: {
+        /*
+         * One surface, full height.
+         *
+         * `siderBg` matches the page chrome so the sidebar is a single plane flush to the viewport edge rather
+         * than a dark island floating beside a white list - the island is what makes an admin shell look like
+         * a template. The separation between sidebar and content is a hairline, not a colour change.
+         */
         siderBg: surface.chrome,
         headerBg: surface.raised,
+        headerHeight: layout.header,
+        headerPadding: `0 ${space[6]}px`,
         bodyBg: surface.base,
       },
       Input: {
@@ -182,18 +215,32 @@ export function buildAntdTheme(locale?: string): ThemeConfig {
         titleFontSize: 16,
       },
       Drawer: {
-        paddingLG: 20,
-      },
-      Card: {
-        headerBg: "transparent",
-        headerFontSize: 16,
+        paddingLG: 24,
       },
       Statistic: {
-        titleFontSize: 13,
-        contentFontSize: 24,
+        // 24 rather than the dashboard's old 32: this is a dense work tool and the figure has to fit beside a
+        // label without the number dominating the row it sits in.
+        titleFontSize: typeScale.label.size,
+        contentFontSize: typeScale.pageTitle.size,
+      },
+      Card: {
+        // A card here is a section, not a widget. Transparent header and antd's own body padding; the
+        // separation a card would normally provide comes from a heading rule instead. No fill, no border -
+        // that is what keeps a long detail page from reading as a stack of boxes.
+        headerBg: "transparent",
+        headerFontSize: typeScale.heading.size,
+        headerHeight: 48,
+        headerPadding: 0,
+        /*
+         * `bodyPadding` stays at antd's own default.
+         *
+         * The zeroing that was here removed the padding a card needs *around its content*, which on a section
+         * containing a form makes every field sit flush against the section heading. The heading rule does the
+         * separating; the body's padding does the rest.
+         */
       },
       Alert: {
-        withDescriptionPadding: "16px 20px",
+        withDescriptionPadding: "12px 16px",
       },
     },
 
@@ -249,9 +296,77 @@ export function buildAntdConfig(locale?: string): AntdConfig {
   };
 }
 
-/** The `:root` block, so plain CSS in a component can reference a token. */
+/**
+ * The `:root` block, so plain CSS in a component can reference a token.
+ *
+ * Colours come from `colors.toCssVariables()` and the spacing, radius, type and layout scales from
+ * `tokens.ts`. Both are emitted here rather than hand-written into `global.css`, so there is exactly one
+ * definition of each value in the repository: a hand-written `:root` block is a second copy of the palette
+ * that a token change silently leaves behind.
+ *
+ * Type is emitted as size/weight/line-height *triples* rather than as ready-made CSS shorthands. A component
+ * that needs only the size writes `var(--type-body-size)`, and one that needs the full definition writes the
+ * three longhands - which keeps the vertical rhythm exact rather than depending on a browser's default
+ * `line-height` when only a size is overridden.
+ */
 export function cssVariablesBlock(): string {
-  const entries = Object.entries(toCssVariables());
-  const lines = entries.map(([name, value]) => `  ${name}: ${value};`);
-  return [":root {", ...lines, "}"].join("\n");
+  const colours = toCssVariables();
+
+  // `--space-N` follows the scale's numeric keys, so a component can reach any step the scale defines and a
+  // new step appears here automatically.
+  const spacingBlock = Object.entries(space)
+    .map(([step, px]) => `  --space-${step}: ${px}px;`)
+    .join("\n");
+
+  const radiusBlock = Object.entries(radius)
+    .map(([step, px]) => `  --radius-${step}: ${px}px;`)
+    .join("\n");
+
+  // Only the steps the console actually uses, so the block is not a wall of variables that nothing reads.
+  // Typed explicitly because the array-of-pairs form infers `(string | TypeStep)[][]`, and `step.size` on a
+  // `string` is the error this exists to prevent.
+  const typeBlock = (
+    [
+      ["body", typeScale.body],
+      ["body-strong", typeScale.bodyStrong],
+      ["label", typeScale.label],
+      ["small", typeScale.small],
+      ["caption", typeScale.caption],
+      ["header", typeScale.tableHeader],
+      ["section", typeScale.heading],
+      ["title", typeScale.pageTitle],
+      ["display", typeScale.display],
+    ] as const
+  )
+    .map(
+      ([name, step]) =>
+        `  --type-${name}-size: ${String(step.size)}px;\n  --type-${name}-weight: ${String(step.weight)};\n  --type-${name}-line: ${String(step.lineHeight)}px;`,
+    )
+    .join("\n");
+
+  const layoutBlock = Object.entries(layout)
+    .map(([key, px]) => `  --layout-${key}: ${px}px;`)
+    .join("\n");
+
+  return [
+    ":root {",
+    "  /* One type family, Latin and Arabic. The Arabic face is second on purpose: Latin reads first in the",
+    "     English UI and the Arabic face takes over for Arabic codepoints. */",
+    `  --font-family: ${FONT_FAMILY};`,
+    `  --control-height: ${MIN_CONTROL_HEIGHT}px;`,
+    `  --touch-target: ${MIN_TOUCH_TARGET}px;`,
+    `  --motion-fast: ${motion.fast}ms;`,
+    `  --motion-base: ${motion.base}ms;`,
+    "  /* --- colours --- */",
+    ...Object.entries(colours).map(([name, value]) => `  ${name}: ${value};`),
+    "  /* --- spacing --- */",
+    spacingBlock,
+    "  /* --- radii --- */",
+    radiusBlock,
+    "  /* --- type --- */",
+    typeBlock,
+    "  /* --- layout --- */",
+    layoutBlock,
+    "}",
+  ].join("\n");
 }

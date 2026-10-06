@@ -15,7 +15,7 @@
  * tell which is stuck looking at the filter.
  */
 
-import { Button, Result } from "antd";
+import { Alert, Button, Result } from "antd";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -68,21 +68,48 @@ export interface ErrorStateProps {
  *
  * So: the sentence by default, the code behind a disclosure.
  */
+/**
+ * A sentence and its code, for an error that happened **inside** a form or dialog rather than in place of a
+ * whole screen.
+ *
+ * ## Why the code is rendered here
+ *
+ * `FriendlyError.messageKey` and `.values` produce the sentence; `.code` is the only way to tell
+ * `UNKNOWN_KEY` (a form that offered a non-writable field - a bug) from `CHECK_VIOLATION` (a bad value) or
+ * `ALREADY_DELETED` (the screen's state is stale). All three render as an `Alert`, and an operator who sees only
+ * "This action was refused" cannot tell whether to fix their input or tell an engineer.
+ *
+ * The code is styled as secondary text rather than an alert title, because it is diagnostic detail next to a
+ * sentence a human acts on - not the sentence itself.
+ */
+export function InlineError({ error }: { readonly error: FriendlyError }): ReactElement {
+  const { t } = useTranslation();
+  return (
+    <Alert
+      type="error"
+      showIcon
+      message={t(error.messageKey, error.values)}
+      description={error.code}
+      className="inline-error"
+    />
+  );
+}
+
 export function ErrorState({ error, onRetry }: ErrorStateProps): ReactElement {
   const { t } = useTranslation();
   const sentence = t(error.messageKey, error.values);
 
   return (
-    <Result
-      status="error"
-      title={sentence}
-      subTitle={t("app.retry")}
-      extra={
-        onRetry === undefined ? null : (
-          <Button type="primary" onClick={onRetry} className="row-action">
-            {t("app.retry")}
-          </Button>
-        )
+  <Result
+  status="error"
+  title={sentence}
+  subTitle={t("app.retry")}
+  extra={
+  onRetry === undefined ? null : (
+  <Button type="primary" onClick={onRetry} className="row-action">
+  {t("app.retry")}
+  </Button>
+  )
       }
     >
       {error.known ? null : (

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B — The Day Ledger · Marketak Admin</title>
+<style>
+:root{
+  --ink:#1C1917; --ink-2:#57534E; --ink-3:#78716C; --on-dark:#FFF; --on-dark-2:#D6D3D1;
+  --canvas:#FFF; --sunken:#F9FAFB; --hover:#F3F4F6; --wash:#FEF6F2;
+  --line:#EAEAEA; --line-2:#D6D3D1;
+  --accent:#B54708; --ok:#067647; --warn:#B54708; --bad:#B42318; --info:#175CD3;
+  --r-ctl:6px; --r-badge:4px;
+  --ff:"IBM Plex Sans","IBM Plex Sans Arabic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:400 14px/20px var(--ff);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;font-weight:600}
+a{color:var(--accent);text-decoration:none}
+.num{font-variant-numeric:tabular-nums}
+
+.shell{display:grid;grid-template-columns:232px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
+.side{grid-row:1/3;background:#1C1917;border-inline-end:1px solid var(--line);
+  display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:16px 20px;border-block-end:1px solid #292524;
+  color:var(--on-dark);text-decoration:none}
+.mark{display:grid;place-items:center;inline-size:28px;block-size:28px;border-radius:var(--r-ctl);
+  background:var(--accent);font-weight:600;font-size:14px}
+.brand b{font-weight:600}
+.nav{padding:8px 0;overflow:auto}
+.nav .grp{padding:16px 20px 4px;color:var(--on-dark-2);font-size:12px;font-weight:500}
+.nav a{display:flex;align-items:center;min-height:44px;padding-inline:20px;color:var(--on-dark-2);
+  text-decoration:none}
+.nav a:hover{background:#292524;color:var(--on-dark)}
+.nav a[aria-current]{background:var(--wash);color:var(--ink);font-weight:500;
+  box-shadow:inset 3px 0 0 var(--accent)}
+.top{grid-column:2;display:flex;align-items:center;justify-content:space-between;padding-inline:24px;
+  border-block-end:1px solid var(--line)}
+.crumbs{color:var(--ink-2);font-size:13px}
+.who{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:13px}
+.who .av{display:grid;place-items:center;inline-size:28px;block-size:28px;border-radius:50%;
+  background:var(--sunken);border:1px solid var(--line);font-weight:600;font-size:12px;color:var(--ink-2)}
+
+/* ── B: the day as a spine ─────────────────────────────────
+   The page is a vertical spine. Service time runs downward, and every
+   order's life is a segment beside it. The question this answers is
+   "how has the day gone", not "what is on fire" — attention is pinned
+   to the top instead, so both are answerable without scrolling. */
+.wrap{grid-column:2;padding:24px;max-inline-size:1000px;display:flex;flex-direction:column;gap:24px}
+
+.alert{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;
+  padding:14px 16px;border:1px solid var(--bad);border-radius:var(--r-ctl);background:#FEF3F2}
+.alert .n{display:grid;place-items:center;inline-size:22px;block-size:22px;border-radius:50%;
+  background:var(--bad);color:#fff;font-size:12px;font-weight:600}
+.alert b{font-weight:600}
+.alert p{margin:2px 0 0;color:var(--ink-2);font-size:13px}
+.alert a{font-size:13px;font-weight:500;white-space:nowrap}
+
+/* the one-line day's shape */
+.shape{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-block:1px solid var(--line)}
+.shape div{padding:14px 16px;border-inline-start:1px solid var(--line)}
+.shape div:first-child{border-inline-start:0;padding-inline-start:0}
+.shape dt{color:var(--ink-3);font-size:12px}
+.shape dd{margin:2px 0 0;font-size:20px;font-weight:600;line-height:28px}
+
+/* spine */
+.spine{position:relative;padding-inline-start:96px}
+.spine::before{content:"";position:absolute;inset-block:6px;inset-inline-start:82px;inline-size:1px;
+  background:var(--line)}
+.hour{position:relative;padding-block:18px}
+.hour::before{content:attr(data-t);position:absolute;inset-inline-start:-96px;inset-block-start:18px;
+  inline-size:64px;text-align:inline-end;color:var(--ink-3);font-size:12px;font-variant-numeric:tabular-nums}
+.hour::after{content:"";position:absolute;inset-inline-start:78px;inset-block-start:26px;
+  inline-size:9px;block-size:9px;border-radius:50%;background:var(--line-2);
+  box-shadow:0 0 0 3px var(--canvas)}
+.hour.live::after{background:var(--bad)}
+.hour.now::after{background:var(--accent);box-shadow:0 0 0 3px var(--canvas),0 0 0 6px var(--wash)}
+.hour h3{font-size:13px;font-weight:500;color:var(--ink-2);margin-block-end:8px}
+.segs{display:flex;flex-direction:column}
+.seg{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:12px;
+  padding-block:7px;border-block-end:1px solid var(--line)}
+.seg:last-child{border:0}
+.seg .no{font-weight:600;font-size:13px}
+.seg .d{font-size:13px;color:var(--ink-2)}
+.seg .amt{font-size:13px;font-weight:600}
+.dot{inline-size:7px;block-size:7px;border-radius:50%;display:inline-block;margin-inline-end:6px;
+  vertical-align:middle}
+.d-bad{background:var(--bad)} .d-warn{background:var(--warn)} .d-ok{background:var(--ok)}
+.d-info{background:var(--info)}
+.badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:var(--r-badge);font-size:12px;
+  font-weight:500;border:1px solid currentcolor}
+.b-ok{color:var(--ok);background:#ECFDF3} .b-warn{color:var(--warn);background:#FFFAEB}
+.b-bad{color:var(--bad);background:#FEF3F2} .b-info{color:var(--info);background:#EFF8FF}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+section>div>h2{font-size:16px;padding-block-end:8px;border-block-end:1px solid var(--line);margin-block-end:4px}
+.lrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:9px;
+  border-block-end:1px solid var(--line)}
+.lrow:last-child{border:0}
+.lrow span{color:var(--ink-3);font-size:13px}
+.lrow b{font-weight:600;font-size:14px}
+.lrow.bad b{color:var(--bad)}
+details>summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding-block:8px;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"";display:inline-block;margin-inline-end:8px;border-block:4px solid transparent;
+  border-inline-start:6px solid currentcolor;transition:transform .12s}
+details[open]>summary::before{transform:rotate(90deg)}
+details .hint{color:var(--ink-3);font-size:12px;margin-inline-start:12px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+@media (max-width:1024px){ .shell{grid-template-columns:1fr} .side{display:none}
+  .grid2{grid-template-columns:1fr} .spine{padding-inline-start:56px}
+  .spine::before{inset-inline-start:42px} .hour::before{inset-inline-start:-56px;inline-size:40px}
+  .hour::after{inset-inline-start:38px} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="#"><span class="mark" aria-hidden="true">M</span><b>Marketak admin</b></a>
+    <nav class="nav">
+      <div class="grp">Overview</div><a href="#" aria-current="page">Dashboard</a>
+      <div class="grp">Operations</div><a href="#">Merchants</a><a href="#">Orders</a><a href="#">Riders</a>
+      <div class="grp">Money</div><a href="#">Reconciliation</a><a href="#">Wallets</a><a href="#">Payouts</a>
+      <div class="grp">Settings</div><a href="#">Feature flags</a>
+    </nav>
+  </aside>
+  <header class="top">
+    <nav class="crumbs" aria-label="Breadcrumb">Dashboard</nav>
+    <div class="who"><span class="av" aria-hidden="true">A</span>ahmedmelgamal6@gmail.com</div>
+  </header>
+
+  <div class="wrap">
+    <!-- One alarm, one line, at the very top. B does not stack six rows of trouble; it names the worst
+         thing and sends you to a queue. -->
+    <div class="alert" role="alert">
+      <span class="n" aria-hidden="true">!</span>
+      <div>
+        <b>6 things need attention — 2 orders late, cash short by EGP 350.00</b>
+        <p>Oldest late order: #1042, 31 minutes past its promise.</p>
+      </div>
+      <a href="#">Work the queue</a>
+    </div>
+
+    <!-- The day's shape, one line. Everything else on the page is detail beneath it. -->
+    <dl class="shape">
+      <div><dt>Placed</dt><dd class="num">214</dd></div>
+      <div><dt>Delivered</dt><dd class="num">186</dd></div>
+      <div><dt>Open now</dt><dd class="num">19</dd></div>
+      <div><dt>On time</dt><dd class="num">91%</dd></div>
+      <div><dt>Cash variance</dt><dd class="num" style="color:var(--bad)">−350.00</dd></div>
+    </dl>
+
+    <!-- The spine. Time down the page; each hour is what happened in it. -->
+    <section aria-labelledby="dh">
+      <h2 id="dh" style="font-size:16px;padding-block-end:8px;border-block-end:1px solid var(--line);margin-block-end:4px">Today, hour by hour</h2>
+      <div class="spine">
+        <div class="hour" data-t="12:00">
+          <h3>Lunch peak · 61 orders placed</h3>
+          <div class="segs">
+            <div class="seg"><span class="no">#1057</span>
+              <span class="d"><span class="badge b-ok">Ready</span> Atef — waiting for a rider</span>
+              <span class="amt num">EGP 158.00</span></div>
+            <div class="seg"><span class="no">#1058</span>
+              <span class="d"><span class="dot d-info" aria-hidden="true"></span>Picked up · 4 merchants</span>
+              <span class="amt num">EGP 312.75</span></div>
+            <div class="seg"><span class="no">#1059</span>
+              <span class="d"><span class="dot d-info" aria-hidden="true"></span>Delivering · 2 merchants</span>
+              <span class="amt num">EGP 129.00</span></div>
+          </div>
+        </div>
+
+        <div class="hour live" data-t="13:00">
+          <h3>2 orders went past their promise in this hour</h3>
+          <div class="segs">
+            <div class="seg"><span class="no">#1042</span>
+              <span class="d"><span class="dot d-bad" aria-hidden="true"></span><span class="badge b-bad">31 min late</span> Delivering · 3 merchants</span>
+              <span class="amt num">EGP 184.00</span></div>
+            <div class="seg"><span class="no">#1051</span>
+              <span class="d"><span class="dot d-warn" aria-hidden="true"></span><span class="badge b-warn">14 min late</span> Preparing</span>
+              <span class="amt num">EGP 96.50</span></div>
+          </div>
+        </div>
+
+        <div class="hour now" data-t="14:00">
+          <h3>Now · 19 open orders, 12 riders online</h3>
+          <div class="segs">
+            <div class="seg"><span class="no">#1055</span>
+              <span class="d"><span class="dot d-warn" aria-hidden="true"></span>Pending · no merchant acceptance for 12 min</span>
+              <span class="amt num">EGP 240.00</span></div>
+          </div>
+        </div>
+
+        <div class="hour" data-t="11:00">
+          <h3>Morning · 44 orders, all delivered</h3>
+          <div class="segs">
+            <div class="seg"><span class="no">#1012</span><span class="d"><span class="dot d-ok" aria-hidden="true"></span>Delivered on time</span><span class="amt num">EGP 88.00</span></div>
+            <div class="seg"><span class="no">#1019</span><span class="d"><span class="dot d-ok" aria-hidden="true"></span>Delivered on time</span><span class="amt num">EGP 142.00</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid2">
+      <section aria-labelledby="mh"><div>
+        <h2 id="mh">Money</h2>
+        <div class="lrow bad"><span>Variance today</span><b class="num">−EGP 350.00</b></div>
+        <div class="lrow"><span>Cash expected</span><b class="num">EGP 12,450.00</b></div>
+        <div class="lrow"><span>Cash collected</span><b class="num">EGP 12,100.00</b></div>
+        <div class="lrow"><span>Still to collect</span><b class="num">EGP 412.00</b></div>
+        <div class="lrow"><span>Rider tips</span><b class="num">EGP 780.00</b></div>
+      </div></section>
+
+      <section aria-labelledby="ch"><div>
+        <h2 id="ch">Capacity</h2>
+        <div class="lrow"><span>Merchants open now</span><b class="num">11 of 24</b></div>
+        <div class="lrow"><span>Merchants paused</span><b class="num">2</b></div>
+        <div class="lrow"><span>Awaiting approval</span><b class="num">3</b></div>
+        <div class="lrow"><span>Riders online</span><b class="num">12 of 18</b></div>
+        <div class="lrow"><span>Verified and online</span><b class="num">9</b></div>
+      </div></section>
+    </div>
+
+    <details>
+      <summary>Analytics <span class="hint">Product telemetry · not live operations</span></summary>
+      <div class="lrow"><span>Sign-ups</span><b class="num">31</b></div>
+      <div class="lrow"><span>Log-ins</span><b class="num">128</b></div>
+      <div class="lrow"><span>Searches with clicks</span><b class="num">264</b></div>
+      <div class="lrow"><span>Zero-result searches</span><b class="num">4.1%</b></div>
+    </details>
+  </div>
+</div>
+</body>
+</html>

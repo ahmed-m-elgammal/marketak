@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C — The Split Board · Marketak Admin</title>
+<style>
+:root{
+  --ink:#1C1917; --ink-2:#57534E; --ink-3:#78716C; --on-dark:#FFF; --on-dark-2:#D6D3D1;
+  --canvas:#FFF; --sunken:#F9FAFB; --hover:#F3F4F6; --wash:#FEF6F2;
+  --line:#EAEAEA; --line-2:#D6D3D1;
+  --accent:#B54708; --ok:#067647; --warn:#B54708; --bad:#B42318; --info:#175CD3;
+  --r-ctl:6px; --r-badge:4px;
+  --ff:"IBM Plex Sans","IBM Plex Sans Arabic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:400 14px/20px var(--ff);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;font-weight:600}
+a{color:var(--accent);text-decoration:none}
+.num{font-variant-numeric:tabular-nums}
+.shell{display:grid;grid-template-columns:232px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
+.side{grid-row:1/3;background:#1C1917;border-inline-end:1px solid var(--line);display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:12px;padding:16px 20px;border-block-end:1px solid #292524;
+  color:var(--on-dark);text-decoration:none}
+.mark{display:grid;place-items:center;inline-size:28px;block-size:28px;border-radius:var(--r-ctl);
+  background:var(--accent);font-weight:600;font-size:14px}
+.brand b{font-weight:600}
+.nav{padding:8px 0;overflow:auto}
+.nav .grp{padding:16px 20px 4px;color:var(--on-dark-2);font-size:12px;font-weight:500}
+.nav a{display:flex;align-items:center;min-height:44px;padding-inline:20px;color:var(--on-dark-2);text-decoration:none}
+.nav a:hover{background:#292524;color:var(--on-dark)}
+.nav a[aria-current]{background:var(--wash);color:var(--ink);font-weight:500;
+  box-shadow:inset 3px 0 0 var(--accent)}
+.top{grid-column:2;display:flex;align-items:center;justify-content:space-between;padding-inline:24px;
+  border-block-end:1px solid var(--line)}
+.crumbs{color:var(--ink-2);font-size:13px}
+.who{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:13px}
+.who .av{display:grid;place-items:center;inline-size:28px;block-size:28px;border-radius:50%;
+  background:var(--sunken);border:1px solid var(--line);font-weight:600;font-size:12px;color:var(--ink-2)}
+
+/* ── C: two panes, and the split is the argument ─────────────
+   The board gets 2/3 because it is the only thing on the page an
+   operator *acts on*. The right column is reference: money, capacity,
+   health, kept permanently in view so it never needs a scroll to
+   answer a question. Neither pane is a card. */
+.board{display:grid;grid-template-columns:1fr 320px;min-inline-size:0}
+.stage{padding:24px;min-inline-size:0;border-inline-end:1px solid var(--line)}
+.rail{padding:24px;min-inline-size:0;background:var(--sunken)}
+
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding-block-end:12px;margin-block-end:16px;border-block-end:1px solid var(--line)}
+.hd h1{font-size:24px;line-height:32px}
+.hd .sub{color:var(--ink-3);font-size:13px}
+
+/* the focus strip: 4 orders, each a row, each 56px, one click */
+.focus{display:flex;flex-direction:column}
+.orow{display:grid;grid-template-columns:64px 104px 1fr 132px 96px;align-items:center;gap:16px;
+  min-block-size:56px;padding-block:8px;border-block-end:1px solid var(--line);color:inherit}
+.orow:hover{background:var(--hover)}
+.orow .no{font-weight:600}
+.orow .meta{color:var(--ink-3);font-size:13px}
+.orow .eta{font-size:13px;color:var(--ink-2);white-space:nowrap}
+.orow .eta.bad{color:var(--bad);font-weight:600}
+.orow .amt{justify-self:end;font-weight:600}
+.orow .big{font-size:17px;font-weight:600}
+
+/* the state system. Dots for liveness, badges for review state.
+   They are never both badges — two identical outlined pills side by
+   side would imply Approval and Availability are the same kind of
+   fact when one is editorial and one is live. */
+.dot{inline-size:7px;block-size:7px;border-radius:50%;display:inline-block;flex:none}
+.d-bad{background:var(--bad)} .d-warn{background:var(--warn)} .d-ok{background:var(--ok)}
+.d-info{background:var(--info)} .d-off{background:var(--line-2)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:1px 7px;border-radius:var(--r-badge);
+  font-size:12px;font-weight:500;border:1px solid currentcolor;white-space:nowrap}
+.b-ok{color:var(--ok);background:#ECFDF3} .b-warn{color:var(--warn);background:#FFFAEB}
+.b-bad{color:var(--bad);background:#FEF3F2} .b-info{color:var(--info);background:#EFF8FF}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);white-space:nowrap}
+
+/* rail sections: ruled, not boxed */
+.rs{padding-block:16px;border-block-end:1px solid var(--line)}
+.rs:first-child{padding-block-start:0}
+.rs h2{font-size:13px;font-weight:500;color:var(--ink-3);padding-block-end:6px}
+.rrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:7px}
+.rrow span{color:var(--ink-2);font-size:13px}
+.rrow b{font-weight:600}
+.rrow.bad b{color:var(--bad)}
+.rrow.warn b{color:var(--warn)}
+.attention li{margin:0;padding:10px 0;border-block-end:1px solid var(--line);list-style:none}
+.attention ul{margin:0;padding:0}
+.attention b{font-size:13px;font-weight:600;display:block}
+.attention p{margin:2px 0 0;color:var(--ink-2);font-size:12px}
+.attention a{font-size:12px;font-weight:500}
+details{border:0}
+summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding-block:8px;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";display:inline-block;margin-inline-end:8px;border-block:4px solid transparent;
+  border-inline-start:6px solid currentcolor;transition:transform .12s}
+details[open] summary::before{transform:rotate(90deg)}
+summary .hint{display:block;color:var(--ink-3);font-size:12px;margin-block-start:2px;margin-inline-start:14px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+@media (max-width:1024px){ .shell{grid-template-columns:1fr} .side{display:none}
+  .board{grid-template-columns:1fr} .rail{border-block-start:1px solid var(--line)}
+  .stage{border-inline-end:0}
+  .orow{grid-template-columns:56px 1fr auto;row-gap:4px}
+  .orow .meta,.orow .eta{grid-column:1/-1} }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="#"><span class="mark" aria-hidden="true">M</span><b>Marketak admin</b></a>
+    <nav class="nav">
+      <div class="grp">Overview</div><a href="#" aria-current="page">Dashboard</a>
+      <div class="grp">Operations</div><a href="#">Merchants</a><a href="#">Orders</a><a href="#">Riders</a>
+      <div class="grp">Money</div><a href="#">Reconciliation</a><a href="#">Wallets</a><a href="#">Payouts</a>
+      <div class="grp">Settings</div><a href="#">Feature flags</a>
+    </nav>
+  </aside>
+  <header class="top">
+    <nav class="crumbs" aria-label="Breadcrumb">Dashboard</nav>
+    <div class="who"><span class="av" aria-hidden="true">A</span>ahmedmelgamal6@gmail.com</div>
+  </header>
+
+  <div class="board">
+    <div class="stage">
+      <div class="hd">
+        <div>
+          <h1>Open orders</h1>
+          <p class="sub num">19 in flight · oldest waiting 31 min · 6 Oct, Africa/Cairo</p>
+        </div>
+        <a href="#" style="font-size:13px;font-weight:500">All orders</a>
+      </div>
+
+      <!-- The work queue, in full width, because acting on it is the job. -->
+      <div class="focus">
+        <a class="orow" href="#">
+          <span class="no">#1042</span>
+          <span class="badge b-info">Delivering</span>
+          <span class="eta bad">Promised 14:04 · 31 min late</span>
+          <span class="big">EGP 184.00</span>
+          <span class="state"><span class="dot d-bad" aria-hidden="true"></span>3 merchants · cash</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1051</span>
+          <span class="badge b-warn">Preparing</span>
+          <span class="eta bad">Promised 14:21 · 14 min late</span>
+          <span class="big">EGP 96.50</span>
+          <span class="state"><span class="dot d-warn" aria-hidden="true"></span>1 merchant</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1055</span>
+          <span class="badge b-warn">Pending</span>
+          <span class="eta">Promised 15:20</span>
+          <span class="big">EGP 240.00</span>
+          <span class="state"><span class="dot d-warn" aria-hidden="true"></span>2 merchants · not accepted</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1057</span>
+          <span class="badge b-ok">Ready</span>
+          <span class="eta">Promised 15:35</span>
+          <span class="big">EGP 158.00</span>
+          <span class="state"><span class="dot d-ok" aria-hidden="true"></span>1 merchant · waiting for rider</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1058</span>
+          <span class="badge b-info">Picked up</span>
+          <span class="eta">Promised 15:48</span>
+          <span class="big">EGP 312.75</span>
+          <span class="state"><span class="dot d-info" aria-hidden="true"></span>4 merchants</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1059</span>
+          <span class="badge b-info">Delivering</span>
+          <span class="eta">Promised 16:02</span>
+          <span class="big">EGP 129.00</span>
+          <span class="state"><span class="dot d-info" aria-hidden="true"></span>2 merchants</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1060</span>
+          <span class="badge b-ok">Ready</span>
+          <span class="eta">Promised 16:10</span>
+          <span class="big">EGP 74.00</span>
+          <span class="state"><span class="dot d-ok" aria-hidden="true"></span>1 merchant</span>
+        </a>
+        <a class="orow" href="#">
+          <span class="no">#1061</span>
+          <span class="badge b-ok">Ready</span>
+          <span class="eta">Promised 16:18</span>
+          <span class="big">EGP 205.00</span>
+          <span class="state"><span class="dot d-ok" aria-hidden="true"></span>1 merchant</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- The reference rail. Everything an operator might need to answer a question without scrolling,
+         kept out of the way of the one thing they act on. -->
+    <aside class="rail" aria-label="Today at a glance">
+      <div class="rs attention">
+        <h2>Needs attention · 6</h2>
+        <ul>
+          <li><b>2 orders late</b><p>Oldest 31 min past promise</p><a href="#">Open queue</a></li>
+          <li><b>Cash short EGP 350.00</b><p>Unexplained for today</p><a href="#">Reconcile</a></li>
+          <li><b>3 merchants awaiting approval</b><p>Oldest submitted 2 h ago</p><a href="#">Review</a></li>
+          <li><b>EGP 412.00 not collected</b><p>Cash on 3 orders in flight</p><a href="#">Open orders</a></li>
+        </ul>
+      </div>
+
+      <div class="rs">
+        <h2>Money</h2>
+        <div class="rrow bad"><span>Variance</span><b class="num">−EGP 350.00</b></div>
+        <div class="rrow"><span>Expected</span><b class="num">EGP 12,450.00</b></div>
+        <div class="rrow"><span>Collected</span><b class="num">EGP 12,100.00</b></div>
+        <div class="rrow"><span>Tips</span><b class="num">EGP 780.00</b></div>
+      </div>
+
+      <div class="rs">
+        <h2>Today</h2>
+        <div class="rrow"><span>Placed</span><b class="num">214</b></div>
+        <div class="rrow"><span>Delivered</span><b class="num">186</b></div>
+        <div class="rrow"><span>Cancelled</span><b class="num">9</b></div>
+        <div class="rrow"><span>Completed</span><b class="num">92%</b></div>
+        <div class="rrow"><span>On time</span><b class="num">91%</b></div>
+        <div class="rrow"><span>Avg arrival error</span><b class="num">+3 min</b></div>
+      </div>
+
+      <div class="rs">
+        <h2>Capacity</h2>
+        <div class="rrow"><span>Merchants open</span><b class="num">11 of 24</b></div>
+        <div class="rrow"><span>Merchants paused</span><b class="num">2</b></div>
+        <div class="rrow warn"><span>Awaiting approval</span><b class="num">3</b></div>
+        <div class="rrow"><span>Riders online</span><b class="num">12 of 18</b></div>
+      </div>
+
+      <details class="rs">
+        <summary>Analytics<span class="hint">Product telemetry · not live operations</span></summary>
+        <div class="rrow"><span>Sign-ups</span><b class="num">31</b></div>
+        <div class="rrow"><span>Log-ins</span><b class="num">128</b></div>
+        <div class="rrow"><span>Searches with clicks</span><b class="num">264</b></div>
+        <div class="rrow"><span>Zero-result</span><b class="num">4.1%</b></div>
+      </details>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
