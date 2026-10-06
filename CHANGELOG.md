@@ -36,6 +36,42 @@ history screen at all, because it looks like there is one.
 **Not fixed here.** It is a schema change across 48 functions, and it gates the console. Tracked as
 `admin-dashboard-plan.md` phase **A1** and `open-questions.md` 6.8.
 
+### Added - `admin-console-screens.md`: 41 screens, the file tree, and the Ant Design call
+
+Written before any admin code, so the structure is decided rather than accreted. Six sidebar sections —
+Dashboard, Customers, Merchants, Orders, Money, Settings, plus Riders — with one rule applied everywhere:
+every list row leads to exactly one profile, and every profile has tabs. A support agent who bookmarks a
+URL must get the same page next week.
+
+The drill-down the user described is stated precisely rather than left as prose: customers → profile with
+Overview/Orders/Addresses/Reviews tabs; merchants → profile → Catalog → category → item. Catalog sits
+**inside** the merchant rather than in the sidebar, because a menu item has no meaning without knowing which
+merchant it belongs to — putting it top-level would force the operator to hold that context in their head.
+
+41 screens counted individually, including the ones that are a single component. Deletes, edits and creates
+are modals, not routes, so a half-finished destructive action cannot be abandoned by navigating away.
+Screens 40–41 (notification templates, rider pay rules) are listed read-only and marked future because no
+`admin_upsert_*` RPC exists for them, so the count stays honest.
+
+Ant Design 5 chosen, with its one real cost stated rather than glossed: antd ships its own visual language
+and its own theme file, so "no hardcoded colours" is at risk the moment a component takes a default colour
+outside our tokens. The fix is structural — `theme/antd-theme.ts` maps our tokens into antd's `ConfigProvider`
+token object and is mounted once, so every antd colour resolves through our scale. The headless
+alternative (Radix/React Aria plus `packages/ui`) offers better RTL and accessibility posture for roughly
+3× the work on the same 41 screens, and is recorded as the choice to revisit if antd's default look is
+unacceptable.
+
+15 numbered rules make the two design principles checkable rather than aspirational. The clearest: a column
+header reads **Approval status**, not `is_approved`; a status is a word plus colour, never colour alone;
+`30.0444, 31.2357` renders as a map link; and `PRICE_CHANGED` never reaches a screen. One `ActionMenu`
+component serves every list and profile header so the same verb always looks the same, and destructive
+actions never appear as an unlabelled icon.
+
+**Correction to the previous entry:** it claimed T1.2/T1.3 blocked the admin menu screens. Verified
+against the live policies, that is wrong — `menu_items`, `menu_categories`, `item_options`,
+`option_choices` and `menu_item_sizes` all carry admin read RLS, and six `admin_upsert_menu_*` /
+`admin_delete_menu_*` RPCs already exist. Those tasks block the *vendor-facing* editor, not the console.
+
 ### Added - `admin-dashboard-plan.md`: the admin console, end to end
 
 Verified live before planning, which changed the shape of it. Eight phases (A0–A7), each with an exit

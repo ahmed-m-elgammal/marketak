@@ -2,6 +2,9 @@
 
 `apps/admin-web`. Static Cloudflare Pages, reads and writes through RPCs under RLS. No Worker.
 
+**Screens, routes, file architecture and Ant Design integration: `admin-console-screens.md`.** That file
+owns the 41-screen inventory and the directory tree; this one owns phases, tasks and exit criteria.
+
 Everything in the "verified" column below was read from the **live** project on 2026-10-06, not from
 `tasks.md`, which lags the schema. Where the two disagree, this file is right and the task list needs
 updating.
@@ -58,15 +61,24 @@ Ordered by dependency, not by size. Each phase has one exit criterion that is ve
 No admin UI work starts without this, because `AGENTS.md` rule 2 bans inline colour and spacing and
 requires `src/theme/`. Scaffolding afterwards means ripping out a stylesheet.
 
-- [ ] **A0.1** `apps/admin-web`: Vite + React + TypeScript, `"strict": true`, added as a workspace
-- [ ] **A0.2** `packages/ui` tokens: colour, spacing, type scale, radii, elevation. CSS custom properties
+- [ ] **A0.1** `apps/admin-web`: Vite + React + TypeScript + **Ant Design 5**, `"strict": true`, added as
+      a workspace. See `admin-console-screens.md` §6 for the kit decision and its one real cost
+- [ ] **A0.2** `packages/ui` tokens: colour, spacing, type scale, radii, elevation. CSS custom properties.
+      `admin-console-screens.md` §4 fixes the tree: `src/theme/` owns every colour and
+      `theme/antd-theme.ts` maps those tokens into antd's `ConfigProvider`, so antd never introduces an
+      untracked colour
 - [ ] **A0.3** Money formatting. `packages/shared/src/domain/money/format-money.ts` exists for the mobile
   app — the console must consume it, not write a second formatter. **All amounts are integer minor units**
-  (paise). Never a float, never a bare number with a currency symbol
+  (paise). Never a float, never a bare number with a currency symbol. Basis points render as a
+      multiplier (`12500` → `1.25×`), never as `12500`
 - [ ] **A0.4** RTL. Arabic and English both ship. Logical properties (`margin-inline-start`) not physical
 - [ ] **A0.5** Supabase client: `createClient` with the **publishable** anon key only. No service-role key
       in a browser, ever
-- [ ] **A0.6** `npm run typecheck`, `lint`, `test` wired into `verify` for the new package
+- [ ] **A0.6** `src/i18n/` with `en.json` and `ar.json`. **No user-facing string may live in a component**
+      — that is what makes the Arabic translation real rather than aspirational. RPC error codes map to
+      message keys via `lib/errors.ts`; `PRICE_CHANGED` and friends never reach the screen
+- [ ] **A0.7** Route-level code splitting. Ant Design is large and the bundle must be measured, not assumed
+- [ ] **A0.8** `npm run typecheck`, `lint`, `test` wired into `verify` for the new package
 
 **Exit:** a page renders with tokens, no inline styles, and `verify` is green.
 
@@ -131,9 +143,14 @@ The widest surface — 57 of the 67 admin RPCs live here.
 - [ ] **A4.4** Cities, areas, brands, cuisines, vouchers — same triple each
 - [ ] **A4.5** Staff: `admin_upsert_vendor_staff_v1`. `vendor_staff.can_edit_menu` and `can_manage_orders`
       are separate booleans — render them as two independent toggles, not a role dropdown
-- [ ] **A4.6** Menus: items, categories, options, choices, sizes. **Blocked on T1.2/T1.3** — the menu
-      *read* RPCs do not exist yet (verified: 0 of 4 present). This sub-task cannot start until they do
-- [ ] **A4.7** Confirmation dialog on every delete, quoting the reason that will be recorded
+- [ ] **A4.6** Menus: categories, items, options, choices, sizes. Admin **read** needs no RPC — `menu_items`,
+      `menu_categories`, `item_options`, `option_choices` and `menu_item_sizes` all carry admin read RLS
+      (verified live), so this screen reads directly. Admin **write** goes through the six existing
+      `admin_upsert_menu_*` / `admin_delete_menu_*` RPCs. **T1.2/T1.3 are not a blocker for this screen** —
+      they are for the *vendor-facing* menu editor, and the earlier draft of this plan said otherwise
+- [ ] **A4.7** Confirmation dialog on every delete, quoting the reason that will be recorded. The reason is
+      a required argument on all 16 delete RPCs, so the dialog must make it required — see
+      `admin-console-screens.md` §2, "Modals, not screens"
 
 **Exit:** an admin creates a vendor, edits it, soft-deletes it, restores it, and each step has an
 `audit_log` row.
@@ -198,9 +215,9 @@ network tab.
 
 | Blocked on | Blocks |
 |---|---|
-| T1.2/T1.3 menu RPCs (0 exist) | A4.6 menus |
-| T1.4 `upload-signer` | any image upload (vendor logos, menu photos) |
-| T1.5 on-device resize | R2 byte budget; not a console task |
+| T1.2/T1.3 menu RPCs (0 exist) | **nothing in the console.** Admin menu read works today via RLS. They block the *vendor* web editor |
+| T1.4 `upload-signer` | any image upload — vendor logos, menu photos (screens 9–11) |
+| T1.5 on-device resize | R2 byte budget; a console task, not an app one |
 | T-1.16 domain | `admin.` hostname, so no cookie-bound custom domain |
 
 ## 5. Open questions

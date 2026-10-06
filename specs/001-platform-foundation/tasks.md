@@ -403,6 +403,10 @@ through RPCs under RLS, **no Worker**. Task IDs below map one-to-one onto that f
 - [ ] **A4** Vendor/city/area/brand/cuisine/voucher/staff CRUD with mandatory delete reason
 - [ ] **A5** Wallets, payouts, fee tiers, commission rules. Drift as its own column; bps shown as a
       multiplier
+
+**Screens, routes, file architecture and the Ant Design decision: `admin-console-screens.md`.**
+41 screens across 6 sidebar sections. `theme/` owns every colour and maps into antd's `ConfigProvider`;
+`i18n/` owns every string; `lib/queries/` owns every network call.
 - [ ] **A6** Orders and sub_orders as a hierarchy; cancel only via `cancel_order_v1`
 - [ ] **A7** Bundle check for `service_role`, accessibility pass, live-RLS cross-check, Pages deploy
 
