@@ -35,6 +35,31 @@
     "flags": "Feature flags",
     "audit": "Audit log"
   },
+  "reconciliation": {
+    "noData": "No takings recorded for this day",
+    "noDataHint": "The day's takings have not been settled yet. Pick another date, or come back later.",
+    "state": "State",
+    "breakdown": "Where the money went",
+    "cashOrders": "Cash orders",
+    "cashOrdersHint": "Collected by the rider and expected to reach the bank",
+    "walletOrders": "Wallet orders",
+    "vendorPayable": "Owed to merchants",
+    "riderPayable": "Owed to riders",
+    "inFlight": "Payouts in progress",
+    "openNet": "Still to be paid out",
+    "explainPrompt": "Why is there a difference between the cash expected and the cash banked?",
+    "explainTooShort": "Write at least a sentence, so this means something to whoever reads it next.",
+    "oneShotWarning": "This can be written once. A second attempt is refused, because an explanation is a justification and overwriting one loses what was originally claimed.",
+    "audited": "Recorded with your name against it"
+  },
+  "flags": {
+    "key": "Flag",
+    "state": "State",
+    "value": "Stored value",
+    "noFlags": "No flags",
+    "noFlagsHint": "Nothing is currently targetable. Flags are read from the database and there are none set.",
+    "readOnlyNotice": "Read-only. Toggling a flag needs an admin RPC that does not exist yet, so a switch here would look like it worked and change nothing."
+  },
   "auth": {
     "signInWithGoogle": "Continue with Google",
     "signInIntro": "This console is for Marketak staff.",

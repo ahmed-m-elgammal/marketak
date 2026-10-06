@@ -191,6 +191,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/**
+ * The warning tone on a card value.
+ *
+ * Used where a figure is a *problem* - an unexplained cash variance - never for decoration. The accompanying
+ * `StatusTag` always carries a word, so this is reinforcement and never the sole signal; `status-tag` applies
+ * the same rule.
+ */
+.metric-card__value--warning {
+  color: var(--color-status-danger);
+}
+
 .metric-card__hint {
   color: var(--color-text-subtle);
   font-size: 12px;
@@ -358,6 +369,24 @@
 .sign-in__note {
   margin: 0;
   color: var(--color-text-subtle);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* --- feature flags --- */
+
+/**
+ * `.flags__value`
+ *
+ * The stored targeting document, verbatim. A monospace block rather than prose, because the whole point is
+ * that it is debuggable: `{"enabled": true, "roles": ["rider"], "min_app_version": "1.2.0"}` is a shape
+ * someone reasons about, and reformatting it into a sentence loses the nesting they were checking.
+ */
+.flags__value {
+  display: block;
+  max-inline-size: 40rem;
+  white-space: pre-wrap;
+  word-break: break-word;
   font-size: 12px;
   line-height: 18px;
 }

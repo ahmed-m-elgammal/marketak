@@ -70,6 +70,8 @@ export interface ScreenDefinition {
 // it would re-create the lazy component on every render and re-trigger the import.
 
 const DashboardPage = lazy(() => import("../features/dashboard/DashboardPage.js"));
+const ReconciliationPage = lazy(() => import("../features/money/ReconciliationPage.js"));
+const FlagsPage = lazy(() => import("../features/settings/FlagsPage.js"));
 
 /** A `Suspense` boundary per route, so navigating suspends the page body and not the shell. */
 function element(Page: ElementType): ReactElement {
@@ -114,7 +116,14 @@ export const SCREENS: readonly ScreenDefinition[] = [
   { key: "riders", path: "/riders", section: "riders", inSidebar: true, phase: "A6" },
   { key: "riderProfile", path: "/riders/:id", section: "riders", phase: "A6" },
 
-  { key: "reconciliation", path: "/money/reconciliation", section: "money", inSidebar: true, phase: "A3" },
+  {
+    key: "reconciliation",
+    path: "/money/reconciliation",
+    section: "money",
+    inSidebar: true,
+    phase: "A3",
+    element: element(ReconciliationPage),
+  },
   { key: "float", path: "/money/float", section: "money", inSidebar: true, phase: "A3" },
   { key: "wallets", path: "/money/wallets", section: "money", inSidebar: true, phase: "A5" },
   {
@@ -132,7 +141,14 @@ export const SCREENS: readonly ScreenDefinition[] = [
   { key: "areas", path: "/settings/areas", section: "settings", inSidebar: true, phase: "A4" },
   { key: "vouchers", path: "/settings/vouchers", section: "settings", inSidebar: true, phase: "A4" },
   { key: "taxonomy", path: "/settings/taxonomy", section: "settings", inSidebar: true, phase: "A4" },
-  { key: "flags", path: "/settings/flags", section: "settings", inSidebar: true, phase: "A3" },
+  {
+    key: "flags",
+    path: "/settings/flags",
+    section: "settings",
+    inSidebar: true,
+    phase: "A3",
+    element: element(FlagsPage),
+  },
   { key: "audit", path: "/settings/audit", section: "settings", inSidebar: true, phase: "A1" },
 ];
 

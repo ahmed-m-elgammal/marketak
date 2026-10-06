@@ -63,6 +63,71 @@ blocking, and it is now recorded rather than left for someone to discover.
 fixture `live-staff@test.local` — a synthetic uuid, not a person, and `auth.identities` is 0. So signing in
 works but lands you as a `customer` and hits the 403, which is the correct behaviour.
 
+### Added - admin console phase A3: dashboard, reconciliation, and feature flags
+
+Three screens, and **4 of 28 routed screens now exist**. Every field was read from `pg_proc` on the live
+project rather than from the plan.
+
+**The dashboard is one request and no date picker.** `get_admin_metrics_v1` returns six blocks - funnel,
+orders, revenue, cancellation, ETA accuracy, vendors, riders - and *already* derives its day boundary from
+`cities.timezone`. Sending a date would override that definition and could disagree with it.
+
+**`float_variance` is rendered whatever it says** (A3.2). constitution I.10, and the RPC's own comment. The
+obvious dashboard behaviour - grey out a zero variance, tint only a non-zero one - destroys the signal the
+number exists to raise, because an operator can no longer tell "no difference" from "not computed". So it is
+always shown, always labelled, and gets the warning tone only when non-zero. A non-zero variance also raises
+an `Alert` above the cards, because an operator scanning numbers does not read a quietly-coloured one.
+
+**Reconciliation explains cash variance**, and explains that it is one-shot. `reconcile_day_v1` takes
+`p_explanation` and writes it, and refuses a second attempt with `VARIANCE_ALREADY_EXPLAINED` - correct, since an
+explanation is a justification and overwriting one destroys what was originally claimed. The dialog says so
+rather than letting an operator be refused after the fact. The field is **required**: a variance explanation
+that explains nothing looks resolved, which is worse than an unexplained variance.
+
+**Feature flags are read-only, and say so on the page.** There is no `admin_upsert_feature_flag` RPC - the 48
+`admin_*` functions cover vendors, cities, menus, staff, schedules and vouchers, but not flags. So this screen
+reads them and states that toggling needs an RPC that does not exist yet, rather than rendering switches that
+would flip and change nothing. A dead toggle during an incident is how an operator loses trust in the whole
+console.
+
+### Fixed - a timezone bug that returned the host machine's offset while claiming the city's
+
+`lib/city-date.ts` computed a zone offset with `new Date(formattedString)` - and `new Date()` on a string like
+`"10/06/2026, 22:30:00"` parses it in the **runtime's** local zone, not the target zone's. So the function
+returned the host's offset while appearing to return Cairo's, and every assertion expecting a date different
+from the host's failed. It is built from `formatToParts` now, where `Date.UTC` on the extracted fields is
+exactly "that wall clock read as UTC".
+
+This is the module where a silent wrong answer looks like correct data: `get_admin_metrics_v1` computes its
+window from `cities.timezone`, so an off-by-one-hour bug here shows an operator *yesterday's* figures against
+today's date, and nothing appears broken. 13 tests, including instants where Cairo and UTC genuinely disagree
+and where DST changes the answer - Egypt reintroduced daylight saving in 2023, so a hardcoded +2 is right in
+January and an hour wrong in July.
+
+`shiftDays` now does plain UTC arithmetic instead of routing a bare `YYYY-MM-DD` through a zone-aware
+function, which had been reintroducing an offset the caller never asked for.
+
+### Fixed - RPC result narrowing had been copied four times and already drifted
+
+Every query function was doing its own version of "read `result.error` and `result.data` into `unknown` before
+touching either" - the wrapping constitution rule 1 requires for the `any` at the `supabase.rpc` edge. Four
+copies, and `metrics.ts` had drifted from the other three. `rpcRows` in `lib/postgrest.ts` does it once, so
+there is exactly one place to change if `supabase-js` ever generates real return types.
+
+It also returns **rows**, always. `returns TABLE(...)` means PostgREST answers with an array; the drain work
+made that mistake once already and it looked exactly like a database with no orders in it.
+
+`PostgrestQueryError` moved out of `queries/metrics.ts` into `lib/postgrest.ts` - importing an error class from
+a module about the dashboard would have been a false dependency.
+
+### Fixed - the dashboard entry chunk fell from 738 KB to 188 KB
+
+Not an optimisation - a consequence of the per-route split. Moving `Card`, `Row`, `Col` and `Statistic` out of
+the shell and into `DashboardPage` took 550 KB out of the entry chunk. Route chunks now read: index 188 KB,
+Flags 273 KB, Reconciliation 152 KB, Dashboard 6.8 KB.
+
+`209 tests pass`, up from 196.
+
 ### Fixed - the console crashed on first paint, and the sign-in page was English-only
 
 Both found by running the console in a real browser, not by reading it. Reported from the console log after

@@ -19,12 +19,19 @@
  * state.
  */
 
+import { PostgrestQueryError } from "../postgrest.js";
 import { getSupabase } from "../supabase-client.js";
 
 /** `cities.timezone` as the RPC resolved it, e.g. `Africa/Cairo`. */
 export interface MetricsPayload {
   readonly business_date: string;
   readonly timezone: string;
+  readonly funnel: {
+    readonly signups: number;
+    readonly logins: number;
+    readonly searches_with_clicks: number;
+    readonly zero_result_rate_bps: number;
+  };
   readonly orders: {
     readonly placed: number;
     readonly delivered: number;
@@ -34,11 +41,22 @@ export interface MetricsPayload {
   };
   readonly revenue: {
     readonly currency: string;
-    readonly delivery_fees_settled: number;
     readonly rider_tips: number;
     readonly cash_expected: number;
     readonly cash_remitted: number;
     readonly float_variance: number;
+  };
+  readonly cancellation: {
+    readonly order_rate_bps: number;
+    readonly sub_orders_cancelled: number;
+    readonly sub_orders_rejected: number;
+  };
+  readonly eta_accuracy: {
+    readonly on_time_rate_bps: number;
+    /** Minutes. Signed: negative means the courier was early. `null` when there are no snapshots. */
+    readonly avg_signed_error_min: number | null;
+    readonly p50_signed_error_min: number | null;
+    readonly p90_signed_error_min: number | null;
   };
   readonly vendors: {
     readonly active_approved: number;
@@ -77,6 +95,17 @@ function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+/**
+ * Reads a number that the RPC may legitimately return as SQL `NULL`.
+ *
+ * `avg_signed_error_min` and the percentiles are `null` when there are no ETA snapshots for the day. That is
+ * different from zero - zero means "accurate on average", null means "nothing to measure" - so the caller must
+ * be able to tell them apart, and this preserves the distinction where `asNumber` would erase it.
+ */
+function asNullableNumber(value: unknown): number | null {
+  return asNumber(value) ?? null;
+}
+
 /** `n(value, fallback)` - a finite number or the fallback. Used for every count and every rate. */
 function n(value: unknown, fallback: number): number {
   return asNumber(value) ?? fallback;
@@ -105,12 +134,21 @@ function narrowPayload(value: unknown): MetricsPayload | null {
   const r = revenue as Record<string, unknown>;
   const v = vendors as Record<string, unknown>;
   const d = riders as Record<string, unknown>;
+  const f = (candidate["funnel"] ?? {}) as Record<string, unknown>;
+  const c = (candidate["cancellation"] ?? {}) as Record<string, unknown>;
+  const e = (candidate["eta_accuracy"] ?? {}) as Record<string, unknown>;
 
   return {
     // The date and timezone are echoed back from the RPC, which derived them from `cities.timezone`. Shown on
     // the dashboard so an operator knows which day and which zone the numbers describe.
     business_date: asString(candidate["business_date"]) ?? "unknown",
     timezone: asString(candidate["timezone"]) ?? "UTC",
+    funnel: {
+      signups: n(f["signups"], 0),
+      logins: n(f["logins"], 0),
+      searches_with_clicks: n(f["searches_with_clicks"], 0),
+      zero_result_rate_bps: n(f["zero_result_rate_bps"], 0),
+    },
     orders: {
       placed: n(o["placed"], 0),
       delivered: n(o["delivered"], 0),
@@ -120,11 +158,23 @@ function narrowPayload(value: unknown): MetricsPayload | null {
     },
     revenue: {
       currency: asString(r["currency"]) ?? "EGP",
-      delivery_fees_settled: n(r["delivery_fees_settled"], 0),
       rider_tips: n(r["rider_tips"], 0),
       cash_expected: n(r["cash_expected"], 0),
       cash_remitted: n(r["cash_remitted"], 0),
       float_variance: n(r["float_variance"], 0),
+    },
+    cancellation: {
+      order_rate_bps: n(c["order_rate_bps"], 0),
+      sub_orders_cancelled: n(c["sub_orders_cancelled"], 0),
+      sub_orders_rejected: n(c["sub_orders_rejected"], 0),
+    },
+    eta_accuracy: {
+      on_time_rate_bps: n(e["on_time_rate_bps"], 0),
+      // Nullable, not defaulted to 0. There is a real difference between "deliveries averaged 0 minutes off"
+      // and "no deliveries were measured", and collapsing them makes a broken snapshot table look accurate.
+      avg_signed_error_min: asNullableNumber(e["avg_signed_error_min"]),
+      p50_signed_error_min: asNullableNumber(e["p50_signed_error_min"]),
+      p90_signed_error_min: asNullableNumber(e["p90_signed_error_min"]),
     },
     vendors: {
       active_approved: n(v["active_approved"], 0),
@@ -138,30 +188,6 @@ function narrowPayload(value: unknown): MetricsPayload | null {
       verified_online: n(d["verified_online"], 0),
     },
   };
-}
-
-/**
- * A failed RPC, as an `Error`.
- *
- * PostgREST returns a plain object on failure, not an `Error` - no `name`, no `stack`, nothing a query cache
- * or an error boundary can treat as a thrown error. Wrapping it here means every call site in the console
- * throws the same kind of thing, and `lib/errors.ts` can read `code` and `message` off it without a
- * `PostgrestError` import in every module.
- *
- * The `cause` is the original object, so nothing is lost and `Error.cause` keeps it in the stack trace.
- */
-export class PostgrestQueryError extends Error {
-  /** The sqlstate, or `undefined` when the failure did not come from Postgres. */
-  public readonly code: string | undefined;
-
-  public constructor(cause: unknown) {
-    const record = typeof cause === "object" && cause !== null ? (cause as Record<string, unknown>) : {};
-    const message = typeof record["message"] === "string" ? record["message"] : "RPC failed";
-    const code = typeof record["code"] === "string" ? record["code"] : undefined;
-    super(message, { cause });
-    this.name = "PostgrestQueryError";
-    this.code = code;
-  }
 }
 
 /**

@@ -144,6 +144,7 @@ and a policy, not inspecting them, and `027a` ships the two assertions that woul
 | P-07 | FCM push, batched 15 s for non-critical events | **Phases 1–3 done, no push sent** — ⬜ shipped | contracts §1.9.0 |
 | A0 | Admin console scaffold, design tokens, i18n | **done** — 1 of 28 routed screens built | `admin-dashboard-plan.md` |
 | A2 | Admin console auth, route guard, shell | **done, login untested end-to-end** | `admin-dashboard-plan.md` |
+| A3 | Read-only dashboard, reconciliation, feature flags | **done** — 4 of 28 screens exist | `admin-dashboard-plan.md` |
 | P-08 | Crashlytics with `app_role`, version and screen, hashed ids only | ⬜ | plan §5 |
 | P-09 | Firebase Analytics funnel, no PII | ⬜ | plan §5 |
 | P-10 | Durable Objects live tracking | ⬜ | Phase 8, flag off |
@@ -163,20 +164,20 @@ required, and specifically a device with a Firebase SDK that has issued a token:
 authenticates the sender and cannot manufacture a token. Sending a deliberately invalid token first would
 prove the request reaches Google and is rejected — worth doing, and not the same claim as a delivery.
 
-**The admin console is scaffolded with auth and a shell. One screen works.** `apps/admin-web` has Google
-sign-in, a three-state route guard, the shell with sign-out, and the dashboard reading `get_admin_metrics_v1`
-through RLS. The other 27 screens are rows in `app/routes.tsx` with **no component** — they 404, and they are
+**The admin console has four of its 28 screens: dashboard, reconciliation, feature flags, and sign-in.**
+Google sign-in, a three-state route guard, the shell with sign-out, the dashboard reading
+`get_admin_metrics_v1`, reconciliation reading `reconcile_day_v1` with a one-shot variance explanation, and
+the flag list. The other screens are rows in `app/routes.tsx` with **no component** — they 404, and they are
 absent from the sidebar, because `AGENTS.md` rule 3 forbids a module whose only content is an admission that it
 is empty.
 
-**You cannot sign in and reach the console yet**, for one reason: **there is no admin account.** The only
-`admin` row in `user_roles` is the live-drain fixture `live-staff@test.local`. Google sign-in itself is verified
-working against the live project — the provider issues a real authorize URL to Google's sign-in screen — but
-landing as `customer` and hitting the 403 is the correct behaviour, not a bug. One `insert into user_roles`
-with your real uuid finishes it.
-
 A1 (the `audit_log` writers) is **deferred**: money is already recorded in `ledger_entries` with reason, actor
 and amount, and deletions already record `reason` in `events`. It returns when there is a second admin.
+
+**The operator account exists** — `ahmedmelgamal6@gmail.com` holds `admin` in `user_roles`, granted explicitly
+rather than by `handle_new_user`, which deliberately grants only `customer`. **The OAuth callback half is still
+unverified**: the provider is confirmed reaching Google's credential prompt, but completing the round trip needs
+a human to click through.
 
 **`035_retention_and_cron` covers the pruning half of P-11, and only that half.** `pg_cron` is
 installed and six jobs are scheduled and active: `prune_events` (7 d, hourly), `prune_order_eta_snapshots`
