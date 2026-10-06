@@ -29,6 +29,14 @@ enabled = true
 [observability.logs]
 enabled = true
 invocation_logs = true
+# WITHOUT THIS, EVERY ERROR IS INVISIBLE. Workers Logs is OFF by default: `console.log` from a Worker
+# goes nowhere unless `enabled = true`, and the headless run of `wrangler tail` on a Worker with it off
+# returns request metadata and nothing else. This was measured, not read in a doc: a manual drain of five
+# real notifications returned a full JSON report and logged NOTHING retrievable until this line was added.
+#
+# `head_sampling_rate = 1` keeps every invocation. The drain runs once a minute; sampling it would throw
+# away exactly the runs that failed.
+head_sampling_rate = 1
 
 # No `vars` for the secrets. The three that exist are set with `wrangler secret put`:
 #

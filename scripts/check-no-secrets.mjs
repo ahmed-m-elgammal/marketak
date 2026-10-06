@@ -57,6 +57,9 @@ const KNOWN_TEST_KEYS = [
   "functions/outbox-dispatcher/src/tests/access-token.test.ts",
 ];
 
+/** This file names the armour in its own documentation, because it is the thing that detects it. */
+const SELF = "scripts/check-no-secrets.mjs";
+
 const KNOWN_PEM_REFERENCE = [
   // Names the armour to strip it, and to detect a value that is not a key.
   "functions/outbox-dispatcher/src/google/access-token.ts",
@@ -64,6 +67,9 @@ const KNOWN_PEM_REFERENCE = [
   "functions/outbox-dispatcher/src/tests/config-env.test.ts",
   // A stub PEM whose body is the literal string "abc".
   "functions/outbox-dispatcher/src/tests/drain-once.test.ts",
+  // Builds a stub PEM inline to assert that `redact` neutralises the armour. The body is a base64 fragment of
+  // a real header, not key material - there is no modulus and no exponent.
+  "functions/outbox-dispatcher/src/tests/logger.test.ts",
 ];
 
 /**
@@ -168,7 +174,7 @@ for (const file of staged) {
 
   const path = file.replace(/\\/gu, "/");
   const isKnownTestKey = KNOWN_TEST_KEYS.includes(path);
-  const isKnownReference = KNOWN_PEM_REFERENCE.includes(path);
+  const isKnownReference = KNOWN_PEM_REFERENCE.includes(path) || path === SELF;
 
   // A private key. The LENGTH of the body is what distinguishes one from a mention of the format.
   if (carriesKeyMaterial(content)) {

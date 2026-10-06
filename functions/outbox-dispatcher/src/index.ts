@@ -17,24 +17,12 @@
 import type { DrainReport } from "./drain/drain-once.js";
 import { drainOnce } from "./drain/drain-once.js";
 import { ConfigError, readEnv } from "./config/env.js";
+import { ErrorCode, describeError, log, newRunId, type ErrorCodeValue, type Severity } from "./config/logger.js";
 
 export interface ScheduledEvent {
   readonly scheduledTime: number;
   readonly cron: string;
 }
-
-/** A hand-invoked drain, used during development. `export default` also receives plain `Request`s. */
-interface ManualRequest {
-  readonly request: Request;
-}
-
-/**
- * A bare, honest response for a manual invocation.
- *
- * No secret is echoed. The report contains order ids and rendered message text, which is enough to confirm
- * the drain works and is still more than an unauthenticated caller should see.
- */
-
 
 /**
  * Serialises a report for a response body.
@@ -56,14 +44,76 @@ function serialiseReport(report: DrainReport): string {
   );
 }
 
-function errorResponse(status: number, message: string): Response {
-  return new Response(JSON.stringify({ error: message }), {
+/**
+ * Builds a JSON error response AND writes the matching log line.
+ *
+ * Logging is not optional here, and this is the fix for the blind spot this Worker had: a `404` and a `401`
+ * used to return a clear message to the caller and then vanish completely. A caller who never retries has no
+ * evidence the request existed, and the 4xx count on a dashboard stays zero while probes are running.
+ *
+ * 4xx is `warn` and 5xx is `error`, because a 4xx is usually somebody asking and a 5xx is us being broken.
+ */
+function errorResponse(
+  status: number,
+  message: string,
+  context: { readonly code: ErrorCodeValue; readonly request?: Request; readonly path?: string },
+): Response {
+  const severity: Severity = status >= 500 ? "error" : "warn";
+  // Cloudflare's own request id. This is the join key between a Worker's log line and Cloudflare's
+  // dashboard, and it is the one identifier that exists before any application code runs.
+  const cfRay = context.request?.headers.get("cf-ray");
+  const path = context.path ?? context.request?.url;
+  const method = context.request?.method;
+  log({
+    severity,
+    code: context.code,
+    message,
+    cf_ray: cfRay ?? "absent",
+    http_status: String(status),
+    path: path ?? "absent",
+    method: method ?? "absent",
+  });
+  return new Response(JSON.stringify({ error: message, code: context.code }), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
 }
 
+/**
+ * Writes the one summary line per drain.
+ *
+ * Severity follows the report: a run that recorded an error is an `error` line, so `wrangler tail
+ * --status error` shows every bad tick without needing the per-notification lines. A clean run is `info`.
+ */
+function logReport(
+  event: "drain" | "drain-manual",
+  report: DrainReport,
+  runId: string,
+  extra: { readonly mode?: string; readonly cf_ray?: string } = {},
+): void {
+  const failedCount = report.errors.length;
+  log({
+    severity: failedCount > 0 ? "error" : "info",
+    code: failedCount > 0 ? ErrorCode.DB_MARK_FAILED : ErrorCode.DELIVERED,
+    message: `${String(report.claimed)} claimed, ${String(report.sent)} sent, ${String(report.failed)} failed, ${String(failedCount)} error(s)`,
+    event,
+    drain_run_id: runId,
+    dry_run: report.dry_run,
+    claimed: report.claimed,
+    sent: report.sent,
+    failed: report.failed,
+    unrenderable: report.unrenderable,
+    marked: report.marked,
+    still_open: report.still_open,
+    duration_ms: report.duration_ms,
+    errors: report.errors,
+    ...(extra.mode === undefined ? {} : { path: extra.mode }),
+    ...(extra.cf_ray === undefined ? {} : { cf_ray: extra.cf_ray }),
+  });
+}
+
 async function handleScheduled(env: unknown): Promise<Response> {
+  const runId = newRunId();
   let report: DrainReport;
   try {
     const config = readEnv(env as Record<string, string | undefined>);
@@ -72,28 +122,12 @@ async function handleScheduled(env: unknown): Promise<Response> {
     if (error instanceof ConfigError) {
       // A missing secret is an operator problem, not a customer problem. The message names the variable
       // and never its value.
-      return errorResponse(500, error.message);
+      return errorResponse(500, error.message, { code: ErrorCode.CONFIG_MISSING });
     }
-    return errorResponse(500, error instanceof Error ? error.message : String(error));
+    return errorResponse(500, describeError(error), { code: ErrorCode.DB_CLAIM_FAILED });
   }
 
-  // `console.log` rather than a structured logger: Workers Observability picks it up, and the drain's
-  // report is the thing an operator reads when the backlog alarm fires. No secret is in it - the report
-  // holds order ids and message text, not credentials.
-  console.log(
-    JSON.stringify({
-      event: "drain",
-      dry_run: report.dry_run,
-      claimed: report.claimed,
-      sent: report.sent,
-      failed: report.failed,
-      unrenderable: report.unrenderable,
-      marked: report.marked,
-      still_open: report.still_open,
-      duration_ms: report.duration_ms,
-      errors: report.errors,
-    }),
-  );
+  logReport("drain", report, runId);
 
   // A cron invocation's status code is not visible anywhere, so the status is chosen for the manual route
   // and the log is what actually records success or failure on a tick.
@@ -103,11 +137,16 @@ async function handleScheduled(env: unknown): Promise<Response> {
   });
 }
 
-async function handleManual(request: Request, env: unknown, token: string | undefined): Promise<Response> {
+async function handleManual(
+  request: Request,
+  env: unknown,
+  token: string | undefined,
+): Promise<Response> {
   if (token === undefined || token.length === 0) {
     return errorResponse(
       503,
       "DRAIN_TOKEN is not set. The manual /drain route is disabled; the cron trigger still works.",
+      { code: ErrorCode.CONFIG_MISSING, request },
     );
   }
 
@@ -115,7 +154,10 @@ async function handleManual(request: Request, env: unknown, token: string | unde
   if (supplied !== token) {
     // 401 rather than 403: the caller has not proved it is allowed, and the distinction tells an attacker
     // the token exists.
-    return errorResponse(401, "invalid or missing x-drain-token");
+    return errorResponse(401, "invalid or missing x-drain-token", {
+      code: ErrorCode.CONFIG_INVALID,
+      request,
+    });
   }
 
   let config: ReturnType<typeof readEnv>;
@@ -123,7 +165,7 @@ async function handleManual(request: Request, env: unknown, token: string | unde
     config = readEnv(env as Record<string, string | undefined>);
   } catch (error) {
     if (error instanceof ConfigError) {
-      return errorResponse(500, error.message);
+      return errorResponse(500, error.message, { code: ErrorCode.CONFIG_MISSING, request });
     }
     throw error;
   }
@@ -134,12 +176,11 @@ async function handleManual(request: Request, env: unknown, token: string | unde
   const mode = wantsSend ? config.dryRun : "log";
 
   const report = await drainOnce({ ...config, dryRun: mode });
-  console.log(
-    JSON.stringify(
-      { event: "drain-manual", mode, ...report },
-      (_key, value: unknown) => (typeof value === "bigint" ? value.toString() : value),
-    ),
-  );
+  const cfRay = request.headers.get("cf-ray");
+  logReport("drain-manual", report, newRunId(), {
+    mode,
+    ...(cfRay === null ? {} : { cf_ray: cfRay }),
+  });
   return new Response(serialiseReport(report), {
     status: report.errors.length > 0 ? 500 : 200,
     headers: { "content-type": "application/json; charset=utf-8" },
@@ -172,14 +213,14 @@ export default {
 
     if (url.pathname === "/drain") {
       if (request.method !== "POST") {
-        return errorResponse(405, "use POST /drain");
+        return errorResponse(405, "use POST /drain", { code: ErrorCode.CONFIG_INVALID, request });
       }
       const bindings = (env ?? {}) as Record<string, string | undefined>;
       return handleManual(request, env, bindings["DRAIN_TOKEN"]);
     }
 
-    return errorResponse(404, "not found");
+    return errorResponse(404, "not found", { code: ErrorCode.CONFIG_INVALID, request });
   },
 } satisfies ExportedHandler<unknown>;
 
-export type { DrainReport, ManualRequest };
+export type { DrainReport };

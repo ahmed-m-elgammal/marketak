@@ -6,6 +6,64 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Fixed - the Worker was logging everything to `console.log`, so no error was ever visible
+
+Cloudflare Workers Logs is **off by default**. `wrangler tail` against this Worker returned request
+metadata and nothing else, and a manual drain of five real notifications returned a complete JSON report
+while logging nothing retrievable. The failure that proved it — `device_tokens.deleted_at` does not
+exist — was therefore *invisible from the Worker side* and had to be found from the database side, by
+grouping five `sqlstate 42703` rows per minute at seconds `:59`, `:00`, `:01`, `:02`, `:03`. Each
+minute's five errors were one bad query executed once per claimed notification.
+
+Three changes, all measured against the live project rather than read from documentation:
+
+1. **`[observability.logs] head_sampling_rate = 1`** in `wrangler.toml`. Sampling the drain would
+   discard exactly the runs that failed.
+2. **New `config/logger.ts`** — one structured line per event, with `console.error` for anything needing
+   attention. `$metadata.level` is what `wrangler tail --status error` filters on, so an error sent to
+   `log` is invisible to an error filter. That was the single defect: every line used `console.log`.
+3. **A stable `ErrorCode` per failure**, so a failure is countable without matching on English prose.
+   The FCM statuses are split by what an operator should *do*: `FCM_AUTH` clears the token cache,
+   `FCM_TOKEN_DEAD` is expected noise until Phase 4 removes stale tokens, `FCM_THROTTLED` backs off.
+
+Also:
+
+- Every HTTP failure (`401`, `404`, `405`, `503`) previously returned a clear message and recorded
+  **nothing**. Each now writes a `warn` (4xx) or `error` (5xx) line carrying `http_status`, `path`,
+  `method` and `cf_ray`.
+- `cf_ray` is now carried on every line as the join key to Cloudflare's dashboard.
+- Every drain run emits one `drain_run_id`, so a single run's lines group even when ticks overlap.
+- The per-notification catch now names its stage (`get_template`, `get_device_tokens`, `fcm_send`).
+  "request failed" did not distinguish two guarded calls with different causes and different fixes.
+- `unwrap()` in `database/supabase.ts` prefixes the PostgREST **sqlstate** into the message, because
+  `postgres_logs.message` comes back **empty** and the sqlstate is the only reliably populated field
+  there.
+
+Verified live on version `db078acf-61df-4b70-aa55-78d3671e0d46`:
+
+| Request | Status | Log level | Code |
+|---|---|---|---|
+| `GET /drain` | 405 | `warn` | `CONFIG_INVALID` |
+| `POST /drain`, wrong token | 401 | `warn` | `CONFIG_INVALID` |
+| `GET /nope` | 404 | `warn` | `CONFIG_INVALID` |
+| `POST /drain`, valid, nothing claimed | 200 | `info` | `DELIVERED` |
+
+109 tests pass, up from 77. 32 new: 16 for the logger, 11 for the HTTP surface, 5 for error codes
+reaching the report.
+
+### Still not tested: a real push
+
+The pipeline is proven up to the HTTP request that leaves the Worker. `DRY_RUN="log"` means no request
+has been made to FCM. `public.device_tokens` is empty and there is no `google-services.json` or
+`GoogleService-Info.plist` in the repository, so no token can be registered.
+
+A real device **is** required, and it is required for one specific reason: FCM only delivers to a token
+that was issued by a Firebase SDK on an installed app. The service account in `FCM_SERVICE_ACCOUNT_JSON`
+authenticates the *sending* side and cannot manufacture a token. Android needs a configured app and a
+real device or emulator; iOS additionally needs an APNs key uploaded to Firebase. A deliberately
+invalid token would prove the send path reaches Google and is rejected, which is worth doing before a
+device exists, and is not the same claim as a delivery.
+
 ### Fixed - `eta` had no source at all (`038g`)
 
 The plan stated `eta` "is computed by `compute_quote`, stored on `orders.promised_delivery_at`". **That was

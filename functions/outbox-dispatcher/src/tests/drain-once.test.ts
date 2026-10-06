@@ -398,6 +398,8 @@ describe("drainOnce - refusing to send a broken message", () => {
 
     const notification = report.notifications[0];
     expect(notification?.error).toContain("vendor_name");
+    // A code, so the failure is countable in the log stream without matching on English prose.
+    expect(notification?.code).toBe("RENDER_UNFILLED");
     // The claim carries no `vendor_name`, and the database deliberately does not supply one for this
     // template on a collapsed customer notification.
     expect(notification?.error).not.toContain("action_required");
@@ -464,6 +466,81 @@ describe("drainOnce - refusing to send a broken message", () => {
     expect(report.sent).toBe(0);
     expect(report.failed).toBe(1);
     expect(report.still_open).toBe(1);
+    expect(report.notifications[0]?.code).toBe("NO_DEVICE_TOKEN");
+  });
+});
+
+describe("drainOnce - error codes reach the report", () => {
+  it("reports NO_DEVICE_TOKEN when the recipient has no device", async () => {
+    // Distinct from every other failure, so the log stream can separate "this user has no phone" - expected
+    // noise that recurs - from "FCM rejected us", which is an outage.
+    const supabase = new FakeSupabase({
+      claims: [fullyPopulatedClaim("order.placed")],
+      templates: REAL_TEMPLATES,
+      devices: [],
+    });
+
+    const report = await drainOnce(testEnv(), { supabase, fcm: new FakeFcm() });
+
+    expect(report.notifications[0]?.code).toBe("NO_DEVICE_TOKEN");
+  });
+
+  it("reports TEMPLATE_MISSING for a deactivated template", async () => {
+    const supabase = new FakeSupabase({
+      claims: [fullyPopulatedClaim("order.placed")],
+      templates: {},
+      devices: [makeDevice()],
+    });
+
+    const report = await drainOnce(testEnv(), { supabase, fcm: new FakeFcm() });
+
+    expect(report.notifications[0]?.code).toBe("TEMPLATE_MISSING");
+  });
+
+  it("reports the underlying FCM code on the group", async () => {
+    // The group takes the FIRST failure's code, so the severity of the log line is decided by a specific
+    // cause rather than a generic "some device failed".
+    const supabase = new FakeSupabase({
+      claims: [fullyPopulatedClaim("order.picked_up")],
+      templates: REAL_TEMPLATES,
+      devices: [makeDevice({ token: "Dead" })],
+    });
+    const fcm = new FakeFcm({
+      results: { Dead: { ok: false, code: "FCM_TOKEN_DEAD", error: "dead token: UNREGISTERED" } },
+    });
+
+    const report = await drainOnce(testEnv(), { supabase, fcm });
+
+    expect(report.notifications[0]?.code).toBe("FCM_TOKEN_DEAD");
+  });
+
+  it("reports DELIVERED on the happy path", async () => {
+    // A success line carries a code too, so `code` is never an intermittently-populated field.
+    const supabase = new FakeSupabase({
+      claims: [fullyPopulatedClaim("order.placed")],
+      templates: REAL_TEMPLATES,
+      devices: [makeDevice()],
+    });
+
+    const report = await drainOnce(testEnv(), { supabase, fcm: new FakeFcm() });
+
+    expect(report.notifications[0]?.code).toBe("DELIVERED");
+  });
+
+  it("names the failing stage so the error is actionable", async () => {
+    // "request failed" does not say whether the template fetch or the token fetch failed, and those two
+    // have different causes and different fixes.
+    const supabase = new FakeSupabase({
+      claims: [fullyPopulatedClaim("order.placed")],
+      templates: REAL_TEMPLATES,
+      devices: [makeDevice()],
+      tokensError: new Error("postgres connection reset"),
+    });
+
+    const report = await drainOnce(testEnv(), { supabase, fcm: new FakeFcm() });
+
+    expect(report.errors[0]).toContain("get_device_tokens");
+    expect(report.errors[0]).toContain("connection reset");
   });
 });
 

@@ -27,6 +27,7 @@
 import type { DeviceTokenRow, Language, RenderedNotification } from "@marketak/shared";
 
 import { FCM_SEND_URL } from "../config/env.js";
+import { ErrorCode, type ErrorCodeValue, redact } from "../config/logger.js";
 import { clearTokenCache, getAccessToken, type SigningKey } from "../google/access-token.js";
 
 /**
@@ -74,19 +75,30 @@ interface FcmSendResponse {
   readonly error?: unknown;
 }
 
-/** The outcome of one device's send, before it is folded into a group outcome. */
+/**
+ * The outcome of one device's send, before it is folded into a group outcome.
+ *
+ * `code` is what the log layer routes on and what an operator filters by. `error` stays free text for
+ * `events.last_error`, which is a single text column an admin reads - so it must be human-readable, which is
+ * a different job from being machine-filterable.
+ */
 export interface DeviceResult {
   readonly token: string;
   readonly ok: boolean;
+  readonly code?: ErrorCodeValue;
   readonly error?: string;
 }
 
-/** True when an FCM status means "retry later", as opposed to "this will never work". */
+// NOTE: the cache TTL for Google access tokens is `ACCESS_TOKEN_TTL_SECONDS` in `config/env.ts`. It is NOT
+// duplicated here, and there is deliberately no local constant: two copies of a duration is one copy too many,
+// and the tests already assert the cache behaviour against the exported value.
+
+/** True when an FCM status means our credentials are wrong, not the device's. */
 function isAuthFailure(status: number): boolean {
   return status === 401 || status === 403;
 }
 
-/** True when FCM says the token itself is dead. */
+/** True when FCM says the token itself is dead and will never work again. */
 function isDeadToken(status: number, payload: FcmSendResponse): boolean {
   if (status === 404) {
     return true;
@@ -97,6 +109,11 @@ function isDeadToken(status: number, payload: FcmSendResponse): boolean {
   }
   const statusName = (error as { status?: unknown }).status;
   return statusName === "NOT_FOUND" || statusName === "UNREGISTERED";
+}
+
+/** True when FCM is asking us to slow down. */
+function isThrottled(status: number): boolean {
+  return status === 429 || (status >= 500 && status <= 599);
 }
 
 /**
@@ -155,7 +172,12 @@ export class FcmClient implements NotificationSender {
       const reason = error instanceof Error ? error.message : String(error);
       // The message is our own: `getAccessToken` includes Google's response body, which contains no key
       // material. The private key never appears, because no error path includes it.
-      return { token: device.token, ok: false, error: `token: ${reason}` };
+      return {
+        token: device.token,
+        ok: false,
+        code: ErrorCode.GOOGLE_TOKEN_FAILED,
+        error: `google auth: ${reason}`,
+      };
     }
 
     const payload = {
@@ -209,7 +231,12 @@ export class FcmClient implements NotificationSender {
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      return { token: device.token, ok: false, error: `network: ${reason}` };
+      return {
+        token: device.token,
+        ok: false,
+        code: ErrorCode.FCM_NETWORK,
+        error: `network: ${reason}`,
+      };
     }
 
     if (response.ok) {
@@ -226,7 +253,8 @@ export class FcmClient implements NotificationSender {
       return {
         token: device.token,
         ok: false,
-        error: `fcm ${String(response.status)}: ${text.slice(0, 200)}`,
+        code: ErrorCode.FCM_REJECTED,
+        error: redact(`fcm ${String(response.status)}: non-JSON response: ${text}`),
       };
     }
 
@@ -240,11 +268,26 @@ export class FcmClient implements NotificationSender {
       // Our credentials, not the device. Clearing the cache means the next invocation signs a new token,
       // which is the only thing that can recover from an expired or revoked one.
       clearTokenCache();
-      return { token: device.token, ok: false, error: `fcm auth ${String(response.status)}: ${detailText}` };
+      return {
+        token: device.token,
+        ok: false,
+        code: ErrorCode.FCM_AUTH,
+        error: redact(`fcm auth ${String(response.status)}: ${detailText}`),
+      };
     }
     if (isDeadToken(response.status, body)) {
-      return { token: device.token, ok: false, error: `dead token: ${detailText}` };
+      return {
+        token: device.token,
+        ok: false,
+        code: ErrorCode.FCM_TOKEN_DEAD,
+        error: redact(`dead token (Phase 4 removes these on sign-out): ${detailText}`),
+      };
     }
-    return { token: device.token, ok: false, error: `fcm ${String(response.status)}: ${detailText}` };
+    return {
+      token: device.token,
+      ok: false,
+      code: isThrottled(response.status) ? ErrorCode.FCM_THROTTLED : ErrorCode.FCM_REJECTED,
+      error: redact(`fcm ${String(response.status)}: ${detailText}`),
+    };
   }
 }

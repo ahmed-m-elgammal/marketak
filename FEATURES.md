@@ -141,12 +141,25 @@ and a policy, not inspecting them, and `027a` ships the two assertions that woul
 | P-04 | Outbox via `events`, every state change in the same transaction | ⬜ | constitution II |
 | P-05 | R2 images, menu snapshots, archives, backups | ⬜ | plan §3 |
 | P-06 | Cloudflare Workers: outbox dispatcher, upload signer, snapshot builder, file access, export | ⬜ | plan §1 |
-| P-07 | FCM push, batched 15 s for non-critical events | **Phases 1+2 done** — ⬜ shipped | contracts §1.9.0 |
+| P-07 | FCM push, batched 15 s for non-critical events | **Phases 1–3 done, no push sent** — ⬜ shipped | contracts §1.9.0 |
 | P-08 | Crashlytics with `app_role`, version and screen, hashed ids only | ⬜ | plan §5 |
 | P-09 | Firebase Analytics funnel, no PII | ⬜ | plan §5 |
 | P-10 | Durable Objects live tracking | ⬜ | Phase 8, flag off |
 | P-11 | Retention jobs: prune transients, archive order detail at 60 days | DB ready — half | §9, T7.1 |
 | P-12 | Nightly export to R2, with a restore test before launch | ⬜ | T6.9, T6.10 |
+
+**P-07 is not shipped, and the honest gap is narrow.** The database half is proven against the live
+project: both RPCs, the collapse, the grants, `eta`, `currency`, and the refusal to send a message with an
+unfilled placeholder. The Worker half is deployed and runs every 60 s
+(`https://outbox-dispatcher.ahmedmelgammal6.workers.dev`, cron `* * * * *` — 15 s was not possible, see
+ADR 23). It renders real English and Arabic from real database templates, and it has claimed and folded
+five real notifications in a dry run.
+
+What has **never** happened is an HTTP request leaving the Worker for FCM. `DRY_RUN="log"`,
+`public.device_tokens` is empty, and there is no Firebase app config in the repository. A real device is
+required, and specifically a device with a Firebase SDK that has issued a token: the service account
+authenticates the sender and cannot manufacture a token. Sending a deliberately invalid token first would
+prove the request reaches Google and is rejected — worth doing, and not the same claim as a delivery.
 
 **`035_retention_and_cron` covers the pruning half of P-11, and only that half.** `pg_cron` is
 installed and six jobs are scheduled and active: `prune_events` (7 d, hourly), `prune_order_eta_snapshots`

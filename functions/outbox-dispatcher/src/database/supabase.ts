@@ -79,12 +79,16 @@ async function unwrap<T>(
   }
 
   if (!response.ok) {
+    // The sqlstate is carried into the message because it is the one field Supabase's OWN log stream
+    // populates reliably. `postgres_logs.message` comes back EMPTY, so a worker error that reaches the
+    // database is only identifiable there by its `sql_state_code` and by its timing pattern. Putting it in
+    // the Worker's message means one log line answers both questions.
     if (isErrorBody(body)) {
       const code = typeof body.code === "string" ? body.code : undefined;
       const hint = typeof body.hint === "string" ? body.hint : undefined;
       throw new Error(
         `${operation} failed: ${String(response.status)}` +
-          `${code === undefined ? "" : ` ${code}`}` +
+          `${code === undefined ? "" : ` sqlstate=${code}`}` +
           `${typeof body.message === "string" ? ` - ${body.message}` : ""}` +
           `${hint === undefined ? "" : ` (${hint})`}`,
       );

@@ -35,6 +35,14 @@ import {
 } from "@marketak/shared";
 
 import type { Env } from "../config/env.js";
+import {
+  ErrorCode,
+  describeError,
+  log,
+  newRunId,
+  type ErrorCodeValue,
+  type Severity,
+} from "../config/logger.js";
 import { SupabaseClient, type NotificationSource } from "../database/supabase.js";
 import { FcmClient, type DeviceResult, type NotificationSender } from "../messaging/fcm-client.js";
 
@@ -47,6 +55,9 @@ export interface NotificationReport {
   readonly devices_targeted: number;
   readonly devices_ok: number;
   readonly sent: boolean;
+  /** Stable code for filtering. See `ErrorCode`. */
+  readonly code?: ErrorCodeValue;
+  /** Free text for `events.last_error` and the admin console. */
   readonly error?: string;
   /** The rendered text, only in `log` mode. Useful, and a data-minimisation cost, so it is opt-in. */
   readonly preview?: string;
@@ -68,6 +79,31 @@ export interface DrainReport {
 }
 
 /**
+ * A group outcome plus the code that explains it.
+ *
+ * `code` is deliberately NOT on the shared `SendOutcome`: that type is the payload for
+ * `mark_events_delivered_v1`, and a logging concern must not leak into a database contract. This local type
+ * extends it, and is assignable to `SendOutcome` everywhere the mark call needs it.
+ */
+interface GroupOutcome extends SendOutcome {
+  readonly code?: ErrorCodeValue;
+}
+
+/**
+ * True for failures that are expected to recur and that an operator should not be paged for.
+ *
+ * `FCM_TOKEN_DEAD` is the stale-token case Phase 4 removes on sign-out; until then it will recur on every
+ * tick for any customer who has ever reinstalled. `NO_DEVICE_TOKEN` means the recipient has never registered
+ * a device, which is the normal state for staff accounts and for any account that completed a web order.
+ *
+ * Everything else - bad credentials, a throttle, an unfilled placeholder, a failed mark - is `error`, because
+ * each one means something is actually broken.
+ */
+function isExpectedNoise(code: ErrorCodeValue): boolean {
+  return code === ErrorCode.FCM_TOKEN_DEAD || code === ErrorCode.NO_DEVICE_TOKEN;
+}
+
+/**
  * Folds several device results into one group outcome.
  *
  * ALL devices must succeed. `mark_events_delivered_v1` closes the collapsed group as a unit, so marking on a
@@ -78,22 +114,31 @@ export interface DrainReport {
 function foldDeviceResults(
   eventIds: readonly bigint[],
   results: readonly DeviceResult[],
-): SendOutcome {
+): GroupOutcome {
   if (results.length === 0) {
     // No device to send to is NOT a success. The customer has a token registered or they would not be the
     // recipient, and marking this delivered would quietly swallow the notification.
-    return { event_ids: eventIds, ok: false, error: "no active device token for this recipient" };
+    return {
+      event_ids: eventIds,
+      ok: false,
+      code: ErrorCode.NO_DEVICE_TOKEN,
+      error: "no active device token for this recipient",
+    };
   }
 
   const failures = results.filter((result) => !result.ok);
   if (failures.length === 0) {
-    return { event_ids: eventIds, ok: true };
+    return { event_ids: eventIds, ok: true, code: ErrorCode.DELIVERED };
   }
 
   // Every failure, not just the first: `events.last_error` is a single text column and the log line is the
   // only place all of them will ever be visible.
   const reasons = failures.map((failure) => failure.error ?? "unknown").join("; ");
-  return { event_ids: eventIds, ok: false, error: reasons.slice(0, 500) };
+  // The first failure's code decides the severity of the group's log line. Ordering is deliberate: the
+  // first device is the one an operator most often has to act on, and a mixed set is still fully described by
+  // `reasons` in the message.
+  const code = failures[0]?.code ?? ErrorCode.FCM_REJECTED;
+  return { event_ids: eventIds, ok: false, code, error: reasons.slice(0, 500) };
 }
 
 /**
@@ -111,6 +156,9 @@ export async function drainOnce(
   },
 ): Promise<DrainReport> {
   const startedAt = Date.now();
+  // One id per invocation. Every log line this run emits carries it, so a single drain's lines can be
+  // grouped even when several ticks overlap or a manual call interleaves with a cron one.
+  const runId = newRunId();
   const errors: string[] = [];
   const notifications: NotificationReport[] = [];
 
@@ -128,7 +176,15 @@ export async function drainOnce(
   try {
     claims = await supabase.claimEvents(env.batchSize);
   } catch (error) {
-    errors.push(`claim: ${error instanceof Error ? error.message : String(error)}`);
+    const reason = describeError(error);
+    errors.push(`claim: ${reason}`);
+    log({
+      severity: "error",
+      code: ErrorCode.DB_CLAIM_FAILED,
+      message: reason,
+      drain_run_id: runId,
+      elapsed_ms: Date.now() - startedAt,
+    });
     return {
       dry_run: env.dryRun,
       claimed: 0,
@@ -160,7 +216,7 @@ export async function drainOnce(
     };
   }
 
-  const outcomes: SendOutcome[] = [];
+  const outcomes: GroupOutcome[] = [];
   let sent = 0;
   let failed = 0;
   let unrenderable = 0;
@@ -171,6 +227,9 @@ export async function drainOnce(
   for (const claim of claims) {
     const eventIds = [...claim.event_ids];
     const ids = eventIds.map((id) => id.toString());
+    // Advances through the steps below so the catch can name the one that threw. Defaulted rather than
+    // declared undefined so a throw from the spread or the map above cannot produce "unknown".
+    let stage = "get_template";
 
     try {
       const template = await supabase.getTemplate(claim.template_key, claim.language);
@@ -179,7 +238,22 @@ export async function drainOnce(
         // between the two calls. Failing the group is right: it keeps the events countable by the backlog
         // alarm rather than dropping them silently.
         unrenderable += 1;
-        outcomes.push({ event_ids: eventIds, ok: false, error: "template missing or inactive" });
+        outcomes.push({
+          event_ids: eventIds,
+          ok: false,
+          error: "template missing or inactive",
+        });
+        log({
+          severity: "error",
+          code: ErrorCode.TEMPLATE_MISSING,
+          message:
+            "the template was deactivated between the claim and the fetch, so the group stays open for the backlog alarm",
+          drain_run_id: runId,
+          template_key: claim.template_key,
+          recipient: claim.recipient,
+          order_id: claim.order_id,
+          event_count: eventIds.length,
+        });
         notifications.push({
           template_key: claim.template_key,
           recipient: claim.recipient,
@@ -188,6 +262,7 @@ export async function drainOnce(
           devices_targeted: 0,
           devices_ok: 0,
           sent: false,
+          code: ErrorCode.TEMPLATE_MISSING,
           error: "template missing or inactive",
         });
         continue;
@@ -198,6 +273,16 @@ export async function drainOnce(
         unrenderable += 1;
         const reason = `unfilled placeholder(s): ${rendered.missing_variables.join(", ")}`;
         outcomes.push({ event_ids: eventIds, ok: false, error: reason });
+        log({
+          severity: "error",
+          code: ErrorCode.RENDER_UNFILLED,
+          message: `${reason}. Sending would have delivered a literal {placeholder} to a customer.`,
+          drain_run_id: runId,
+          template_key: claim.template_key,
+          recipient: claim.recipient,
+          order_id: claim.order_id,
+          event_count: eventIds.length,
+        });
         notifications.push({
           template_key: claim.template_key,
           recipient: claim.recipient,
@@ -206,15 +291,18 @@ export async function drainOnce(
           devices_targeted: 0,
           devices_ok: 0,
           sent: false,
+          code: ErrorCode.RENDER_UNFILLED,
           error: reason,
         });
         continue;
       }
 
+      stage = "get_device_tokens";
       const devices = await supabase.getDeviceTokens(claim.recipient_id);
       const results: DeviceResult[] = [];
 
       if (env.dryRun === "send") {
+        stage = "fcm_send";
         for (const device of devices) {
           results.push(
             await fcm.sendToDevice(device, rendered, {
@@ -240,8 +328,35 @@ export async function drainOnce(
 
       if (outcome.ok) {
         sent += 1;
+        // INFO, not warn. A successful send is the expected case, and logging it louder makes the error
+        // stream useless.
+        log({
+          severity: "info",
+          code: ErrorCode.DELIVERED,
+          message: env.dryRun === "log" ? "rendered, not sent (DRY_RUN=log)" : "accepted by FCM",
+          drain_run_id: runId,
+          template_key: claim.template_key,
+          recipient: claim.recipient,
+          order_id: claim.order_id,
+          event_count: eventIds.length,
+        });
       } else {
         failed += 1;
+        // WARN, not ERROR, for the two failures that are part of normal operation and self-heal: a token
+        // FCM has declared dead, and a recipient with no registered device. An operator woken by those
+        // every tick would stop reading the stream, which costs more than the alarm is worth.
+        const code = outcome.code ?? ErrorCode.FCM_REJECTED;
+        const severity: Severity = isExpectedNoise(code) ? "warn" : "error";
+        log({
+          severity,
+          code,
+          message: outcome.error ?? "send failed",
+          drain_run_id: runId,
+          template_key: claim.template_key,
+          recipient: claim.recipient,
+          order_id: claim.order_id,
+          event_count: eventIds.length,
+        });
       }
 
       notifications.push({
@@ -252,17 +367,35 @@ export async function drainOnce(
         devices_targeted: results.length,
         devices_ok: devicesOk,
         sent: outcome.ok,
+        ...(outcome.code === undefined ? {} : { code: outcome.code }),
         ...(outcome.error === undefined ? {} : { error: outcome.error }),
         ...(env.dryRun === "log"
           ? { preview: `${rendered.title} | ${rendered.body}` }
           : {}),
       });
     } catch (error) {
-      // One notification's failure must not abandon the rest of the batch.
-      const reason = error instanceof Error ? error.message : String(error);
-      errors.push(`${claim.template_key} (${claim.recipient}): ${reason}`);
-      outcomes.push({ event_ids: eventIds, ok: false, error: reason.slice(0, 500) });
+      // One notification's failure must not abandon the rest of the batch. `stage` is what makes this line
+      // actionable: the same catch guards the template fetch and the token fetch, and "request failed" alone
+      // does not say which of them did.
+      const reason = describeError(error);
+      errors.push(`${claim.template_key} (${claim.recipient}): ${stage}: ${reason}`);
+      outcomes.push({
+        event_ids: eventIds,
+        ok: false,
+        code: stage === "get_template" ? ErrorCode.DB_TEMPLATE_FAILED : ErrorCode.DB_TOKENS_FAILED,
+        error: `${stage}: ${reason}`,
+      });
       failed += 1;
+      log({
+        severity: "error",
+        code: stage === "get_template" ? ErrorCode.DB_TEMPLATE_FAILED : ErrorCode.DB_TOKENS_FAILED,
+        message: `${stage}: ${reason}`,
+        drain_run_id: runId,
+        template_key: claim.template_key,
+        recipient: claim.recipient,
+        order_id: claim.order_id,
+        event_count: eventIds.length,
+      });
       notifications.push({
         template_key: claim.template_key,
         recipient: claim.recipient,
@@ -271,7 +404,10 @@ export async function drainOnce(
         devices_targeted: 0,
         devices_ok: 0,
         sent: false,
-        error: reason,
+        // The stage decides the code, so a template-fetch failure and a token-fetch failure stay
+        // distinguishable in the report as well as in the log.
+        code: stage === "get_template" ? ErrorCode.DB_TEMPLATE_FAILED : ErrorCode.DB_TOKENS_FAILED,
+        error: `${stage}: ${reason}`,
       });
     }
   }
@@ -285,7 +421,15 @@ export async function drainOnce(
   } catch (error) {
     // The events stay open, so the next tick retries the whole batch. That is the intended failure mode,
     // and it is why nothing is marked optimistically before the send.
-    errors.push(`mark: ${error instanceof Error ? error.message : String(error)}`);
+    const reason = describeError(error);
+    errors.push(`mark: ${reason}`);
+    log({
+      severity: "error",
+      code: ErrorCode.DB_MARK_FAILED,
+      message: `${reason}. Every event in this batch stays open and the whole batch is retried.`,
+      drain_run_id: runId,
+      elapsed_ms: Date.now() - startedAt,
+    });
   }
 
   return {

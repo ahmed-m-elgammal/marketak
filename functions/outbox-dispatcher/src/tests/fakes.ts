@@ -75,6 +75,13 @@ export interface FakeSupabaseOptions {
   readonly claimError?: Error;
   /** Thrown by `markDelivered`, to test that the batch survives a mark failure. */
   readonly markError?: Error;
+  /**
+   * Thrown by `getDeviceTokens`, to test that the token-fetch stage is named in the error.
+   *
+   * Needed because a token fetch and a template fetch are guarded by the SAME `try` in the drain. Without a
+   * way to fail only the token fetch, "the error says which stage failed" would be untestable.
+   */
+  readonly tokensError?: Error;
 }
 
 /**
@@ -91,6 +98,7 @@ export class FakeSupabase implements NotificationSource {
   readonly #devices: readonly DeviceTokenRow[];
   readonly #claimError: Error | undefined;
   readonly #markError: Error | undefined;
+  readonly #tokensError: Error | undefined;
 
   public constructor(options: FakeSupabaseOptions = {}) {
     this.#claims = options.claims ?? [];
@@ -98,6 +106,7 @@ export class FakeSupabase implements NotificationSource {
     this.#devices = options.devices ?? [];
     this.#claimError = options.claimError;
     this.#markError = options.markError;
+    this.#tokensError = options.tokensError;
   }
 
   public claimEvents(batchSize: number): Promise<readonly ClaimedNotification[]> {
@@ -120,6 +129,9 @@ export class FakeSupabase implements NotificationSource {
 
   public getDeviceTokens(userId: string): Promise<readonly DeviceTokenRow[]> {
     this.calls.push({ kind: "tokens", userId });
+    if (this.#tokensError !== undefined) {
+      return Promise.reject(this.#tokensError);
+    }
     return Promise.resolve(this.#devices);
   }
 
