@@ -15,10 +15,21 @@
  * query and a mutation, and the naming keeps them apart on purpose: `getReconciliation` is a query,
  * `explainVariance` is a mutation. A screen that calls the mutating one from a render is then visibly wrong.
  *
- * ## Why no date is sent for "today"
+ * ## Why the caller supplies the date rather than relying on the database default
  *
- * The RPCs default to "today in `cities.timezone`". Sending the browser's date instead would be wrong by up to
- * a day in Cairo, and would silently disagree with the number the RPC computed beside it.
+ * A `p_date` of `NULL` **looks** like it would take the RPC's "today in `cities.timezone`" default, and the
+ * signature invites it: `pg_get_function_arguments` reports `p_date date, p_explanation text DEFAULT
+ * NULL::text` - the `DEFAULT` is visibly attached only to the *second* parameter. In fact `p_date` has no
+ * default at all, and the body rejects null immediately:
+ *
+ *     if p_date is null then
+ *       perform private.err('DATE_REQUIRED', 'date is required');
+ *     end if;
+ *
+ * So the screen's default date has to be computed in the console, and it is - `getReconciliation` takes the
+ * business date and the metrics RPC's zone, and the caller derives it with `cityToday`. Sending the browser's
+ * own date instead would be wrong by up to a day in Cairo and would silently disagree with the figure printed
+ * beside it.
  */
 
 import { rpcRows } from "../postgrest.js";
@@ -82,9 +93,30 @@ function toReconciliation(row: Record<string, unknown>): Reconciliation {
   };
 }
 
-/** Today's reconciliation. Sends no date, so the RPC applies its own city-timezone default. */
-export async function getReconciliation(): Promise<Reconciliation | null> {
-  const rows = await rpcRows("reconcile_day_v1");
+/**
+ * One day's reconciliation.
+ *
+ * ## Both arguments are named, and `p_date` is required
+ *
+ * Two separate traps in one call, so both are worth stating.
+ *
+ * **Naming.** A bodiless `rpc("reconcile_day_v1")` fails with `PGRST202`, and the error describes something
+ * that is not wrong: *"Searched for the function ... without parameters or with a single unnamed json/jsonb
+ * parameter, but no matches were found in the schema cache."* PostgREST resolves a bodiless `POST /rpc/f`
+ * against **zero-argument** functions only - a defaulted parameter is not optional at the routing layer - so a
+ * function with two declared arguments is unreachable by name alone. The cache was never stale and the function
+ * never missing.
+ *
+ * **`p_date` has no default.** `pg_get_function_arguments` renders the signature as
+ * `p_date date, p_explanation text DEFAULT NULL::text`, so the `DEFAULT` looks like it applies to the pair. It
+ * applies only to `p_explanation`, and the body rejects a null date with `DATE_REQUIRED`. The date is therefore
+ * computed by the caller in the city's timezone - see the note at the top of this file - and passed in.
+ *
+ * `p_explanation` is sent as `null` because this is a read. Sending it means the function resolves even though
+ * the body treats null as "no explanation supplied", which is the correct state for a read.
+ */
+export async function getReconciliation(date: string): Promise<Reconciliation | null> {
+  const rows = await rpcRows("reconcile_day_v1", { p_date: date, p_explanation: null });
   const first = rows[0];
   return first === undefined ? null : toReconciliation(first);
 }

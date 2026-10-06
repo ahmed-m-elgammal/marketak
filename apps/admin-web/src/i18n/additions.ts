@@ -39,8 +39,10 @@ export const enAdditions = {
   /** The work queue at the top of the console. */
   attention: {
     title: "Needs attention",
-    clearTitle: "Nothing needs attention",
-    clearBody: "No late orders, no unaccepted merchants, and cash accounts for.",
+    clearTitle: "All clear",
+    // Reads as a state, not as a sentence about cash. The earlier "cash accounts for" named a float an
+    // operator has to translate, and this line is read at a glance in the first two seconds of a shift.
+    clearBody: "No late orders, no unaccepted orders, no unreconciled cash.",
     varianceTitle: "Cash does not reconcile",
     varianceDetail: "{{amount}} {{currency}} unexplained on {{date}}. Open reconciliation to record why.",
     lateOrder: "Order {{number}} is late",
@@ -76,8 +78,22 @@ export const enAdditions = {
     analyticsTitle: "Analytics",
     cashRemitted: "Cash collected",
     cashRemittedHint: "Collected by riders",
-    completionRate: "Completed",
-    completedCountHint: "{{rate}} of today's orders",
+    /**
+     * Named here rather than reusing `variance.cashExpected`.
+     *
+     * That key reads "Expected in hand" - a cash-float word for the reconciliation screen, where the reader is
+     * looking at a settlement. Beside "Cash collected" in a summary band it read as an instruction rather than a
+     * figure, so the dashboard states it plainly.
+     */
+    cashExpected: "Cash expected",
+    /**
+     * Counts, not a rate.
+     *
+     * `0 of 1` is a fact an operator can act on; `0.0%` beside a hint repeating `0.0%` reads as two
+     * figures that disagree. Interpolation is pluralised by i18next, so this is one key for both numbers.
+     */
+    completedOfPlaced: "Completed of placed",
+    completedOfPlacedValue: "{{delivered}} of {{placed}}",
     onTimeRate: "On time",
     cancellationRate: "Cancelled",
     etaAverage: "Arrival error",
@@ -93,6 +109,34 @@ export const enAdditions = {
     ridersVerifiedHint: "{{count}} verified and online now",
     vendorsCount: "{{count}} merchants",
     dueBy: "Due {{time}}",
+
+    /**
+     * The focal order's sub-states, oldest-wait-first wording.
+     *
+     * A dedicated `status` object rather than reusing `orderStatus.*`: those label a *stored* status, while
+     * these describe how urgent the row is. "Delivering, on time" and "Delivering, 12 min late" are the same
+     * stored status and very different rows, so the urgency is a separate axis and gets its own words.
+     */
+    onTime: "On time",
+    dueSoon: "Due soon",
+    overdue: "Overdue",
+    awaitingPickup: "Waiting for the rider",
+    /** The count beside the heading, e.g. "Active orders · 3". */
+    openOrdersCount: "{{count}} open",
+
+    merchantsTitle: "Merchants",
+    ridersTitle: "Riders",
+
+    /**
+     * Riders verified, as a fraction of those online.
+     *
+     * A bare count implied every rider was verified, or that this was the total; `2 of 3` is neither. The
+     * `online` interpolation is what makes the row answerable at a glance, which is the whole question a
+     * dispatch screen asks.
+     */
+    ridersVerifiedValue: "{{verified}} of {{online}} online",
+    /** Analytics, stated as a deliberate choice rather than a hidden drawer. */
+    analyticsHint: "Product telemetry · not part of live operations",
   },
 } as const;
 
@@ -103,8 +147,8 @@ export const arAdditions = {
   },
   attention: {
     title: "يحتاج إلى انتباه",
-    clearTitle: "لا شيء يحتاج إلى انتباه",
-    clearBody: "لا توجد طلبات متأخرة ولا تجّار لم يقبلوا، والكاش متساوٍ.",
+    clearTitle: "لا شيء يحتاج انتباهًا",
+    clearBody: "لا طلبات متأخرة، ولا طلبات لم تُقبَل، ولا كاش غير متوازن.",
     varianceTitle: "الكاش غير متوازن",
     varianceDetail: "{{amount}} {{currency}} غير مفسّرة في {{date}}. افتح التسوية لتسجيل السبب.",
     lateOrder: "الطلب {{number}} متأخر",
@@ -139,8 +183,10 @@ export const arAdditions = {
     analyticsTitle: "التحليلات",
     cashRemitted: "الكاش المحصّل",
     cashRemittedHint: "حصّله السائقون",
+    cashExpected: "الكاش المتوقع",
     completionRate: "مكتملة",
-    completedCountHint: "{{rate}} من طلبات اليوم",
+    completedOfPlaced: "مكتملة من المُستلَمة",
+    completedOfPlacedValue: "{{delivered}} من {{placed}}",
     onTimeRate: "في الموعد",
     cancellationRate: "ملغاة",
     etaAverage: "فارق الوصول",
@@ -150,5 +196,17 @@ export const arAdditions = {
     ridersVerifiedHint: "{{count}} موثّق ومتاح الآن",
     vendorsCount: "{{count}} تجار",
     dueBy: "الموعد {{time}}",
+
+    onTime: "في الموعد",
+    dueSoon: "الموعد قريب",
+    overdue: "متأخر",
+    awaitingPickup: "بانتظار السائق",
+    openOrdersCount: "{{count}} مفتوح",
+
+    merchantsTitle: "التجار",
+    ridersTitle: "السائقون",
+
+    ridersVerifiedValue: "{{verified}} من {{online}} متاح",
+    analyticsHint: "بيانات المنتج · ليست جزءًا من التشغيل الحي",
   },
 } as const;

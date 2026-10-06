@@ -14,6 +14,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { Link } from "react-router-dom";
 import type { ReactElement, ReactNode } from "react";
 
 import { Money } from "../../components/Money.js";
@@ -98,64 +99,269 @@ export function AllClear(): ReactElement {
 }
 
 /**
- * The live board.
+ * How urgent a live order is.
  *
- * Ordered oldest-arrival-first, which is the opposite of the usual "newest at the top" default and the only
- * order that matches the job: the row at the top is the one that has been waiting longest.
+ * A separate axis from the stored status: "Delivering, 12 min late" and "Delivering, on time" are the same
+ * status and very different rows, so the stored status alone cannot drive the visual weight. Three levels
+ * rather than more, because every additional level is one more thing an operator has to learn.
+ */
+export type OrderUrgency = "overdue" | "soon" | "ontime";
+
+/**
+ * An order due within this many minutes reads as "soon" rather than merely "not yet late".
+ *
+ * Exported so the boundary itself can be asserted in tests. A threshold that decides whether an order gets an
+ * alarm edge is a business rule, and a rule whose exact edge cannot be tested is a rule that will be moved by
+ * accident.
+ */
+export const SOON_WINDOW_MS = 15 * 60_000;
+
+/**
+ * Classify urgency from the promise.
+ *
+ * `picked_up` with no promise cannot be late - nobody has been given a time yet - so it is "soon" rather than
+ * a false reassurance. That state is called out separately by `awaitingPickup`.
+ */
+export function orderUrgency(
+  order: Pick<LiveOrder, "status" | "promised_delivery_at">,
+  now: number,
+): OrderUrgency {
+  const promised = order.promised_delivery_at;
+  if (promised === null) {
+    return "soon";
+  }
+  const due = Date.parse(promised);
+  if (due < now) {
+    return "overdue";
+  }
+  return due - now <= SOON_WINDOW_MS ? "soon" : "ontime";
+}
+
+/**
+ * The live board, with the row that needs the operator most promoted.
+ *
+ * The oldest-waiting order is rendered as a **focus card** - larger type, its own status, a clear action - and
+ * the rest follow as compact rows beneath it. Every live order was already equally weighted in the previous
+ * version, so an order about to breach its promise looked identical to one with an hour to run.
+ *
+ * Whole-row clickable via `react-router`'s `Link` rather than a small button: the row is the target, and a 32px
+ * affordance in a 64px row is a miss on a tablet. Keyboard and screen-reader behaviour come free from `Link`,
+ * which a click handler on a `div` would not.
  */
 export function OrderQueue({ orders }: { readonly orders: readonly LiveOrder[] }): ReactElement {
   const { t } = useTranslation();
   const intl = intlTagFor(useLocale());
   const now = Date.now();
-
   const time = new Intl.DateTimeFormat(intl, { hour: "2-digit", minute: "2-digit" });
 
-  return (
-    <ul className="queue">
-      {orders.map((order) => {
-        const promised = order.promised_delivery_at;
-        const late = promised !== null && Date.parse(promised) < now;
+  // `orders` arrives oldest-first from the query, so the first row is the longest wait.
+  const [focus, ...rest] = orders;
 
-        return (
-          <li key={order.id} className="queue__row">
-            <span className="queue__number">{order.order_number}</span>
-            <StatusTag label={t(`orderStatus.${order.status}`)} tone={orderTone(order.status)} />
-            <span className="queue__meta">
-              {t("dashboard.vendorsCount", { count: order.vendor_count })}
-              {order.payment_method === "cash" ? ` · ${t("orderStatus.cash")}` : ""}
-            </span>
-            <span className={`queue__eta${late ? " queue__eta--late" : ""}`}>
-              {promised === null ? "—" : t("dashboard.dueBy", { time: time.format(new Date(promised)) })}
-              {late ? ` · ${t("attention.lateBy", { minutes: lateMinutes(promised, now) })}` : ""}
-            </span>
-            <span className="queue__amount">
-              <Money amount={order.total} currency={order.currency} />
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+  if (focus === undefined) {
+    return <p className="section__empty">{t("dashboard.activeEmpty")}</p>;
+  }
+
+  return (
+    <div className="board">
+      <FocusOrder order={focus} time={time} now={now} />
+
+      {rest.length === 0 ? null : (
+        <ul className="queue">
+          {rest.map((order) => {
+            const urgency = orderUrgency(order, now);
+            return (
+              <li key={order.id} className={`queue__row queue__row--${urgency}`}>
+                <Link className="queue__link" to={`/orders/${order.id}`}>
+                  <span className="queue__number">{order.order_number}</span>
+                  <StatusTag label={t(`orderStatus.${order.status}`)} tone={orderTone(order.status)} />
+                  <span className="queue__meta">{orderMeta(order, t)}</span>
+                  <span className="queue__eta">{dueLabel(order, t, time, now)}</span>
+                  <span className="queue__amount">
+                    <Money amount={order.total} currency={order.currency} />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
-/** A section: a heading with an optional count, then content. No border, no fill - see `global.css`. */
+/**
+ * The single most urgent live order, given room to breathe.
+ *
+ * The only place on the screen with a large figure and a visible action, which is what makes it the focal
+ * point without needing a colour or a shadow to announce itself.
+ */
+function FocusOrder({
+  order,
+  time,
+  now,
+}: {
+  readonly order: LiveOrder;
+  readonly time: Intl.DateTimeFormat;
+  readonly now: number;
+}): ReactElement {
+  const { t } = useTranslation();
+  const urgency = orderUrgency(order, now);
+
+  return (
+    <Link className={`focus focus--${urgency}`} to={`/orders/${order.id}`}>
+      <div className="focus__head">
+        <span className="focus__number">{order.order_number}</span>
+        <StatusTag label={t(`orderStatus.${order.status}`)} tone={orderTone(order.status)} />
+        <span className={`focus__urgency focus__urgency--${urgency}`}>{urgencyLabel(order, urgency, t)}</span>
+      </div>
+
+      <div className="focus__body">
+        {/*
+          The promise is the largest text on the row because it is the deadline the customer was given, and
+          it is the number an operator is actually working against.
+        */}
+        <span className="focus__promise">{dueLabel(order, t, time, now)}</span>
+        <span className="focus__meta">{orderMeta(order, t)}</span>
+      </div>
+
+      <span className="focus__amount">
+        <Money amount={order.total} currency={order.currency} />
+      </span>
+    </Link>
+  );
+}
+
+function orderMeta(order: LiveOrder, t: Translate): string {
+  const vendors = t("dashboard.vendorsCount", { count: order.vendor_count });
+  return order.payment_method === "cash" ? `${vendors} · ${t("orderStatus.cash")}` : vendors;
+}
+
+function dueLabel(
+  order: Pick<LiveOrder, "promised_delivery_at">,
+  t: Translate,
+  time: Intl.DateTimeFormat,
+  now: number,
+): string {
+  const promised = order.promised_delivery_at;
+  if (promised === null) {
+    return "—";
+  }
+  // Compared as timestamps, not as formatted strings. `"10:30" < "09:00"` is false even when 10:30 is later,
+  // because the strings sort lexically - which is the same class of bug as comparing money as strings.
+  const dueAt = Date.parse(promised);
+  return dueAt < now
+    ? t("attention.lateBy", { minutes: lateMinutes(promised, now) })
+    : t("dashboard.dueBy", { time: time.format(new Date(dueAt)) });
+}
+
+/**
+ * The urgency word, not a colour.
+ *
+ * `awaitingPickup` wins over `soon`: an order sitting in `picked_up` with no promise is a stalled handover
+ * rather than a merely-upcoming delivery, and calling that "due soon" would hide the problem.
+ */
+function urgencyLabel(order: LiveOrder, urgency: OrderUrgency, t: Translate): string {
+  if (order.status === "picked_up" && order.promised_delivery_at === null) {
+    return t("dashboard.awaitingPickup");
+  }
+  switch (urgency) {
+    case "overdue":
+      return t("dashboard.overdue");
+    case "soon":
+      return t("dashboard.dueSoon");
+    case "ontime":
+      return t("dashboard.onTime");
+  }
+}
+
+/**
+ * A section: a heading with an optional count, then content.
+ *
+ * The heading carries a `meta` slot for a subordinate phrase. Sections previously blended into one another
+ * because every heading was identical uppercase grey text - the reader had nothing to anchor on. A short
+ * right-hand note ("product telemetry, not live operations") tells the reader why a section is quieter than
+ * its neighbours, which is information the whitespace alone cannot carry.
+ */
 export function Section({
   title,
   count,
+  meta,
   children,
 }: {
   readonly title: string;
   readonly count?: number;
+  readonly meta?: string | undefined;
   readonly children: ReactNode;
 }): ReactElement {
   return (
     <section className="section">
-      <h2 className="section__heading">
-        {title}
-        {count === undefined ? null : <span className="section__count">{count}</span>}
-      </h2>
+      <div className="section__head">
+        <h2 className="section__heading">
+          {title}
+          {count === undefined ? null : <span className="section__count">{count}</span>}
+        </h2>
+        {meta === undefined ? null : <span className="section__meta">{meta}</span>}
+      </div>
       {children}
     </section>
+  );
+}
+
+/**
+ * One figure in the Today band.
+ *
+ * `emphasis` marks the figure an operator reads first - the open count, the number that says whether anyone
+ * needs watching. It is a weight and a size change, not a colour: this band sits directly under the work
+ * queues, and tinting figures here would compete with the attention block for the same visual channel.
+ */
+export function Stat({
+  label,
+  value,
+  emphasis,
+  tone = "default",
+}: {
+  readonly label: string;
+  readonly value: ReactNode;
+  readonly emphasis?: boolean | undefined;
+  readonly tone?: "default" | "muted";
+}): ReactElement {
+  const classes = ["stat", emphasis === true ? "stat--emphasis" : "", tone === "muted" ? "stat--muted" : ""]
+    .filter((c) => c !== "")
+    .join(" ");
+
+  return (
+    <div className={classes}>
+      <span className="stat__label">{label}</span>
+      <span className="stat__value">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * A labelled group of measures - one side of the marketplace.
+ *
+ * Splitting merchants from riders is not cosmetic. In one flat list of six figures, a merchant count and a
+ * rider count looked like neighbours, and the reader had to already know which was which.
+ */
+export function CapacityGroup({
+  title,
+  action,
+  children,
+}: {
+  readonly title: string;
+  readonly action: { readonly label: string; readonly href: string };
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <div className="group">
+      <div className="group__head">
+        <h3 className="group__title">{title}</h3>
+        <Link className="group__action" to={action.href}>
+          {action.label}
+        </Link>
+      </div>
+      <dl className="measure-list">{children}</dl>
+    </div>
   );
 }
 
@@ -165,25 +371,6 @@ export function Section({
  * A cell in a row, not a card. A row of six reads as a summary line; six cards read as six widgets competing
  * for attention, which is the failure this redesign exists to remove.
  */
-export function Figure({
-  label,
-  value,
-  hint,
-}: {
-  readonly label: string;
-  readonly value: ReactNode;
-  /** `| undefined` for the same reason as `Measure`: see the note there. */
-  readonly hint?: string | undefined;
-}): ReactElement {
-  return (
-    <div className="figure">
-      <span className="figure__label">{label}</span>
-      <span className="figure__value">{value}</span>
-      {hint === undefined ? null : <span className="figure__hint">{hint}</span>}
-    </div>
-  );
-}
-
 /**
  * A rate, its value, and what the number means.
  *
@@ -194,15 +381,28 @@ export function Measure({
   label,
   value,
   hint,
+  tone = "default",
+  emphasis,
 }: {
   readonly label: string;
   readonly value: ReactNode;
   /** Spelled `| undefined` rather than `?:` because `exactOptionalPropertyTypes` is on: with `?`, passing an
    * explicit `undefined` is a type error, and every caller here computes the hint conditionally. */
   readonly hint?: string | undefined;
+  /** `warning` is reserved for a count that is a problem in itself - merchants awaiting approval. */
+  readonly tone?: "default" | "warning";
+  readonly emphasis?: boolean | undefined;
 }): ReactElement {
+  const classes = [
+    "measure",
+    tone === "warning" ? "measure--warning" : "",
+    emphasis === true ? "measure--emphasis" : "",
+  ]
+    .filter((c) => c !== "")
+    .join(" ");
+
   return (
-    <div className="measure">
+    <div className={classes}>
       <dt className="measure__label">{label}</dt>
       <dd className="measure__value">
         {value}

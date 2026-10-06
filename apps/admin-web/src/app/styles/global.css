@@ -175,13 +175,27 @@
  *
  * A section is a heading, a rule, and content. No border, no fill, no shadow: the earlier design put every
  * group of metrics in a bordered card, which gave the page four competing boxes and made a routine screen
- * look like a stack of widgets. Rules and whitespace are enough to separate, and they cost no paint.
+ * look like a stack of widgets.
+ *
+ * The **rule under the heading** is what stops sections blending into one another. Uppercase grey headings on
+ * their own were too quiet to separate five consecutive sections - the eye slid from one to the next with
+ * nothing to anchor on. A full-width hairline gives each section an edge to end at, which is separation
+ * carried by the layout rather than by five near-identical headings.
  */
 
 .section {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-border-subtle);
 }
 
 .section__heading,
@@ -195,6 +209,14 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* The right-hand note on a heading. Carries the *reason* a section is quieter than its neighbours, which
+   whitespace alone cannot express. */
+.section__meta {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 /* A count beside a heading, so an operator reads "3" without counting rows. */
@@ -351,11 +373,121 @@
   font-size: 13px;
 }
 
-/* --- order queue ---
+/* --- the board: focus order, then queue ---
  *
- * A grid, not a stack of cards. Each row is one order and its attributes line up in columns across rows, which
- * is the thing cards cannot do - with cards, comparing two orders means reading two separate boxes.
+ * The focus card is the screen's single point of emphasis. It gets its weight from **size and space** - a
+ * larger promise, more padding, a generous type scale - rather than from a colour or a shadow. That matters:
+ * the attention block above already owns red, so if the focus order were tinted too there would be two things
+ * competing for the same signal, and the louder one would win even when it mattered less.
+ *
+ * `.board` exists so the focus card and the queue beneath it share one vertical rhythm, and so the queue's
+ * top border does not double up against the focus card's bottom edge.
  */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.focus {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-inline-start: 3px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--motion-fast);
+}
+
+.focus:hover {
+  border-color: var(--color-border-strong);
+}
+
+.focus:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * Urgency as a left edge, not a fill.
+ *
+ * A 3px edge is visible while scanning without tinting the whole card, so the row stays readable and the
+ * attention block above keeps sole ownership of "this is wrong". Overdue is the only level that gets the
+ * danger colour; "soon" is a weight change alone.
+ */
+.focus--overdue {
+  border-inline-start-color: var(--color-status-danger);
+}
+
+.focus--soon {
+  border-inline-start-color: var(--color-status-warning);
+}
+
+.focus__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.focus__number {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus__urgency {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.focus__urgency--overdue {
+  background: var(--color-wash-danger);
+  color: var(--color-status-danger);
+}
+
+.focus__urgency--soon {
+  background: var(--color-wash-warning);
+  color: var(--color-status-warning);
+}
+
+.focus__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* The largest text on the row: the deadline the customer was given. */
+.focus__promise {
+  color: var(--color-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 28px;
+}
+
+.focus__meta {
+  color: var(--color-text-subtle);
+  font-size: 13px;
+}
+
+.focus__amount {
+  grid-row: 1 / -1;
+  align-self: center;
+  justify-self: end;
+  font-size: 16px;
+  font-weight: 600;
+}
 
 .queue {
   display: flex;
@@ -367,13 +499,39 @@
 }
 
 .queue__row {
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+
+/*
+ * The whole row is the link.
+ *
+ * A `Link` filling the row, rather than a click handler on a `div`: keyboard focus, activation and the
+ * context menu all come from the anchor, none of which a div with an onClick provides. The row is also a
+ * comfortable target on a tablet, which a 32px affordance inside a 56px row is not.
+ */
+.queue__link {
   display: grid;
   grid-template-columns: minmax(6rem, 9rem) 9rem minmax(6rem, 1fr) minmax(9rem, auto) auto;
   align-items: center;
   gap: var(--space-4);
   padding-block: var(--space-3);
-  border-block-end: 1px solid var(--color-border-subtle);
+  color: inherit;
   font-size: 14px;
+  text-decoration: none;
+}
+
+.queue__link:hover {
+  background: var(--color-surface-hover);
+}
+
+.queue__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* An overdue row is marked with a short edge, matching the focus card's language at lower weight. */
+.queue__row--overdue {
+  box-shadow: inset 3px 0 0 0 var(--color-status-danger);
 }
 
 .queue__number {
@@ -393,9 +551,7 @@
   white-space: nowrap;
 }
 
-/* The one place on the board where colour carries meaning without a word beside it, because the row's status
-   tag already states the state - this only makes the breach visible while scrolling. */
-.queue__eta--late {
+.queue__row--overdue .queue__eta {
   color: var(--color-status-danger);
   font-weight: 600;
 }
@@ -407,37 +563,124 @@
 /* --- figures and measures --- */
 
 /*
- * `.figure-row`
+ * `.stat-band`
  *
- * One dense row of figures. Six at 1/6 width each reads as a summary line rather than six widgets, which is
- * what today's totals are: context for the queues above, not a thing to be studied.
+ * The day's order counts, as one horizontal band with a rule above and below rather than four cards.
+ *
+ * Four adjacent figures *are* a table - the reader's eye moves left to right comparing them - so the layout
+ * says so. Cards would put a border and a fill around each figure, which both wastes the space that makes
+ * comparison possible and hands four things equal prominence when one of them is the one that matters.
+ *
+ * `.stat--emphasis` is the open count: it is the figure that says whether anyone needs watching, and it is
+ * larger. Weight and size, no colour - this band sits directly under the work queues and must not start
+ * competing with the attention block for the same visual channel.
  */
-.figure-row {
+.stat-band {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   gap: var(--space-4);
-  padding-block: var(--space-3);
+  padding-block: var(--space-4);
   border-block: 1px solid var(--color-border-subtle);
 }
 
-.figure {
+.stat {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   min-inline-size: 0;
 }
 
-.figure__label {
+.stat__label {
   color: var(--color-text-subtle);
   font-size: 12px;
+  line-height: 18px;
 }
 
-.figure__value {
+.stat__value {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 28px;
+  line-height: 32px;
+}
+
+.stat--emphasis .stat__value {
+  font-size: 32px;
+  line-height: 40px;
+}
+
+.stat--emphasis .stat__label {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+/* A cancelled count is worth seeing but is not a problem in itself - most cancellations are normal. */
+.stat--muted .stat__value {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/*
+ * Two measure lists with a money sub-block, separated by whitespace and a rule so the money figures do not
+ * read as more operational rates. Rates are percentages of orders; the money block is piastres. Keeping them
+ * in one list made a cash figure look like a rate.
+ */
+.measure-list--split {
+  padding-block-start: var(--space-2);
+}
+
+/*
+ * `.pair`
+ *
+ * Merchants beside riders, each with its own sub-heading and a link to its screen. One flat list of six made
+ * a merchant count and a rider count look like neighbours, so the reader had to already know which was which.
+ */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-6);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block-end: var(--space-1);
+}
+
+.group__title {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.group__action {
+  color: var(--color-text-link);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.group__action:hover,
+.group__action:focus-visible {
+  text-decoration: underline;
+}
+
+/* The one measure allowed a warning tone: merchants awaiting approval is a queue someone must work. */
+.measure--warning .measure__value {
+  color: var(--color-status-warning);
+}
+
+.measure--emphasis .measure__value {
+  font-size: 16px;
 }
 
 /*
@@ -486,22 +729,65 @@
 
 /* --- analytics ---
  *
- * Collapsed by default. Signups and search behaviour are product telemetry: useful, but nothing an admin must
- * act on during service, and putting them above the queue is how a console gets ignored.
+ * Collapsed, and visibly a choice.
+ *
+ * A bare collapsed `<details>` reads as unfinished work. This carries a full-width top rule, the title, and a
+ * plain-language note saying these are product telemetry rather than live operations - so the reader knows the
+ * section was demoted deliberately and is not looking at something the developer forgot to build.
+ *
+ * The native marker is replaced with a chevron that rotates on `open`. Left as the platform's triangle it sits
+ * next to a two-line summary and reads as a dropdown menu rather than a disclosure.
  */
 
 .analytics {
-  border-block-start: 1px solid var(--color-border-subtle);
+  margin-block-start: var(--space-2);
   padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-border-subtle);
 }
 
 .analytics__summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
   cursor: pointer;
+  list-style: none;
+}
+
+.analytics__summary::-webkit-details-marker {
+  display: none;
+}
+
+.analytics__title {
   color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.analytics__hint {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+}
+
+/* The chevron is a CSS triangle rather than an icon font or an SVG component: it costs nothing, needs no
+   colour token of its own, and rotates with a transform. */
+.analytics__title::before {
+  content: "";
+  display: inline-block;
+  margin-inline-end: var(--space-2);
+  border-block: 4px solid transparent;
+  border-inline-start: 6px solid currentcolor;
+  transform: translateY(1px);
+  transition: transform var(--motion-fast);
+}
+
+.analytics[open] .analytics__title::before {
+  transform: rotate(90deg) translateX(1px);
+}
+
+.analytics .measure-list {
+  margin-block-start: var(--space-2);
 }
 
 /* A small note beside a heading - "in Africa/Cairo", "of 3 shops". */
@@ -513,7 +799,7 @@
 @media (max-width: 768px) {
   /* The queue's five columns cannot fit a phone, and a squeezed five-column row is unreadable rather than
      compact. Each attribute drops to its own line instead. */
-  .queue__row {
+  .queue__link {
     grid-template-columns: 1fr auto;
     row-gap: var(--space-2);
   }
@@ -521,6 +807,17 @@
   .queue__meta,
   .queue__eta {
     grid-column: 1 / -1;
+  }
+
+  /* The focus card's amount sits beside the promise on a wide screen and below it here, so the deadline -
+     the largest text on the row - keeps the full width instead of sharing a line with an amount. */
+  .focus {
+    grid-template-columns: 1fr;
+  }
+
+  .focus__amount {
+    grid-row: auto;
+    justify-self: start;
   }
 }
 

@@ -42,7 +42,6 @@ import type { ReactElement } from "react";
 import { Money } from "../../components/Money.js";
 import { PageSkeleton } from "../../components/PageSkeleton.js";
 import { EmptyState, ErrorState } from "../../components/StateBlock.js";
-import { StatusTag } from "../../components/StatusTag.js";
 import { formatRateBps } from "@marketak/shared";
 import { cityDate } from "../../lib/city-date.js";
 import { intlTagFor } from "../../i18n/index.js";
@@ -54,11 +53,13 @@ import { getOperationsSnapshot, type OperationsSnapshot } from "../../lib/querie
 import {
   AllClear,
   AttentionSection,
-  Figure,
+  CapacityGroup,
   Measure,
   OrderQueue,
   Section,
-  buildAttention,  type Translate,
+  Stat,
+  buildAttention,
+  type Translate,
 } from "../operations/OperationsSections.js";
 
 export default function DashboardPage(): ReactElement {
@@ -137,7 +138,6 @@ export default function DashboardPage(): ReactElement {
       maximumFractionDigits: 2,
     }).format(amount / 100);
 
-  const completion = formatRateBps(orders.completion_rate_bps, intl);
   const onTime = formatRateBps(eta_accuracy.on_time_rate_bps, intl);
   const cancelled = formatRateBps(cancellation.order_rate_bps, intl);
 
@@ -178,42 +178,49 @@ export default function DashboardPage(): ReactElement {
 
       {attention.length > 0 ? <AttentionSection entries={attention} /> : <AllClear />}
 
-      <Section title={t("dashboard.activeTitle")} count={liveOrders.length}>
-        {liveOrders.length === 0 ? (
-          <p className="section__empty">{t("dashboard.activeEmpty")}</p>
-        ) : (
-          <OrderQueue orders={liveOrders} />
-        )}
+      {/*
+        The board. `Section` states the open count as a phrase rather than a bare number, so the heading reads
+        "Active orders · 3 open" instead of a numeral that could be mistaken for a percentage or a rank.
+      */}
+      <Section
+        title={t("dashboard.activeTitle")}
+        count={liveOrders.length}
+        meta={liveOrders.length === 0 ? undefined : t("dashboard.openOrdersCount", { count: liveOrders.length })}
+      >
+        <OrderQueue orders={liveOrders} />
       </Section>
 
+      {/*
+        Today, as one scannable band rather than a grid of cards.
+
+        The count and its rate are the *same fact* at two scales, so they belong adjacent and share one
+        visual unit - four order counts in a row, then the derived rates underneath. The earlier version put
+        `Completed 0.0%` beside a hint reading `0.0% of today's orders`, which printed the number twice and
+        made a completion rate look like two separate metrics.
+      */}
       <Section title={t("dashboard.todayTitle")}>
-        <div className="figure-row">
-          <Figure label={t("dashboard.ordersPlaced")} value={orders.placed} />
-          <Figure label={t("dashboard.ordersDelivered")} value={orders.delivered} />
-          <Figure label={t("dashboard.ordersCancelled")} value={orders.cancelled} />
-          <Figure label={t("dashboard.ordersOpen")} value={orders.open} />
-          {/*
-            Platform revenue is deliberately absent: `get_admin_metrics_v1` returns cash expected, cash
-            remitted, the variance and rider tips, but no revenue figure. Showing cash remitted here would
-            label a rider-collected amount as revenue, which is the one confusion this screen must not create -
-            constitution I.10 keeps platform money distinct from the cash float.
-          */}
-          <Figure
-            label={t("dashboard.cashRemitted")}
-            value={<Money amount={revenue.cash_remitted} currency={revenue.currency} />}
-            hint={t("dashboard.cashRemittedHint")}
+        <div className="stat-band">
+          <Stat label={t("dashboard.ordersPlaced")} value={orders.placed} />
+          <Stat label={t("dashboard.ordersDelivered")} value={orders.delivered} />
+          <Stat
+            label={t("dashboard.ordersCancelled")}
+            value={orders.cancelled}
+            tone={orders.cancelled > 0 ? "muted" : "default"}
           />
-          <Figure
-            label={t("dashboard.riderTips")}
-            value={<Money amount={revenue.rider_tips} currency={revenue.currency} />}
-          />
+          <Stat label={t("dashboard.ordersOpen")} value={orders.open} emphasis />
         </div>
 
         <dl className="measure-list">
+          {/*
+            Completion is stated as counts, not as a rate beside its own percentage. `0 of 1` is
+            unambiguous where `0.0%` next to `0.0% of today's orders` reads as two disagreeing figures.
+          */}
           <Measure
-            label={t("dashboard.completionRate")}
-            value={completion ?? "—"}
-            hint={completion === null ? undefined : t("dashboard.completedCountHint", { rate: completion })}
+            label={t("dashboard.completedOfPlaced")}
+            value={t("dashboard.completedOfPlacedValue", {
+              delivered: orders.delivered,
+              placed: orders.placed,
+            })}
           />
           <Measure label={t("dashboard.onTimeRate")} value={onTime ?? "—"} />
           <Measure label={t("dashboard.cancellationRate")} value={cancelled ?? "—"} />
@@ -223,29 +230,81 @@ export default function DashboardPage(): ReactElement {
             hint={t("dashboard.etaAverageHint")}
           />
         </dl>
-      </Section>
 
-      <Section title={t("dashboard.capacityTitle")}>
-        <dl className="measure-list">
-          <Measure label={t("dashboard.vendorsActive")} value={vendors.active_approved} />
-          <Measure label={t("dashboard.vendorsOpen")} value={vendors.open_now} />
-          <Measure label={t("dashboard.vendorsPaused")} value={vendors.paused} />
-          <Measure label={t("dashboard.ridersActive")} value={riders.active} />
-          <Measure label={t("dashboard.ridersOnline")} value={riders.online_now} />
+        <dl className="measure-list measure-list--split">
           <Measure
-            label={t("dashboard.ridersVerified")}
-            value={<StatusTag label={t("status.verified")} tone="success" />}
-            hint={t("dashboard.ridersVerifiedHint", { count: riders.verified_online })}
+            label={t("dashboard.cashRemitted")}
+            value={<Money amount={revenue.cash_remitted} currency={revenue.currency} />}
+            hint={t("dashboard.cashRemittedHint")}
+          />
+          <Measure
+            label={t("dashboard.riderTips")}
+            value={<Money amount={revenue.rider_tips} currency={revenue.currency} />}
+          />
+          <Measure
+            label={t("dashboard.cashExpected")}
+            value={<Money amount={revenue.cash_expected} currency={revenue.currency} />}
           />
         </dl>
       </Section>
 
       {/*
-        Analytics last, collapsed. Signups and search behaviour are product telemetry: interesting, but nothing
-        an admin must act on during service, and putting them above the queue is how a console gets ignored.
+        Merchants and riders, split into two labelled groups rather than one flat list of six.
+
+        The flat version read as a single column of unrelated numbers, and mixing a merchant count with a
+        rider count in one alphabetical-looking run made it impossible to tell which side of the marketplace
+        a figure belonged to. Two groups with their own sub-headings say it without an icon.
+      */}
+      <Section title={t("dashboard.capacityTitle")}>
+        <div className="pair">
+          <CapacityGroup
+            title={t("dashboard.merchantsTitle")}
+            action={{ label: t("nav.merchants"), href: "/merchants" }}
+          >
+            <Measure label={t("dashboard.vendorsActive")} value={vendors.active_approved} />
+            <Measure label={t("dashboard.vendorsOpen")} value={vendors.open_now} />
+            <Measure label={t("dashboard.vendorsPaused")} value={vendors.paused} />
+            <Measure
+              label={t("dashboard.vendorsPending")}
+              value={vendors.pending_approval}
+              tone={vendors.pending_approval > 0 ? "warning" : "default"}
+            />
+          </CapacityGroup>
+
+          <CapacityGroup
+            title={t("dashboard.ridersTitle")}
+            action={{ label: t("nav.riders"), href: "/riders" }}
+          >
+            <Measure label={t("dashboard.ridersOnline")} value={riders.online_now} emphasis />
+            <Measure label={t("dashboard.ridersActive")} value={riders.active} />
+            {/*
+              Verified riders are stated as `2 of 3 online`. The earlier phrasing - a "Verified" pill beside
+              the hint "1 verified and online now" - made a count look like a status, and the sentence
+              described the same fact the number already showed.
+            */}
+            <Measure
+              label={t("dashboard.ridersVerified")}
+              value={t("dashboard.ridersVerifiedValue", {
+                verified: riders.verified_online,
+                online: riders.online_now,
+              })}
+            />
+          </CapacityGroup>
+        </div>
+      </Section>
+
+      {/*
+        Analytics, last and collapsed.
+
+        The `hint` is what makes it read as deliberate rather than unfinished: a bare collapsed `<details>`
+        looks like something the developer forgot to finish. Saying these are product telemetry and not live
+        operations tells the operator the section was demoted on purpose and there is nothing missing from it.
       */}
       <details className="analytics">
-        <summary className="analytics__summary">{t("dashboard.analyticsTitle")}</summary>
+        <summary className="analytics__summary">
+          <span className="analytics__title">{t("dashboard.analyticsTitle")}</span>
+          <span className="analytics__hint">{t("dashboard.analyticsHint")}</span>
+        </summary>
         <dl className="measure-list">
           <Measure label={t("dashboard.signups")} value={funnel.signups} />
           <Measure label={t("dashboard.logins")} value={funnel.logins} />

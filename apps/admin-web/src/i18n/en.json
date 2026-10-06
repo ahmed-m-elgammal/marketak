@@ -167,7 +167,19 @@
     "cashRemittedHint": "Collected by riders",
     "completedCountHint": "{{rate}} of today's orders",
     "ridersVerified": "Verified riders",
-    "ridersVerifiedHint": "{{count}} verified and online now"
+    "ridersVerifiedHint": "{{count}} verified and online now",
+    "completedOfPlaced": "Completed of placed",
+    "completedOfPlacedValue": "{{delivered}} of {{placed}}",
+    "onTime": "On time",
+    "dueSoon": "Due soon",
+    "overdue": "Overdue",
+    "awaitingPickup": "Waiting for the rider",
+    "openOrdersCount": "{{count}} open",
+    "merchantsTitle": "Merchants",
+    "ridersTitle": "Riders",
+    "ridersVerifiedValue": "{{verified}} of {{online}} online",
+    "analyticsHint": "Product telemetry · not part of live operations",
+    "cashExpected": "Cash expected"
   },
   "variance": {
     "title": "Cash variance",
@@ -402,8 +414,8 @@
   },
   "attention": {
     "title": "Needs attention",
-    "clearTitle": "Nothing needs attention",
-    "clearBody": "No late orders, no unaccepted merchants, and cash accounts for.",
+    "clearTitle": "All clear",
+    "clearBody": "No late orders, no unaccepted orders, no unreconciled cash.",
     "varianceTitle": "Cash does not reconcile",
     "varianceDetail": "{{amount}} {{currency}} unexplained on {{date}}. Open reconciliation to record why.",
     "lateOrder": "Order {{number}} is late",

@@ -53,7 +53,12 @@ export default function ReconciliationPage(): ReactElement {
 
   const reconciliation = useQuery({
     queryKey: ["reconciliation", date],
-    queryFn: getReconciliation,
+    // `date` is passed explicitly rather than the function being handed to `queryFn` bare. `reconcile_day_v1`
+    // has no default for `p_date` and rejects null with `DATE_REQUIRED`, so a bare `queryFn: getReconciliation`
+    // sends an empty body and comes back DATE_REQUIRED - which is what this screen was doing.
+    queryFn: () => getReconciliation(date),
+    // An empty date is not a valid request; a disabled query is better than one that fires and fails.
+    enabled: date !== "",
   });
 
   const explain = useMutation({

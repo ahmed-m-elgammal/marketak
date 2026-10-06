@@ -3,8 +3,12 @@
  *
  * The statuses come from a `CHECK` constraint in the database, which TypeScript cannot see. That is the whole
  * reason this file exists: without it, adding a status to the query layer and not to the translations produces
- * a card reading the literal text `orderStatus.foo`, and adding one to neither produces an order that renders
+ * a row reading the literal text `orderStatus.foo`, and adding one to neither produces an order that renders
  * as in-flight forever.
+ *
+ * The constraint below was read from `pg_constraint` on the live project. Copying it here is deliberate: a
+ * mirror of the database that is checked by a test is how drift becomes visible, where a comment saying "keep in
+ * sync" is how it goes unnoticed.
  */
 
 import { describe, expect, it } from "vitest";
