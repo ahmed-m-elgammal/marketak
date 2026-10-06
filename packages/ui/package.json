@@ -1,0 +1,28 @@
+{
+  "name": "@marketak/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Design tokens shared by the admin console and the mobile app. Tokens only, no components.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "antd": "^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "antd": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@marketak/shared": "*"
+  },
+  "comments": {
+    "antdIsOptionalPeer": "antd is an OPTIONAL peer. Only theme/antd-theme.ts needs it, and the mobile app loads this package without it - so `import { space } from '@marketak/ui'` must work in a React Native bundle that has no antd installed. A required peer would make the mobile app install a desktop UI kit to read a spacing scale."
+  }
+}

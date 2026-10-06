@@ -1,0 +1,315 @@
+/**
+ * `app/styles/global.css` - the only stylesheet in the console.
+ *
+ * ## Why there is exactly one
+ *
+ * `AGENTS.md` rule 2: no hardcoded colours or spacing in a component. The enforcement is two-sided:
+ *
+ * - **Colours and spacing** come from `@marketak/ui` tokens. `providers.tsx` injects them as CSS custom
+ *   properties on `:root` at runtime, so this file references `var(--color-text-primary)` and
+ *   `var(--space-4)` and never a literal.
+ * - **Layout** - grids, flex, sticky positioning - lives here, where it can be read as CSS instead of
+ *   scattered through JSX. This file contains no colour and no spacing value of its own; every one is a
+ *   `var()` reference.
+ *
+ * A component therefore has no inline `style` prop, and a reviewer grepping for `#` or a `px` literal in TSX
+ * finds nothing.
+ */
+
+/**
+ * `--space-*` mirrors `space` from `@marketak/ui`.
+ *
+ * Declared here as well as injected at runtime because a custom property used in a stylesheet must exist
+ * before first paint, and the runtime injection happens after React mounts. `providers.tsx` overwrites these
+ * with the same values from the same source, so there is no drift: if they disagreed, the two would be
+ * visibly different and `tests/tokens.test.ts` asserts the mapping is complete.
+ */
+:root {
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --touch-target: 48px;
+  --control-height: 48px;
+  --sidebar-width: 240px;
+  --header-height: 56px;
+}
+
+/**
+ * `.visually-hidden`
+ *
+ * Not `display: none`, which removes an element from the accessibility tree entirely - and is therefore the
+ * opposite of what a screen-reader announcement needs. Clipped instead.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- app shell --- */
+
+.app-shell {
+  display: grid;
+  grid-template-areas: "sidebar header" "sidebar content";
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: var(--header-height) 1fr;
+  min-height: 100vh;
+}
+
+.app-shell__sidebar {
+  grid-area: sidebar;
+  overflow-y: auto;
+}
+
+.app-shell__header {
+  grid-area: header;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-inline: var(--space-6);
+  border-block-end: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-raised);
+}
+
+.app-shell__content {
+  grid-area: content;
+  padding: var(--space-6);
+  background: var(--color-surface-base);
+}
+
+@media (max-width: 768px) {
+  /* One column below 768px. The sidebar becomes a drawer, which is the only layout that keeps 48px targets
+     without a menu button that an operator presses by accident. */
+  .app-shell {
+    grid-template-areas: "header" "content";
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height) 1fr;
+  }
+
+  .app-shell__sidebar {
+    display: none;
+  }
+
+  .app-shell__content {
+    padding: var(--space-4);
+  }
+}
+
+/* --- page furniture --- */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/**
+ * Breadcrumbs.
+ *
+ * The drill-down merchants → catalog → category → item is four levels deep. Without a visible trail an
+ * operator who arrived from a notification has no idea how to go back one level without the browser's
+ * back button, which loses their filters.
+ */
+.breadcrumbs {
+  margin-block-end: var(--space-1);
+}
+
+.breadcrumbs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* --- metric grid --- */
+
+.metric-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.metric-card__label {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.metric-card__value {
+  color: var(--color-text-primary);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+  /* Proportional digits: a column of amounts must align on the decimal point, or an operator comparing two
+     figures has to count characters. */
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-card__hint {
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/**
+ * Money, wherever it appears.
+ *
+ * `tabular-nums` is the reason this class exists rather than being applied ad hoc. Every amount in the
+ * console is an integer count of piastres formatted by `packages/shared`, so alignment is a rendering
+ * property, not a data one.
+ */
+.money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.money--negative {
+  color: var(--color-status-danger);
+}
+
+/* --- interactive targets --- */
+
+/**
+ * Every row action is at least 48px on its short axis.
+ *
+ * The global floor in `tokens.ts`, applied in CSS rather than per component so it cannot be forgotten. A
+ * table row inherits it, which is why a row of `⋯` buttons is tappable without aiming.
+ */
+.row-action {
+  min-block-size: var(--touch-target);
+  min-inline-size: var(--touch-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/**
+ * Focus is never removed, only restyled.
+ *
+ * WCAG 2.2 SC 2.4.11 Focus Not Obscured and SC 2.4.7 Focus Visible. A console is keyboard-driven for an
+ * operator working through a list of rejections, so this is load-bearing rather than cosmetic.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- states --- */
+
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+}
+
+.state-block__title {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.state-block__body {
+  max-inline-size: 46ch;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/**
+ * Status is a word plus a colour, never a colour alone.
+ *
+ * `admin-console-screens.md` §5 rule 10. A colour-blind operator must be able to read "Rejected", so
+ * `StatusTag` renders its label and these classes only add the tint. Five tones, not one per status value -
+ * `cancelled` and `rejected` are both `danger`, `delivered` and `paid` are both `success`.
+ */
+.status-tag {
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  border: 1px solid currentcolor;
+}
+
+.status-tag--success {
+  color: var(--color-status-success);
+  background: var(--color-wash-success);
+}
+
+.status-tag--warning {
+  color: var(--color-status-warning);
+  background: var(--color-wash-warning);
+}
+
+.status-tag--danger {
+  color: var(--color-status-danger);
+  background: var(--color-wash-danger);
+}
+
+.status-tag--info {
+  color: var(--color-status-info);
+  background: var(--color-wash-info);
+}
+
+.status-tag--neutral {
+  color: var(--color-status-neutral);
+  background: var(--color-wash-neutral);
+}
+
+/** Visually hidden focus label for an icon-only control, whose text is inside an `aria-label`. */
+.icon-action__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

@@ -27,7 +27,16 @@ export default tseslint.config(
   // off the type-aware RULES; it leaves the project service switched on, which is what produces
   // "was not found by the project service" on a file with no tsconfig.
   {
-    files: ["eslint.config.js", "vitest.config.ts", "scripts/**/*.mjs", "**/*.config.js"],
+    // Build-tool config files. `apps/admin-web/vite.config.ts` is here for the same reason as the others: it
+    // is a Node module that happens to be TypeScript, it belongs to no application tsconfig the project
+    // service could attach to, and the typed rules cannot run without type information it will never get.
+    files: [
+      "eslint.config.js",
+      "vitest.config.ts",
+      "scripts/**/*.mjs",
+      "**/*.config.js",
+      "apps/*/vite.config.ts",
+    ],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       parserOptions: {
@@ -48,7 +57,7 @@ export default tseslint.config(
   {
     // The rules that matter, scoped to source. Scoping matters: without `files`, these would apply to
     // `eslint.config.js` too, and the type-aware ones would re-attach the parser this block exists to avoid.
-    files: ["packages/*/src/**/*.ts", "functions/*/src/**/*.ts"],
+    files: ["packages/*/src/**/*.ts", "functions/*/src/**/*.ts", "apps/*/src/**/*.ts", "apps/*/src/**/*.tsx"],
     languageOptions: {
       // The project service is switched ON here and only here. The typed preset above turns the type-aware
       // rules on for every file, so source needs this to give those rules the type information they call
@@ -85,7 +94,7 @@ export default tseslint.config(
     // Tests are allowed to be less paranoid about `any` in fixtures, but not about
     // behaviour. Never relax `no-explicit-any` here - a fixture with `any` is how a
     // DTO loses a field without a compile error.
-    files: ["**/*.test.ts"],
+    files: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",

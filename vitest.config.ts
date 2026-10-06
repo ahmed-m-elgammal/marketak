@@ -12,8 +12,18 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
-    include: ["packages/*/src/tests/**/*.test.ts", "functions/*/src/tests/**/*.test.ts"],
+    include: [
+      "packages/*/src/tests/**/*.test.ts",
+      "functions/*/src/tests/**/*.test.ts",
+      // The console has two kinds of test. Pure-logic ones - tokens, formatters, the error catalogue, the
+      // route table - run in node exactly like the others. Component tests need a DOM and are added when
+      // A2 brings the first renderable screen with behaviour worth asserting.
+      "apps/*/src/tests/**/*.test.{ts,tsx}",
+    ],
+    // Not "node" globally. The token and error tests need no DOM, but any future component test does, and
+    // a global node environment would fail on `document` rather than on the behaviour under test.
     environment: "node",
+    environmentMatchGlobs: [["apps/*/src/tests/**", "jsdom"]],
     globals: false,
     // A failing test must not be able to be hidden behind a retry.
     retry: 0,

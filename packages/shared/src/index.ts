@@ -34,6 +34,15 @@ export { formatCount, formatMoney, isCurrencyCode, PIASBRES } from "./domain/mon
 export type { CurrencyCode, Piastres } from "./domain/money/format-money.js";
 
 export {
+  formatDateTimeInZone,
+  formatMultiplierBps,
+  formatRateBps,
+  formatRelativeInZone,
+  formatWhen,
+  multiplierFromBps,
+} from "./domain/measure/format-measure.js";
+
+export {
   isSendable,
   placeholdersIn,
   renderTemplate,

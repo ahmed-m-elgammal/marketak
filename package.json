@@ -8,21 +8,25 @@
     "node": ">=22"
   },
   "scripts": {
-    "typecheck": "tsc --build --force",
+    "typecheck": "tsc --build --force && npm run typecheck --workspace @marketak/admin-web",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-"test:integrity": "node scripts/check-test-integrity.mjs",
+    "test:integrity": "node scripts/check-test-integrity.mjs",
     "check:secrets": "node scripts/check-no-secrets.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run test:integrity && npm run check:secrets",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run test:integrity && npm run check:secrets && npm run check:hardcoded-colors",
     "worker:dev": "npm run dev --workspace @marketak/outbox-dispatcher",
-    "worker:deploy": "npm run deploy --workspace @marketak/outbox-dispatcher"
+    "worker:deploy": "npm run deploy --workspace @marketak/outbox-dispatcher",
+    "admin:dev": "npm run dev --workspace @marketak/admin-web",
+    "admin:build": "npm run build --workspace @marketak/admin-web",
+    "check:hardcoded-colors": "node scripts/check-no-hardcoded-colors.mjs"
   },
-"devDependencies": {
+  "devDependencies": {
     "@cloudflare/workers-types": "^5.20261005.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.4",
     "eslint": "^10.12.0",
+    "jsdom": "^29.1.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3",
@@ -30,7 +34,8 @@
   },
   "workspaces": [
     "packages/*",
-    "functions/*"
+    "functions/*",
+    "apps/*"
   ],
   "comments": {
     "typescriptPin": "TypeScript is pinned to ~6.0.3 rather than latest, and the pin is deliberate. TypeScript 7.0.2 is the current latest, but typescript-eslint@8.71.1 declares `peer typescript >=4.8.4 <6.1.0`, so TS7 refuses to install alongside the linter. 6.0.3 is the newest release inside the range the linter supports. Bump both together when typescript-eslint widens its peer range; do not --force past it, because a mismatched parser is how a lint rule silently stops seeing the file."

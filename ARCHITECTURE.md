@@ -22,19 +22,52 @@ There is no other entry point. If you need a fourth, it goes in `package.json` `
 ```
 delivery app/
 ├─ packages/
-│  └─ shared/                          # types, money, rendering. No Cloudflare, no React.
+│  ├─ shared/                          # types, money, measures, rendering. No Cloudflare, no React.
+│  │  └─ src/
+│  │     ├─ domain/                    # facts about the business. Imports nothing upward.
+│  │     │  ├─ money/format-money.ts   # piastres -> a string a human reads
+│  │     │  ├─ measure/                # basis points -> factor/percent, instants in a named zone
+│  │     │  │  └─ format-measure.ts    # shared with the mobile app, so it lives here not in the console
+│  │     │  └─ notifications/
+│  │     │     └─ claim-contract.ts    # what claim_events_v1 returns + the Worker-owned strings
+│  │     ├─ application/
+│  │     │  └─ render-notification.ts  # variables + template -> a sendable message
+│  │     ├─ adapters/                  # reserved for future I/O
+│  │     ├─ tests/                     # EVERY test in this package
+│  │     └─ index.ts                   # the public surface. Import from here, not from a deep path.
+│  │
+│  ├─ ui/                              # TOKENS ONLY. No components, ever.
+│  │  └─ src/
+│  │     ├─ theme/
+│  │     │  ├─ tokens.ts               # spacing, type, radius, motion. No colour in this file.
+│  │     │  ├─ colors.ts               # THE ONLY FILE ALLOWED A HEX LITERAL.
+│  │     │  └─ antd-theme.ts           # maps tokens into antd's ConfigProvider. The only antd import.
+│  │     ├─ tests/tokens.test.ts       # every contrast ratio, asserted against its WCAG floor
+│  │     └─ index.ts
+│  │
+├─ apps/
+│  └─ admin-web/                       # the admin console. Static Cloudflare Pages, reads through RLS.
+│     ├─ index.html                    # deny-by-default CSP, noindex
+│     ├─ vite.config.ts                # per-route chunks, React split out
+│     ├─ tsconfig.json                 # its OWN: DOM lib + jsx, NOT in the root project
 │     └─ src/
-│        ├─ domain/                    # facts about the business. Imports nothing upward.
-│        │  ├─ money/format-money.ts   # piastres -> a string a human reads
-│        │  └─ notifications/
-│        │     └─ claim-contract.ts    # what claim_events_v1 returns + the Worker-owned strings
-│        ├─ application/
-│        │  └─ render-notification.ts  # variables + template -> a sendable message
-│        ├─ adapters/                  # reserved for future I/O
-│        ├─ tests/                     # EVERY test in this package
-│        │  ├─ format-money.test.ts
-│        │  └─ ...
-│        └─ index.ts                   # the public surface. Import from here, not from a deep path.
+│        ├─ main.tsx                   # locale resolved BEFORE createRoot, so no RTL flash
+│        ├─ app/
+│        │  ├─ routes.tsx              # the screen table. No element = not built = 404.
+│        │  ├─ providers.tsx           # ConfigProvider + QueryClient + CSS variable injection
+│        │  ├─ AppShell.tsx  App.tsx
+│        │  └─ styles/global.css       # the ONLY stylesheet. var(--...) references, never a literal.
+│        ├─ i18n/
+│        │  ├─ en.json  ar.json        # every user-facing string. Arabic has SIX plural categories.
+│        │  ├─ index.ts  format.ts  use-locale.ts
+│        ├─ lib/
+│        │  ├─ supabase.ts             # readConsoleEnv. REFUSES a service-role key.
+│        │  ├─ supabase-client.ts      # the one lazy client
+│        │  ├─ errors.ts               # RPC code -> i18n key. No raw Postgres text reaches a screen.
+│        │  └─ queries/metrics.ts      # one module per RPC. This is the only Supabase call site.
+│        ├─ features/dashboard/        # one directory per sidebar section
+│        ├─ components/                # feature-agnostic: PageSkeleton, StateBlock, Money, StatusTag
+│        └─ tests/                     # EVERY test in this app
 │
 ├─ functions/
 │  └─ outbox-dispatcher/               # the Cloudflare Worker
@@ -42,7 +75,8 @@ delivery app/
 │     └─ src/
 │        ├─ index.ts                   # entry point: scheduled + fetch handlers
 │        ├─ config/
-│        │  └─ env.ts                  # reads and validates the four env values
+│        │  ├─ env.ts                  # reads and validates the four env values
+│        │  └─ logger.ts               # structured lines. console.error for anything actionable.
 │        ├─ database/
 │        │  └─ supabase.ts             # the ONLY code that talks to Postgres. Three RPCs.
 │        ├─ google/
@@ -56,12 +90,16 @@ delivery app/
 │           ├─ access-token.test.ts
 │           ├─ drain-once.test.ts
 │           ├─ supabase.test.ts
+│           ├─ index.test.ts           # the HTTP surface, and that each failure is LOGGED
+│           ├─ logger.test.ts          # severity routing, stable codes, redaction
 │           └─ fakes.ts                # hand-written doubles. Not a mocking library, on purpose.
 │
 ├─ supabase/migrations/                # numbered .sql, applied in order, NEVER edited after applying
 ├─ specs/001-platform-foundation/      # the specification. Decisions, contracts, data model, tasks.
 ├─ scripts/
-│  └─ check-test-integrity.mjs         # refuses .skip, .only, tautologies, hollow suites
+│  ├─ check-test-integrity.mjs         # refuses .skip, .only, tautologies, hollow suites
+│  ├─ check-no-secrets.mjs             # refuses a staged credential
+│  └─ check-no-hardcoded-colors.mjs    # refuses a colour outside packages/ui/src/theme/colors.ts
 ├─ eslint.config.js
 ├─ vitest.config.ts
 ├─ tsconfig.json
@@ -82,12 +120,33 @@ Filenames match the module they cover:
 | `functions/outbox-dispatcher/src/tests/drain-once.test.ts` | `functions/outbox-dispatcher/src/drain/drain-once.ts` |
 | `functions/outbox-dispatcher/src/tests/supabase.test.ts` | `functions/outbox-dispatcher/src/database/supabase.ts` |
 | `functions/outbox-dispatcher/src/tests/access-token.test.ts` | `functions/outbox-dispatcher/src/google/access-token.ts` |
+| `functions/outbox-dispatcher/src/tests/index.test.ts` | `functions/outbox-dispatcher/src/index.ts` |
+| `packages/ui/src/tests/tokens.test.ts` | `packages/ui/src/theme/colors.ts` and `tokens.ts` |
+| `apps/admin-web/src/tests/i18n.test.ts` | `apps/admin-web/src/i18n/en.json` and `ar.json` |
+| `apps/admin-web/src/tests/format-and-routes.test.tsx` | `apps/admin-web/src/app/routes.tsx`, `i18n/format.ts` |
 
-A test file ends in `.test.ts` and lives under a `tests/` directory. `vitest.config.ts` matches exactly that
-glob, so a test written anywhere else does not run and does not fail either — which is why
+A test file ends in `.test.ts` or `.test.tsx` and lives under a `tests/` directory. `vitest.config.ts` matches
+exactly that glob, so a test written anywhere else does not run and does not fail either — which is why
 `check-test-integrity.mjs` fails on a file with zero assertions.
 
 `fakes.ts` lives in `tests/` too. It is not a test; it has no `it()` in it.
+
+`environmentMatchGlobs` sends `apps/*/src/tests/**` to **jsdom** and leaves everything else on node. The
+console's pure-logic tests — tokens, formatters, the error catalogue, the route table — need no DOM, but any
+future component test does, and a global node environment would fail on `document` rather than on the behaviour
+under test.
+
+---
+
+## The console is not in the root TypeScript project
+
+`tsconfig.json` covers `packages/*` and `functions/*`. `apps/admin-web` is **excluded**, and that is deliberate
+rather than an oversight: the root config carries `lib: ["ES2022"]` and Cloudflare's `workers-types`, because
+the Worker and the RPCs run on workerd and Postgres. Adding `DOM` and `jsx` there would put `document` and
+`window` in scope for code that would crash on them at runtime rather than fail to compile.
+
+So the console has its own `tsconfig.json`, and `npm run typecheck` runs **both** projects. The console one
+sets `composite: false` and emits nothing; Vite does the bundling.
 
 ---
 

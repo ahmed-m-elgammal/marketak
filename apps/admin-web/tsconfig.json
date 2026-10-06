@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    // The console is the ONLY target in this repository that renders to a DOM, so it is the only one that
+    // gets `lib.dom` and `jsx`. The root config deliberately does not carry them: adding them there would
+    // put `document` and `window` in scope for the Worker and the Supabase RPCs, which run on workerd and
+    // Postgres and where a stray `document` reference is a runtime crash rather than a type error.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+
+    // NOT composite, and NOT referenced by the root project. The root `tsc --build` covers
+    // `packages/*` and `functions/*`; this app has DOM types and JSX that neither has, so it is typechecked
+    // by its own script and by `npm run typecheck`, which runs both. See package.json "typecheck".
+    "composite": false,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

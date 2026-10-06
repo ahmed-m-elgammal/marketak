@@ -142,6 +142,7 @@ and a policy, not inspecting them, and `027a` ships the two assertions that woul
 | P-05 | R2 images, menu snapshots, archives, backups | ⬜ | plan §3 |
 | P-06 | Cloudflare Workers: outbox dispatcher, upload signer, snapshot builder, file access, export | ⬜ | plan §1 |
 | P-07 | FCM push, batched 15 s for non-critical events | **Phases 1–3 done, no push sent** — ⬜ shipped | contracts §1.9.0 |
+| A0 | Admin console scaffold, design tokens, i18n | **done** — 1 of 28 routed screens built | `admin-dashboard-plan.md` |
 | P-08 | Crashlytics with `app_role`, version and screen, hashed ids only | ⬜ | plan §5 |
 | P-09 | Firebase Analytics funnel, no PII | ⬜ | plan §5 |
 | P-10 | Durable Objects live tracking | ⬜ | Phase 8, flag off |
@@ -160,6 +161,12 @@ What has **never** happened is an HTTP request leaving the Worker for FCM. `DRY_
 required, and specifically a device with a Firebase SDK that has issued a token: the service account
 authenticates the sender and cannot manufacture a token. Sending a deliberately invalid token first would
 prove the request reaches Google and is rejected — worth doing, and not the same claim as a delivery.
+
+**The admin console is scaffolded, not built.** `apps/admin-web` exists with one working screen (the
+dashboard, reading `get_admin_metrics_v1` through RLS), the token module, the antd theme bridge, both
+language catalogues and the router. The other 27 screens are rows in `app/routes.tsx` with **no component** —
+they 404, and they are absent from the sidebar, because `AGENTS.md` rule 3 forbids a module whose only content
+is an admission that it is empty. A1 (the `audit_log` writers) still gates every write screen.
 
 **`035_retention_and_cron` covers the pruning half of P-11, and only that half.** `pg_cron` is
 installed and six jobs are scheduled and active: `prune_events` (7 d, hourly), `prune_order_eta_snapshots`

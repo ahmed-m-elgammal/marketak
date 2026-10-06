@@ -6,6 +6,63 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Added - `apps/admin-web`: the admin console, phase A0
+
+Scaffold and tokens only. **One screen works.** The other 27 are rows in `app/routes.tsx` with no component.
+
+`packages/ui` is the new token package: a 4px spacing scale, a type scale, radii, motion, and the semantic
+colour palette. It exports **tokens only, no components** — the mobile app needs the same scale and a palette,
+and a token module only the console can import is a second palette waiting to diverge. `antd` is an
+*optional* peer dependency for exactly this reason: `theme/antd-theme.ts` is the one file that knows the kit
+exists, and a React Native bundle can read `space.4` without installing a desktop UI kit.
+
+**Ant Design 6, not 5** — 6.6.5 is current. Three v6 defaults are corrected rather than inherited:
+CSS variables get a stable key, `Modal`/`Drawer` mask blur is off (it costs a paint on a tablet), and `Tag`'s
+trailing margin is reinstated because the dense status columns relied on it.
+
+**The colours were measured, not chosen by eye.** Every ratio is asserted in `packages/ui/src/tests/tokens.test.ts`
+against its WCAG floor, and the assertions record the exact value as well so a *silent* drift fails too. Two
+findings changed the palette:
+
+- `border.strong` was `#D0D0D0` — **1.54:1**, failing SC 1.4.11 for a control boundary. Now `#94908C` at
+  3.17:1. It is the outline of every input, so it is the sole means of identifying the control.
+- `border.subtle` is 1.20:1 and **deliberately stays there**: a table divider carries no information, so
+  SC 1.4.11 does not apply. Asserted as exempt so nobody "fixes" it into a heavy line.
+
+`AGENTS.md` rule 2 is now mechanical rather than a review instruction: `scripts/check-no-hardcoded-colors.mjs`
+fails `npm run verify` on a hex, `rgb()` or `hsl()` outside `colors.ts`, and on an antd colour prop — which is
+the route a literal would otherwise be smuggled through. `global.css` may reference `var(--color-*)` but may
+never define a colour. The guard was verified by planting a probe, not by reading it.
+
+Two things this change got wrong and corrected, recorded because both are the kind that survive review:
+
+1. **Arabic plurals were written with English's two forms.** i18next gives Arabic **six**
+   (`_zero _one _two _few _many _other`), so every Arabic count read as "3 merchants" for a single merchant.
+   The catalogue now declares all six, and the test asserts each language declares exactly its own CLDR
+   categories rather than that the two key sets match — asserting identical key sets is what hid the bug.
+2. **A timezone assumption, written twice.** The test asserted 14:32 UTC renders as `16:32` in Cairo and the
+   comment above it repeated the claim. Egypt reintroduced DST in 2023, so October 2026 is UTC+3 and it is
+   `17:32`. The test now asserts the invariant that actually matters — that the hour came from `timeZone`
+   rather than the runner — plus the literal under `en-GB`, because `en-EG` renders it as `5:32 PM` and
+   asserting a 24-hour string would be asserting a clock format, not a timezone.
+
+Rate, multiplier and timestamp formatting moved to `packages/shared/src/domain/measure/format-measure.ts`.
+They were first written inside the console, which A0.3 forbids: every value they format comes from a column the
+mobile app also reads, so the duplication would have surfaced as two apps disagreeing about a delivery fee.
+The console keeps only what is genuinely its own — the `{en, ar}` → BCP-47 mapping, and `tel:`/`map:` links.
+
+**`readConsoleEnv` refuses a service-role key.** A service-role key in a browser bundle bypasses all 115 RLS
+policies, and Vite will happily inline any `VITE_`-prefixed variable — so renaming one in a hurry is a
+realistic accident, not a hypothetical. This is the only path to a Supabase client in the console.
+
+`186 tests pass`, up from 109.
+
+**Bundle, measured rather than asserted.** The A0 build's entry chunk is 679 KB minified / **208.73 KB
+gzipped**, against the 400 KB warning line in `vite.config.ts`. Route splitting cannot fix it: `AppShell`
+imports antd's `Layout` and `Menu`, and the shell loads before any route. 208 KB is under half of antd's own
+~432 KB full bundle, because named imports let Rollup tree-shake to what the shell actually renders. For an
+internal console on a tablet that is acceptable, and it is recorded rather than left for someone to discover.
+
 ### Found, not fixed - `audit_log` has no writers, so no admin write screen can be trusted
 
 Found while planning the admin console. Verified against the live database, not inferred.
