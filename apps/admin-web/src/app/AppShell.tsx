@@ -66,6 +66,14 @@ export function AppShell({ children }: { readonly children: ReactElement }): Rea
   };
 
   return (
+    // Nesting matters, and the first version got it wrong. antd's `Layout` is a **flex** container, and
+    // `.ant-layout-has-sider { display: flex; flex-direction: row }` is injected by antd's runtime
+    // CSS-in-JS *after* this stylesheet - so a `display: grid` on `.app-shell` loses the cascade at equal
+    // specificity. With a flat `Sider + Header + Content` DOM that meant all three became row siblings: the
+    // sidebar took 240px, the header sat beside it, and the content was squeezed into whatever was left.
+    //
+    // Wrapping the header and content in an inner `Layout` is the structure antd is designed for, so the
+    // flexbox it already implements does the layout and this file no longer overrides it.
     <Layout className="app-shell">
       <Sider className="app-shell__sidebar" width={240} breakpoint="lg" collapsedWidth={0}>
         <Menu
@@ -86,28 +94,31 @@ export function AppShell({ children }: { readonly children: ReactElement }): Rea
           }))}
         />
       </Sider>
-      <Header className="app-shell__header">
-        <span className="metric-card__label">{t("app.console")}</span>
-        <div className="page__actions">
-          <LocaleSwitch />
-          <Button
-            icon={<LogoutOutlined />}
-            onClick={() => void onSignOut()}
-            className="row-action"
-            // A labelled button, not an icon. An icon-only control is a guess, and a tooltip is only
-            // reachable by hover, which excludes a keyboard and a touch screen.
-            aria-label={t("app.signOut")}
-          >
-            {t("app.signOut")}
-          </Button>
-        </div>
-      </Header>
-      <Content className="app-shell__content">
-        {signOutFailure === null ? null : (
-          <ErrorState error={authError(signOutFailure)} onRetry={() => void onSignOut()} />
-        )}
-        {children}
-      </Content>
+
+      <Layout className="app-shell__body">
+        <Header className="app-shell__header">
+          <span className="metric-card__label">{t("app.console")}</span>
+          <div className="page__actions">
+            <LocaleSwitch />
+            <Button
+              icon={<LogoutOutlined />}
+              onClick={() => void onSignOut()}
+              className="row-action"
+              // A labelled button, not an icon. An icon-only control is a guess, and a tooltip is only
+              // reachable by hover, which excludes a keyboard and a touch screen.
+              aria-label={t("app.signOut")}
+            >
+              {t("app.signOut")}
+            </Button>
+          </div>
+        </Header>
+        <Content className="app-shell__content">
+          {signOutFailure === null ? null : (
+            <ErrorState error={authError(signOutFailure)} onRetry={() => void onSignOut()} />
+          )}
+          {children}
+        </Content>
+      </Layout>
     </Layout>
   );
 }

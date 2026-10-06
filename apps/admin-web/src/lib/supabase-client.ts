@@ -29,12 +29,24 @@ export function getSupabase(): SupabaseClient {
   const env = readConsoleEnv(import.meta.env);
   cached = createClient(env.supabaseUrl, env.supabaseAnonKey, {
     auth: {
-      // The console is a Google-only sign-in surface (constitution 5). No email, no password, no OTP, so
-      // only the implicit flow is configured and nothing else can be attempted from here.
-      flowType: "implicit",
+      // PKCE, not implicit. The verifier is held in storage and only ever used server-side to redeem a
+      // short-lived code, so an access token never sits in a URL where it lands in browser history, a
+      // `Referer` header or a screenshot of the address bar. For a console that may be left open on a shared
+      // tablet, that difference is worth the extra step.
+      flowType: "pkce",
+
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,
+
+      // MUST be true, and this is the second half of the sign-in flow.
+      //
+      // Google → Supabase → `redirectTo` lands the browser back at `/auth/callback` carrying the
+      // authorization result. `true` is what makes supabase-js read it: exchange the code for a session when
+      // the flow is PKCE, or parse the fragment when it is implicit. Set to `false` - as it was - supabase-js
+      // never looks, so **no session is ever established** and every protected route redirects to sign-in
+      // forever. The app looked correct and could never be signed in.
+      detectSessionInUrl: true,
+
       storageKey: "marketak-admin-auth",
     },
     global: {

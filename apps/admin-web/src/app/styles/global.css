@@ -68,51 +68,65 @@
 
 /* --- app shell --- */
 
+/*
+ * `.app-shell`
+ *
+ * The outer antd `Layout` row: sidebar beside body. **`display` is deliberately not declared here.**
+ *
+ * The first version set `display: grid` with `grid-template-areas: "sidebar header" "sidebar content"` and it
+ * silently did nothing, because antd injects `.ant-layout-has-sider { display: flex }` from its runtime
+ * CSS-in-JS *after* this stylesheet and both selectors have the same specificity. Ant Design's rule won, so
+ * `Sider`, `Header` and `Content` became row siblings: the sidebar took its 240px, the header sat beside it,
+ * and the content was squeezed into the leftover width - one narrow column of cards on a page whose header
+ * floated in the middle. Overriding antd's layout primitives requires beating them on specificity, and any
+ * `display` set here is a declaration of war antd wins by default.
+ *
+ * `AppShell` instead nests the header and content in an inner `Layout`, which is the structure antd is
+ * designed for, so the flexbox it already implements does the layout and nothing here fights it.
+ */
 .app-shell {
-  display: grid;
-  grid-template-areas: "sidebar header" "sidebar content";
-  grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: var(--header-height) 1fr;
-  min-height: 100vh;
+  min-block-size: 100vh;
+}
+
+/*
+ * The inner `Layout` holding the header and content.
+ *
+ * `min-inline-size: 0` is load-bearing, not defensive. A flex item defaults to `min-width: auto`, which
+ * resolves to its content's min-content width and refuses to shrink below it. Any wide child - a wide table,
+ * a long unbroken string in a `flags__value` block - would push the whole content area wider than the
+ * viewport and produce a page-level horizontal scrollbar instead of scrolling inside the table.
+ */
+.app-shell__body {
+  min-inline-size: 0;
 }
 
 .app-shell__sidebar {
-  grid-area: sidebar;
   overflow-y: auto;
 }
 
 .app-shell__header {
-  grid-area: header;
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
   padding-inline: var(--space-6);
+  line-height: normal;
   border-block-end: 1px solid var(--color-border-subtle);
   background: var(--color-surface-raised);
 }
 
 .app-shell__content {
-  grid-area: content;
+  min-inline-size: 0;
   padding: var(--space-6);
   background: var(--color-surface-base);
 }
 
 @media (max-width: 768px) {
-  /* One column below 768px. The sidebar becomes a drawer, which is the only layout that keeps 48px targets
-     without a menu button that an operator presses by accident. */
-  .app-shell {
-    grid-template-areas: "header" "content";
-    grid-template-columns: 1fr;
-    grid-template-rows: var(--header-height) 1fr;
-  }
-
-  .app-shell__sidebar {
-    display: none;
-  }
-
+  /* antd's `breakpoint="lg"` collapses the Sider to `collapsedWidth={0}` and hands it to a trigger, so the
+     shell only needs the tighter content padding here. */
   .app-shell__content {
     padding: var(--space-4);
   }

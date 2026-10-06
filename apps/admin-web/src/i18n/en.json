@@ -66,7 +66,10 @@
     "signInNote": "You will be asked to approve the app. Staff accounts are granted by an existing admin.",
     "signInChecking": "Checking your access…",
     "signOut": "Sign out",
-    "signOutFailed": "Sign out did not complete. Try again, or close the tab."
+    "signOutFailed": "Sign out did not complete. Try again, or close the tab.",
+    "callbackFailed": "Sign-in could not be completed",
+    "callbackFailedHint": "The approval link may have expired, or it was already used. Sign in again to get a fresh one.",
+    "backToSignIn": "Back to sign in"
   },
   "common": {
     "status": "Status",
@@ -122,6 +125,8 @@
     "ordersDelivered": "Delivered",
     "ordersCancelled": "Cancelled",
     "ordersOpen": "Still open",
+    "completionRateHint": "{{rate}} completed",
+    "etaMinutes": "minutes",
     "deliveryFees": "Delivery fees",
     "riderTips": "Rider tips",
     "commissionRate": "Completion rate",

@@ -35,6 +35,7 @@ import { builtScreens } from "./routes.js";
 import { PageSkeleton } from "../components/PageSkeleton.js";
 import { useAuthStatus } from "../lib/use-auth.js";
 import SignInPage from "../features/auth/SignInPage.js";
+import AuthCallbackPage from "../features/auth/AuthCallbackPage.js";
 
 /**
  * Wraps the app routes, so navigating between screens never re-renders the shell — which is what keeps the
@@ -88,6 +89,14 @@ export function App(): ReactElement {
       {/* Public. Reachable without a session, so a signed-out operator has somewhere to land. */}
       <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/403" element={<Forbidden />} />
+
+      {/*
+        The route Google returns to. It MUST exist: without it the catch-all below matched and rendered
+        "That page does not exist" after a perfectly successful sign-in. `public` because the session is
+        established *by loading this URL* - guarding it behind `RequireAdmin` would bounce the browser away
+        before supabase-js could read the authorization result, and sign-in could never complete.
+      */}
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       {/* A screen that does not exist. Declared before the guard so an unknown URL does not first bounce
           through `/sign-in` on its way to a 404 — the operator would see a login page for a typo. */}
