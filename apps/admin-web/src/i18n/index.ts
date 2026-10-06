@@ -92,9 +92,12 @@ export const resources = {
  * `escapeValue: false`.
  *
  * The console interpolates values that contain `&`, `<` and `>` - an entity name, a free-text reason typed
- * by an operator - and i18next's default escaping would render `Kofta & Sons` as `Kofta &amp; Sons`.
- * React escapes on render, so escaping here as well would double-encode. The trade is that these strings are
- * never injected as raw HTML, which is true because every one of them goes through a JSX text node.
+ * by an operator - and i18next's default escaping would render `Kofta & Sons` as `Kofta &amp; Sons`. React
+ * escapes on render, so escaping here as well would double-encode. The trade is that these strings are never
+ * injected as raw HTML, which is true because every one of them goes through a JSX text node.
+ *
+ * `showSupportNotice: false` silences i18next's promotional console notice. It is noise on every load, and an
+ * operator investigating a bug should not have to scroll past an advertisement to find a real error.
  */
 void i18n.use(initReactI18next).init({
   resources,
@@ -102,6 +105,7 @@ void i18n.use(initReactI18next).init({
   fallbackLng: "en",
   interpolation: { escapeValue: false },
   returnNull: false,
+  showSupportNotice: false,
 });
 
 export default i18n;

@@ -63,6 +63,48 @@ blocking, and it is now recorded rather than left for someone to discover.
 fixture `live-staff@test.local` — a synthetic uuid, not a person, and `auth.identities` is 0. So signing in
 works but lands you as a `customer` and hits the 403, which is the correct behaviour.
 
+### Fixed - the console crashed on first paint, and the sign-in page was English-only
+
+Both found by running the console in a real browser, not by reading it. Reported from the console log after
+`npm run admin:dev`.
+
+**`No QueryClient set, use QueryClientProvider to set one`.** The auth bridge called `useQueryClient()` from
+inside `Providers` — but `Providers` is what *renders* `QueryClientProvider`, so anything `Providers` calls
+runs before that provider exists. A hook can only read context from an ancestor. The bridge is now a
+component rendered *inside* the provider, which is a one-line structural fix and the only arrangement that is
+correct.
+
+Worth noting because it is invisible to every tool in this repo: both versions were perfectly typed, the unit
+tests passed, `verify` was green, and the app was completely broken. Provider *ordering* is a runtime property
+of the tree, so no static check here can catch it. The only check that found it was a browser.
+
+**`frame-ancestors` was ignored and warning on every load.** A `<meta>` CSP cannot express `frame-ancestors` —
+framing is decided when response *headers* arrive — so the directive did nothing while Chrome correctly
+complained about it on every page load. Removed from the meta tag, and recorded as what it actually is: the
+console has **no clickjacking protection** until `frame-ancestors 'none'` ships as a real header from Cloudflare
+Pages. That is a launch task, not something this file can do.
+
+**The first screen an operator sees was English-only.** The language switcher lived in the shell, which a
+signed-out operator never reaches — so an Arabic-only operator hit a wall before getting to the control that
+would fix it, on a product where Arabic is a launch language. The switcher is now on the sign-in panel too.
+
+Also silenced i18next's promotional console notice, and the `/favicon.ico` 404 with `href="data:,"` rather than
+by adding a real icon: a favicon needs a fill colour, which would be a hex literal outside
+`packages/ui/src/theme/colors.ts` — the one exemption `check-no-hardcoded-colors.mjs` grants. A real icon and a
+widened exemption belong together in A7.
+
+### Verified in a real browser
+
+Driven with Playwright against the dev server, not asserted:
+
+- `/` as a signed-out operator **redirects to `/sign-in`** — the guard works
+- the sign-in button **reaches Google's credential prompt**, with `redirect_to=http://localhost:5173/auth/callback`
+  carried through and Google's "Email or phone" field rendered. Not completed — that needs the operator's own
+  credentials, so **the callback half of the round trip is still unproven**
+- `/403` renders "This area is for admins / Your account is signed in but is not an admin"
+- switching to العربية sets `document.dir = "rtl"` and `lang = "ar-EG"`, and the panel mirrors
+- the console is **clean: zero errors, zero warnings** on load
+
 ### Fixed - the test-integrity guard was covering 8 of 12 test files
 
 `scripts/check-test-integrity.mjs` walked `packages` and `functions` only, and matched `.test.ts` only. Adding

@@ -92,14 +92,26 @@ function useInjectedCssVariables(): void {
  * The single `onAuthStateChange` listener for the whole app.
  *
  * It lives here rather than inside `useSession` because every caller of that hook would otherwise open its
- * own subscription, and two readers could disagree about whether there is a session - which shows up as a
+ * own subscription, and two readers could disagree about whether there is a session — which shows up as a
  * screen that renders while the guard still believes you are signed out.
  *
  * It also clears the cache on sign-out. Without that, the next operator to sign in on the same tablet sees
  * the previous operator's cached merchants and orders for up to `staleTime`. On a shared device that is a
  * data leak, not a stale read, and it is the kind of bug nobody reports because they assume the app is broken.
+ *
+ * **This component is rendered INSIDE `QueryClientProvider`, and it has to stay there.**
+ *
+ * An earlier version called this as a hook from `Providers` itself, which threw
+ * `No QueryClient set, use QueryClientProvider to set one` on the first paint. The reason is ordering, and it
+ * is not subtle once stated: `Providers` *renders* `QueryClientProvider`, so anything `Providers` calls runs
+ * before that provider exists in the tree. A hook can only read context from an ancestor, and this one would
+ * have to be its own descendant.
+ *
+ * The crash was in the first render of the whole app, which is the worst possible place for a provider
+ * ordering mistake to hide — and it only showed up at runtime. TypeScript cannot see it: both versions are
+ * well-typed.
  */
-function useAuthBridge(): void {
+function AuthBridge(): null {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -119,6 +131,8 @@ function useAuthBridge(): void {
       unsubscribe?.();
     };
   }, [queryClient]);
+
+  return null;
 }
 
 export interface ProvidersProps {
@@ -130,7 +144,6 @@ export function Providers({ children, locale }: ProvidersProps): ReactNode {
   useInjectedCssVariables();
 
   const queryClient = useMemo(() => createQueryClient(), []);
-  useAuthBridge();
 
   const antdLocale = useMemo(() => ANTD_LOCALES[locale], [locale]);
   // `buildAntdConfig` returns the theme AND the ConfigProvider props that are not tokens - `modal.mask`,
@@ -152,7 +165,11 @@ export function Providers({ children, locale }: ProvidersProps): ReactNode {
         // pick up this theme and direction.
       >
         <AntdApp>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <QueryClientProvider client={queryClient}>
+            {/* Inside the provider on purpose - see AuthBridge. */}
+            <AuthBridge />
+            {children}
+          </QueryClientProvider>
         </AntdApp>
       </ConfigProvider>
     </I18nextProvider>

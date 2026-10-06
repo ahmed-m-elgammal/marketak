@@ -30,6 +30,7 @@ import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
 import { EmptyState, ErrorState } from "../../components/StateBlock.js";
+import { LocaleSwitch } from "../../components/LocaleSwitch.js";
 import { AUTH_CALLBACK_PATH, authError, signInWithGoogle } from "../../lib/auth.js";
 import { SESSION_QUERY_KEY, useAuthStatus } from "../../lib/use-auth.js";
 
@@ -92,6 +93,18 @@ export default function SignInPage(): ReactElement {
   return (
     <div className="sign-in">
       <div className="sign-in__panel">
+        {/*
+          The language switcher, here as well as in the shell.
+
+          It was originally only in the shell, which meant the FIRST screen an operator ever sees was
+          English-only — and Arabic is a launch language. An operator whose only working language is Arabic
+          hits a wall before reaching the control that would fix it. `main.tsx` does read `navigator.language`,
+          so a browser set to Arabic is served Arabic automatically; the switcher is what covers everyone else.
+        */}
+        <div className="sign-in__lang">
+          <LocaleSwitch />
+        </div>
+
         <Typography.Title level={2}>{t("app.console")}</Typography.Title>
         <Typography.Paragraph type="secondary">{t("auth.signInIntro")}</Typography.Paragraph>
 

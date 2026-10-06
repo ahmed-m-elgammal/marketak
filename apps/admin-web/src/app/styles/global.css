@@ -338,6 +338,18 @@
 }
 
 /**
+ * The language switcher on the sign-in panel.
+ *
+ * Pushed to the end of the row, so it reads as a setting rather than as the page's primary action. In RTL the
+ * logical `margin-inline-start` moves it to the other side automatically, which is the whole reason the shell
+ * uses logical properties throughout.
+ */
+.sign-in__lang {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/**
  * The note under the button.
  *
  * `.metric-card__hint` is reused for its typography rather than duplicated - a second definition of the same
