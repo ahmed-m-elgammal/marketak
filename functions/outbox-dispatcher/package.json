@@ -1,0 +1,16 @@
+{
+  "name": "@marketak/outbox-dispatcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: claims collapsed notifications from Postgres, renders them from notification_templates, sends via FCM HTTP v1, marks the batch.",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@marketak/shared": "*"
+  }
+}

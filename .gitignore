@@ -78,3 +78,20 @@ Thumbs.db
 logs/
 coverage/
 .pgtest/
+
+# Secrets. `supabase_keys` holds a service-role key that bypasses RLS on every
+# table. The Firebase file holds a private key. Both are also in
+# eslint.config.js's ignores, so the linter cannot put their contents in a cache
+# or a log. NEVER `git add -f` either one - this repo has a rule against that.
+marketak-eg-firebase-adminsdk-fbsvc-c7293a9dfd.json
+supabase_keys
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Build artefacts
+node_modules/
+dist/
+coverage/
+.wrangler/
+*.tsbuildinfo

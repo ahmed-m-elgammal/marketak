@@ -1,0 +1,60 @@
+# outbox-dispatcher
+#
+# NEVER put a secret in this file. `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS on every table and
+# `FCM_SERVICE_ACCOUNT_JSON` holds a private key. Both are set with `wrangler secret put`, which stores them
+# in Cloudflare's encrypted store. Anything written here is committed.
+
+name = "outbox-dispatcher"
+main = "src/index.ts"
+compatibility_date = "2026-10-05"
+compatibility_flags = ["nodejs_compat"]
+
+# The drain is 60 seconds, not the plan's 15.
+#
+# Cloudflare Cron Triggers have a ONE-MINUTE FLOOR. The plan's 15-second route required `pg_cron` plus
+# `pg_net` - a second scheduler and a new extension on the database - to save at most 45 seconds on a
+# notification nobody is timing. `pg_net` is deliberately NOT installed for this.
+#
+# Recorded as a deviation, not a silent change. If 15 s ever becomes a real requirement the answer is a
+# queue, not a second scheduler: Cloudflare Queues supports second-level delays and gives exactly-once
+# semantics that a lease on `events` would otherwise have to fake.
+[triggers]
+crons = ["* * * * *"]
+
+# Observability. The drain's report is what an operator reads when the section 11 backlog alarm fires, so it
+# has to be retrievable after the fact rather than only in the tick's live output.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+# No `vars` for the secrets. The three that exist are set with `wrangler secret put`:
+#
+#   SUPABASE_URL              a plain var, safe to declare here if preferred:
+#                             https://erxxsebcqqcpkipzcdhg.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY secret. BYPASSRLS on every table.
+#   FCM_SERVICE_ACCOUNT_JSON  secret. Holds a Firebase private key.
+#   DRAIN_TOKEN               secret. Guards the manual POST /drain route.
+#
+# Two vars that ARE safe to declare, because neither is a secret and both fail safe:
+[vars]
+# "log" renders and marks without sending. "send" calls FCM.
+#
+# Default is "log" and the Worker refuses an unrecognised value rather than falling back. A Worker deployed
+# with a missing or misspelled flag must fail toward NOT sending: an undelivered notification is retried on
+# the next tick, while a wrongly-delivered one reaches a customer and cannot be recalled.
+DRY_RUN = "log"
+
+# Notifications claimed per invocation. `claim_events_v1` clamps to 200 and floors at 1, and this Worker
+# refuses anything outside that range rather than appearing to honour a value the RPC silently clamps.
+BATCH_SIZE = "50"
+
+# Bundling. Wrangler's esbuild does not resolve npm workspaces, so `@marketak/shared` has to be aliased to
+# its source. Not a workaround - it is the documented fix, and it also means the Worker bundles the shared
+# source rather than a build artefact, so there is no stale `dist/` to redeploy against.
+#
+# The path is relative to THIS file, and `../..` is the repo root.
+[alias]
+"@marketak/shared" = "../../packages/shared/src/index.ts"
