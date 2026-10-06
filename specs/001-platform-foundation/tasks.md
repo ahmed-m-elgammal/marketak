@@ -390,6 +390,43 @@ known with real data.
 
 ---
 
+## Admin console — `apps/admin-web`
+
+Full phase/task breakdown in **`admin-dashboard-plan.md`**. Static Cloudflare Pages, reads and writes
+through RPCs under RLS, **no Worker**. Task IDs below map one-to-one onto that file's phases.
+
+- [ ] **A0** Scaffold `apps/admin-web`, `packages/ui` tokens, money formatter, RTL, anon-key-only client
+- [ ] **A1** `039_admin_audit` — make the 48 `admin_*` RPCs write `audit_log`. **Blocks every write
+      screen.** See the finding below
+- [ ] **A2** Google-only auth, `user_roles` role gate, 403 page, shell, ar/en
+- [ ] **A3** Read-only dashboard: `get_admin_metrics_v1`, reconciliation, float variance, flags
+- [ ] **A4** Vendor/city/area/brand/cuisine/voucher/staff CRUD with mandatory delete reason
+- [ ] **A5** Wallets, payouts, fee tiers, commission rules. Drift as its own column; bps shown as a
+      multiplier
+- [ ] **A6** Orders and sub_orders as a hierarchy; cancel only via `cancel_order_v1`
+- [ ] **A7** Bundle check for `service_role`, accessibility pass, live-RLS cross-check, Pages deploy
+
+### Verified against the live database, and not reflected above
+
+- [x] 48 `admin_*` RPCs exist (16 `upsert`, 16 `delete`, 16 `restore`), all `security definer`, all
+      guarded by `private.is_admin()`
+- [x] 13 admin read/mutate RPCs exist and grant `authenticated=true`, `anon=false` — including
+      `get_admin_metrics_v1` and `reconcile_day_v1`, which **T4.13/T4.14/T5.12 still mark incomplete**
+- [x] 12 tables carry admin read RLS policies
+- [ ] T4.13, T4.14, T5.12, T5.14, T6.2 are therefore already served by the schema and are covered by A3/A5
+
+### Found, not fixed — `audit_log` has no writers
+
+`audit_log` is fully built: 2 relations, 4 indexes, 3 admin read policies, `before`/`after` jsonb,
+`actor_user_id ... on delete set null`. **Zero functions anywhere insert into it**, and no trigger does
+either. It holds 0 rows.
+
+Admin writes land in `events` instead, recording the actor and the *names* of the changed fields but not
+the values — `admin_upsert_vendor_v1` emits `payload = {actor, fields:[...]}`. So a price change is visible
+but not reconstructable, which is the opposite of what `data-model.md` §2052 says the table is for.
+
+A1 fixes it. Every write screen waits for it.
+
 ## Cross-cutting
 
 - [ ] **X.1** `pgTAP` policy tests in migration 022: every cross-tenant read returns zero

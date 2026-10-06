@@ -6,6 +6,57 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Found, not fixed - `audit_log` has no writers, so no admin write screen can be trusted
+
+Found while planning the admin console. Verified against the live database, not inferred.
+
+**What exists.** `audit_log` is complete: 2 relations (parent plus a monthly partition), 4 indexes, 3
+admin read policies, `bigserial` primary key, `before`/`after jsonb`, and
+`actor_user_id uuid references users(id) on delete set null` — precisely as `data-model.md` §2018
+specifies, including the `set null` choice that is load-bearing for user deletion.
+
+**What does not.** Nothing writes to it.
+
+- 0 of 48 `admin_*` functions mention `audit_log`
+- 0 functions database-wide match `insert into ... audit_log`
+- no trigger on `vendors`, `cities`, `wallets`, `user_roles` or `vouchers` other than `set_updated_at` and
+  `private.assert_wallet_owner`
+- the table contains 0 rows
+
+**Why that matters.** The admin RPCs write to `events` instead. `admin_upsert_vendor_v1` ends with
+`insert into public.events (type, aggregate_type, aggregate_id, payload) values ('vendor.updated', ...)`
+carrying `jsonb_build_object('actor', v_user, 'fields', <the patch's key names>)`.
+
+So the record says *an admin changed these fields on this vendor* and does not say *from what to what*.
+`data-model.md` §2052 argues `before`/`after` exist so each row is self-contained, and the current write
+path defeats that argument. A console that exposed `adjust_wallet_v1` or a vendor price edit on top of
+this would ship an admin panel whose history an operator cannot trust — which is worse than having no
+history screen at all, because it looks like there is one.
+
+**Not fixed here.** It is a schema change across 48 functions, and it gates the console. Tracked as
+`admin-dashboard-plan.md` phase **A1** and `open-questions.md` 6.8.
+
+### Added - `admin-dashboard-plan.md`: the admin console, end to end
+
+Verified live before planning, which changed the shape of it. Eight phases (A0–A7), each with an exit
+criterion, plus five open questions.
+
+Two findings reshaped it:
+
+1. **The backend is already there.** 48 `admin_*` RPCs (16 `upsert`, 16 `delete`, 16 `restore`), 13
+   admin read/mutate RPCs, and 12 tables carrying admin read RLS — all `security definer`, all guarded by
+   `private.is_admin()`, all granting `authenticated=true` and `anon=false`. `tasks.md` marks T4.13,
+   T4.14, T5.12, T5.14 and T6.2 incomplete; the functions they describe exist and are granted. The task
+   list lags the schema, so it is corrected in place.
+2. **No Worker is needed.** The console is static Cloudflare Pages reading through RLS. Confirmed against
+   the plan's five planned Workers: the console needs none of them. `upload-signer` (T1.4) becomes a
+   dependency later, and only for image uploads.
+
+The plan also records four things the UI must not get wrong, each traceable to the schema rather than to
+taste: `float_variance` is surfaced and never filtered to zero (constitution I.10); `multiplier_bps` is
+shown as a multiplier next to the raw basis points; wallet `drift` gets its own column; and orders render
+as `orders` + N `sub_orders` rather than flattened.
+
 ### Fixed - the Worker was logging everything to `console.log`, so no error was ever visible
 
 Cloudflare Workers Logs is **off by default**. `wrangler tail` against this Worker returned request
