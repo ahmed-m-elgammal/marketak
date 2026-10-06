@@ -163,67 +163,57 @@ delivery location.
 ```
 apps/admin-web/
 ├─ src/
-│  ├─ app/                      # shell only: providers, router, layout, guards
-│  │  ├─ router.tsx
-│  │  ├─ routes.ts              # the 41 routes, one entry each
-│  │  ├─ providers.tsx          # ConfigProvider (antd theme + locale), AuthProvider, QueryClient
-│  │  └─ layout/                # AppShell, Sidebar, Header, Breadcrumbs
-│  ├─ theme/                    # RULE 2 LIVES HERE. No colour literal outside this directory.
-│  │  ├─ tokens.ts              # spacing scale, radii, type scale, z-index
-│  │  ├─ colors.ts              # semantic only: text.primary, surface.raised. No raw hex elsewhere
-│  │  ├─ antd-theme.ts          # maps tokens → antd ConfigProvider token object
-│  │  └─ index.ts
+│  ├─ app/                      # shell only: providers, router, layout, guards, routes table
+│  │  ├─ routes.tsx             # the screen table. A screen with no element is NOT built and 404s.
+│  │  ├─ providers.tsx          # ConfigProvider (antd theme + locale), QueryClient, CSS variables
+│  │  ├─ AppShell.tsx           # sidebar, header, breadcrumbs
+│  │  ├─ App.tsx                # the router and the two guards
+│  │  └─ styles/global.css      # the ONLY stylesheet. var(--…) references, never a literal.
 │  ├─ i18n/
-│  │  ├─ index.ts               # instance, LocaleProvider
+│  │  ├─ index.ts               # instance, Locale type, antd locale mapping, document direction
 │  │  ├─ en.json  ar.json       # every user-facing string. Rule: no string in a component.
-│  │  └─ format.ts              # money, dates, relative time — delegates to packages/shared
+│  │  ├─ format.ts              # console-only formatters: locale mapping, tel:, map:
+│  │  └─ use-locale.ts          # reads the active locale outside a translation lookup
 │  ├─ lib/
-│  │  ├─ supabase.ts            # createClient, anon key only
-│  │  ├─ queries/               # one hook per RPC or table read. No fetch in components.
-│  │  │  ├─ metrics.ts  customers.ts  merchants.ts  orders.ts
-│  │  │  ├─ catalog.ts  money.ts  settings.ts  audit.ts
-│  │  ├─ errors.ts              # RPC error code → message key. Never a raw Postgres string.
-│  │  └─ permissions.ts         # canEdit(), canDelete() from user_roles
-│  ├─ features/                 # one directory per section, mirroring the sidebar
-│  │  ├─ dashboard/
-│  │  │  ├─ DashboardPage.tsx    # < 300 lines
-│  │  │  ├─ MetricCard.tsx  FunnelChart.tsx  EtaAccuracy.tsx  VarianceAlert.tsx
-│  │  ├─ customers/
-│  │  │  ├─ CustomerListPage.tsx  CustomerProfilePage.tsx
-│  │  │  ├─ tabs/  OverviewTab.tsx  OrdersTab.tsx  AddressesTab.tsx  ReviewsTab.tsx
-│  │  │  └─ components/  CustomerForm.tsx  OrderHistoryTable.tsx
-│  │  ├─ merchants/
-│  │  │  ├─ MerchantListPage.tsx  MerchantProfilePage.tsx
-│  │  │  ├─ tabs/  OverviewTab.tsx  CatalogTab.tsx  StaffTab.tsx
-│  │  │  │        ScheduleTab.tsx  WalletTab.tsx  OrdersTab.tsx
-│  │  │  ├─ catalog/  CategoryPage.tsx  ItemPage.tsx  CategoryForm.tsx  ItemForm.tsx
-│  │  │  └─ components/  VendorForm.tsx  StaffTable.tsx  ScheduleEditor.tsx  LocationCell.tsx
-│  │  ├─ orders/     OrderListPage.tsx  OrderDetailPage.tsx  Timeline.tsx  SubOrdersTable.tsx
-│  │  ├─ riders/     RiderListPage.tsx  RiderProfilePage.tsx
-│  │  ├─ money/      ReconciliationPage.tsx  WalletsPage.tsx  WalletDetailPage.tsx
-│  │  │             PayoutsPage.tsx  FeeTiersPage.tsx  CommissionsPage.tsx
-│  │  ├─ settings/   CitiesPage.tsx  AreasPage.tsx  VouchersPage.tsx  FlagsPage.tsx  AuditPage.tsx
-│  │  └─ auth/       SignInPage.tsx  ForbiddenPage.tsx  NotFoundPage.tsx
+│  │  ├─ supabase.ts            # readConsoleEnv - refuses a service-role key
+│  │  ├─ supabase-client.ts     # the one lazy client instance
+│  │  ├─ errors.ts              # RPC error code -> i18n key. Never a raw Postgres string.
+│  │  ├─ use-admin-role.ts      # is this operator an admin? reads user_roles
+│  │  └─ queries/               # one module per RPC or table read. No fetch in components.
+│  ├─ features/<section>/       # one directory per sidebar section
 │  ├─ components/               # shared, feature-agnostic
-│  │  ├─ DataTable.tsx          # server-side sort/filter/paginate, count=exact
-│  │  ├─ PageHeader.tsx  EmptyState.tsx  LoadingState.tsx  ErrorState.tsx
-│  │  ├─ ConfirmWithReason.tsx  StatusTag.tsx  Money.tsx  PhoneLink.tsx  LocationLink.tsx
-│  │  └─ ActionMenu.tsx         # the per-row admin actions. See below.
+│  │  ├─ PageSkeleton.tsx  StateBlock.tsx  Money.tsx  StatusTag.tsx  LocaleSwitch.tsx
 │  └─ main.tsx
-└─ package.json
+packages/ui/
+└─ src/theme/
+   ├─ tokens.ts                 # spacing, type, radius, motion, breakpoints. No colour.
+   ├─ colors.ts                 # THE ONLY FILE with a hex literal.
+   ├─ antd-theme.ts             # maps tokens into antd's ConfigProvider
+   └─ tests/tokens.test.ts      # asserts every contrast ratio against its WCAG floor
 ```
 
-**Five rules this tree enforces**
+**Why tokens live in `packages/ui` and not `apps/admin-web/src/theme/`**
 
-1. **`theme/` owns every colour.** A hex literal anywhere else is a lint error. `antd-theme.ts` maps our
-   tokens *into* antd, so antd never introduces an untracked colour.
-2. **`i18n/` owns every string.** No English or Arabic literal in a component. This is what makes the ar
+An earlier draft of this document put `theme/` inside the console. It was built in `packages/ui` instead, and
+this section was wrong rather than the code. The mobile app needs the same spacing scale and the same palette,
+and a token module that only the console can import is a second palette waiting to diverge. `packages/ui`
+exports **tokens only** — no components — and `antd` is an *optional* peer dependency, so a React Native
+bundle can read `space.4` without installing a desktop UI kit. Only `antd-theme.ts` knows the kit exists.
+
+**Six rules this tree enforces**
+
+1. **One file owns colour.** `packages/ui/src/theme/colors.ts` is the only file permitted a hex literal, and
+   `scripts/check-no-hardcoded-colors.mjs` fails `npm run verify` on one anywhere else. The guard was
+   verified by planting a probe, not by reading it.
+2. **`global.css` may reference a token, never define one.** Stricter than the rule on TSX, because a
+   stylesheet is where a hardcoded hex survives longest.
+3. **`i18n/` owns every string.** No English or Arabic literal in a component. This is what makes the Arabic
    translation real rather than aspirational.
-3. **`lib/queries/` owns every network call.** No `supabase.from(...)` inside a component, so no component
-   can invent its own filter and quietly bypass RLS intent.
-4. **`components/` is feature-agnostic.** Anything that knows about vendors belongs in `features/`.
-5. **One file, one screen or one component.** `AGENTS.md` rule 5 caps a screen at 300–400 lines; the
-   heaviest here is `MerchantProfilePage.tsx` at ~120 because the content lives in tabs.
+4. **`lib/queries/` owns every network call.** No `supabase.from(...)` inside a component.
+5. **`components/` is feature-agnostic.** Anything that knows about vendors belongs in `features/`.
+6. **An unbuilt screen does not exist as a module.** The route table carries its path and phase; it has no
+   `element`, is absent from the sidebar, and 404s. `AGENTS.md` rule 3 forbids a file whose only content is an
+   admission that it is empty.
 
 ### `ActionMenu` — your "clear admin action" requirement
 
@@ -276,22 +266,34 @@ Your two principles, made checkable:
 - 41 screens of tables, forms, drawers and dialogs is exactly antd's strength. Building that from scratch
   would be weeks of work that adds nothing to the product.
 - Its `Form` + `Drawer` + `Modal` trio covers every modal in §2 without a custom component.
-- Built-in RTL support via `ConfigProvider direction="rtl"` — required, since Arabic ships.
-- Locale packs exist for ar and en.
+- **antd 6, not 5.** 6.6.5 is current. It requires React ≥ 18, supports React 19 without the
+  `@ant-design/v5-patch-for-react-19` shim, and keeps the same `ConfigProvider theme.token` mechanism this
+  design depends on. Three v6 defaults are corrected in `providers.tsx` rather than left to surprise a
+  screen later:
+  - **CSS variables are on by default**, with a stable `key`, so the generated variable names do not change
+    per build.
+  - **`Modal`/`Drawer` masks blur by default from 6.3.0.** Disabled — it costs a paint on a tablet and this
+    console does not need it.
+  - **`Tag` lost its trailing `margin-inline-end`.** Reinstated via `ConfigProvider`, because dense status
+    columns relied on it and its absence reads as a layout bug.
+- `ar_EG` and `en_US` locale packs both ship, so Arabic is not a hand-built locale.
 
-**The tension, stated honestly.** Ant Design ships its own visual language and its own theme file. Your
+**The tension, stated honestly.** Ant Design ships its own visual language and its own token object. Your
 rule "no hardcoded colors" is at risk the moment a component takes a default colour that is not in our
-tokens. The fix is in `theme/antd-theme.ts`: a single function that maps our tokens onto antd's token
-object, so **every** antd colour resolves through our scale. `ConfigProvider` is mounted once in
-`providers.tsx` and nothing else touches antd theming.
+tokens. The fix is in `theme/antd-theme.ts`: a single function that maps our tokens onto antd's token object,
+so **every** antd colour resolves through our scale. `ConfigProvider` is mounted once in `providers.tsx` and
+nothing else touches antd theming. This is not theoretical — antd's default `colorError` measures **3.0:1**
+against white and fails AA at body weight, which is why every status colour here was chosen against a
+measured floor instead of copied from the kit.
 
 Two more:
 
-- **Bundle.** Ant Design is large. Route-level code splitting plus `import { Table } from 'antd'`-style
-  named imports keeps the initial payload sane. Worth measuring, not assuming.
-- **`Form` validation vs RPC validation.** The RPCs validate server-side with a whitelist
-  (`UNKNOWN_KEY` for a field antd thinks is fine). Client validation is for the operator's benefit; the
-  server remains the authority. Never mirror server rules by hand — they drift.
+- **Bundle.** Ant Design's full bundle is ~430 KB gzipped. Named imports plus one chunk per route keeps it
+  down; React is split separately so a token tweak does not invalidate the framework cache. Worth measuring,
+  not assuming.
+- **`Form` validation vs RPC validation.** The RPCs validate server-side with a whitelist (`UNKNOWN_KEY` for
+  a field antd thinks is fine). Client validation is for the operator's benefit; the server remains the
+  authority. Never mirror server rules by hand — they drift.
 
 **Alternative, if you'd rather own the pixels:** build on a headless kit (Radix or React Aria) plus
 `packages/ui` tokens. Better RTL and accessibility posture, no default look to fight. Roughly 3× the
