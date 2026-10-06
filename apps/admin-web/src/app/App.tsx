@@ -1,17 +1,28 @@
 /**
- * `app/App` - the router, and the two guards.
+ * `app/App` - the router, and the guard.
  *
- * ## Why the role check is a route element and not a hook inside each page
+ * ## One guard, wrapping a group
  *
- * A guard inside each page would be 41 chances to forget one. A route element wraps every protected screen by
- * construction, and `PUBLIC_PATHS` is the only way out. `admin-console-screens.md` screens 37–38 are the
- * landing pages for the two ways through: a signed-in non-admin, and a URL that does not exist.
+ * A guard inside each page would be one chance per screen to forget one. A route element wraps every
+ * protected screen by construction, and `PUBLIC_PATHS` is the only way out.
  *
- * ## Why the non-admin gets `/403` and not a redirect to sign-in
+ * ## Where each failure state lands, and why the two must differ
  *
- * A non-admin **is** signed in. Redirecting them to sign-in produces an infinite loop - sign in, land on
- * the page, bounce to sign-in - and it reads as a broken session rather than as "ask someone for access".
- * `errors.forbiddenBody` says exactly what to do about it.
+ * | State | Lands on |
+ * |---|---|
+ * | no session yet | the skeleton |
+ * | no session | `/sign-in` |
+ * | session, no `admin` role | `/403` |
+ * | session and `admin` | the app |
+ *
+ * Both "no session" and "no admin" mean *you cannot see this*, so the tempting implementation sends both to
+ * one destination. That produces an infinite loop in both directions: a signed-out operator is bounced to
+ * `/sign-in`, signs in, lands back on their deep link and is bounced again — because the guard was checking
+ * the role and never asked whether a session existed. A signed-in non-admin sent to `/sign-in` is just as
+ * broken: they authenticate successfully, arrive back, and are bounced forever.
+ *
+ * `resolveAuthStatus` is a pure function precisely so all four branches are unit-tested, because the loop only
+ * shows up at runtime with a real session and a real router.
  */
 
 import { Result } from "antd";
@@ -21,13 +32,13 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./AppShell.js";
 import { builtScreens } from "./routes.js";
-import { useAdminRole } from "../lib/use-admin-role.js";
+import { PageSkeleton } from "../components/PageSkeleton.js";
+import { useAuthStatus } from "../lib/use-auth.js";
+import SignInPage from "../features/auth/SignInPage.js";
 
 /**
- * Wraps the app routes. Renders the shell around whatever matched.
- *
- * The shell sits here rather than inside each screen so navigating between screens never re-renders it -
- * which is what keeps the sidebar from flashing and the operator's scroll position intact.
+ * Wraps the app routes, so navigating between screens never re-renders the shell — which is what keeps the
+ * sidebar from flashing and the operator's scroll position intact.
  */
 function Shell(): ReactElement {
   return (
@@ -37,16 +48,28 @@ function Shell(): ReactElement {
   );
 }
 
+/**
+ * The guard every protected screen passes through.
+ *
+ * `noImplicitReturns` is what makes the switch exhaustive: add a fifth state to `AuthStatus` and this
+ * function stops returning on every path, which is a compile error. A helper function whose only purpose was
+ * to assert that was written and then deleted as dead code — the compiler already says it.
+ */
 function RequireAdmin(): ReactElement {
-  const { isPending, isAdmin } = useAdminRole();
+  const status = useAuthStatus();
 
-  if (isPending) {
-    // A blank page while the role loads would look like a signed-out session. The skeleton's announcement is
-    // what stops a screen-reader user from being told nothing at all.
-    return <Result status="info" title="" />;
+  switch (status) {
+    case "pending":
+      // The session has not been read yet. Redirecting now would send an operator who is about to be
+      // authenticated to the sign-in page, which is the flashiest version of the loop above.
+      return <PageSkeleton />;
+    case "signed-out":
+      return <Navigate to="/sign-in" replace />;
+    case "not-admin":
+      return <Navigate to="/403" replace />;
+    case "admin":
+      return <Outlet />;
   }
-
-  return isAdmin ? <Outlet /> : <Navigate to="/403" replace />;
 }
 
 function Forbidden(): ReactElement {
@@ -62,13 +85,17 @@ function NotFound(): ReactElement {
 export function App(): ReactElement {
   return (
     <Routes>
-      {/* Public. No admin session needed. */}
+      {/* Public. Reachable without a session, so a signed-out operator has somewhere to land. */}
+      <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/403" element={<Forbidden />} />
+
+      {/* A screen that does not exist. Declared before the guard so an unknown URL does not first bounce
+          through `/sign-in` on its way to a 404 — the operator would see a login page for a typo. */}
       <Route path="*" element={<NotFound />} />
 
-      {/* Everything else. The guard wraps the group, so a new screen cannot be added without passing it.
-          Only `builtScreens` is registered: a planned screen with no implementation falls through to the
-          `*` route above, which is honest - it says the page does not exist, because it does not yet. */}
+      {/* Everything else. Only `builtScreens` is registered: a planned screen with no implementation is not
+          a route, so it falls through to the `*` above, which is honest — it says the page does not exist,
+          because it does not yet. */}
       <Route element={<RequireAdmin />}>
         <Route element={<Shell />}>
           {builtScreens().map((screen) => (

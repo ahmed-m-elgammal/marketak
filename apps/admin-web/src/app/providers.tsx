@@ -15,7 +15,7 @@
  * them on demand, and an operator switching language mid-session must not see a flash of English.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { App as AntdApp, ConfigProvider } from "antd";
 import arEG from "antd/locale/ar_EG";
 import enUS from "antd/locale/en_US";
@@ -25,6 +25,8 @@ import { I18nextProvider } from "react-i18next";
 import { buildAntdConfig, cssVariablesBlock } from "@marketak/ui";
 
 import i18nInstance, { antdLocaleKeyFor, type Locale } from "../i18n/index.js";
+import { onSessionChange } from "../lib/auth.js";
+import { SESSION_QUERY_KEY } from "../lib/use-auth.js";
 
 /** antd's locale packs, keyed by the same `Locale` union the rest of the app uses. */
 const ANTD_LOCALES: Readonly<Record<Locale, typeof enUS>> = {
@@ -86,6 +88,39 @@ function useInjectedCssVariables(): void {
   }, [block]);
 }
 
+/**
+ * The single `onAuthStateChange` listener for the whole app.
+ *
+ * It lives here rather than inside `useSession` because every caller of that hook would otherwise open its
+ * own subscription, and two readers could disagree about whether there is a session - which shows up as a
+ * screen that renders while the guard still believes you are signed out.
+ *
+ * It also clears the cache on sign-out. Without that, the next operator to sign in on the same tablet sees
+ * the previous operator's cached merchants and orders for up to `staleTime`. On a shared device that is a
+ * data leak, not a stale read, and it is the kind of bug nobody reports because they assume the app is broken.
+ */
+function useAuthBridge(): void {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = onSessionChange((session) => {
+        queryClient.setQueryData(SESSION_QUERY_KEY, session);
+        if (session === null) {
+          queryClient.clear();
+        }
+      });
+    } catch {
+      // A missing environment throws here. The session query surfaces the same misconfiguration to the
+      // operator with an actionable message; swallowing it twice would just delay that.
+    }
+    return () => {
+      unsubscribe?.();
+    };
+  }, [queryClient]);
+}
+
 export interface ProvidersProps {
   readonly children: ReactNode;
   readonly locale: Locale;
@@ -95,6 +130,8 @@ export function Providers({ children, locale }: ProvidersProps): ReactNode {
   useInjectedCssVariables();
 
   const queryClient = useMemo(() => createQueryClient(), []);
+  useAuthBridge();
+
   const antdLocale = useMemo(() => ANTD_LOCALES[locale], [locale]);
   // `buildAntdConfig` returns the theme AND the ConfigProvider props that are not tokens - `modal.mask`,
   // `drawer.mask`, `tag.styles`, all moved out of `theme.components` in antd 6. They are spread together so

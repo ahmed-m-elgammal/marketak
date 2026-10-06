@@ -35,6 +35,14 @@
     "flags": "Feature flags",
     "audit": "Audit log"
   },
+  "auth": {
+    "signInWithGoogle": "Continue with Google",
+    "signInIntro": "This console is for Marketak staff.",
+    "signInNote": "You will be asked to approve the app. Staff accounts are granted by an existing admin.",
+    "signInChecking": "Checking your access…",
+    "signOut": "Sign out",
+    "signOutFailed": "Sign out did not complete. Try again, or close the tab."
+  },
   "common": {
     "status": "Status",
     "name": "Name",

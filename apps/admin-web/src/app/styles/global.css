@@ -304,6 +304,52 @@
   background: var(--color-wash-neutral);
 }
 
+/* --- sign in --- */
+
+/**
+ * `.sign-in`
+ *
+ * Full-viewport and centred. No sidebar, no header: there is no session to render navigation for, and showing
+ * a sidebar full of links an operator cannot follow would be dishonest about what they can do.
+ */
+.sign-in {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 100vh;
+  padding: var(--space-6);
+  background: var(--color-surface-sunken);
+}
+
+.sign-in__panel {
+  inline-size: 100%;
+  max-inline-size: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.sign-in__button {
+  inline-size: 100%;
+}
+
+/**
+ * The note under the button.
+ *
+ * `.metric-card__hint` is reused for its typography rather than duplicated - a second definition of the same
+ * 13px/12px-grey text is how a palette ends up with two spellings of one style.
+ */
+.sign-in__note {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 /** Visually hidden focus label for an icon-only control, whose text is inside an `aria-label`. */
 .icon-action__label {
   position: absolute;

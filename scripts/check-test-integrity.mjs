@@ -31,7 +31,18 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
-const TEST_DIRS = ["packages", "functions"];
+/**
+ * Where test files live, and — more importantly — where they MUST NOT.
+ *
+ * `apps` was added with the admin console in phase A0. Without it this script silently stopped covering four
+ * of the twelve test files: it reported "8 files" while `vitest` reported twelve, which is exactly the failure
+ * mode `AGENTS.md` rule 4 exists to prevent. A guard that covers less than the suite is worse than no guard,
+ * because it is reported as green.
+ *
+ * It walks `src/tests/` rather than globbing `*.test.ts` so a test written outside that directory is not
+ * counted as covered.
+ */
+const TEST_DIRS = ["packages", "functions", "apps"];
 
 /** Collected as one list so the final message names every problem, not just the first. */
 const errors = [];
@@ -59,7 +70,9 @@ function walk(dir, out = []) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       walk(full, out);
-    } else if (entry.endsWith(".test.ts")) {
+    } else if (entry.endsWith(".test.ts") || entry.endsWith(".test.tsx")) {
+      // `.tsx` included since the admin console's first JSX test. Without it this file reported 11 covered
+      // while vitest reported 12 — a guard that under-reports is a guard that is quietly not working.
       out.push(full);
     }
   }

@@ -6,6 +6,75 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Added - admin console phase A2: auth, the guard, and the shell
+
+The console now has a way in and a way of keeping people out.
+
+**Google sign-in, and nothing else.** `signInWithGoogle()` takes no arguments, so email, password and phone
+OTP are absent from the codebase rather than one flag away. constitution rule 18 is scoped here as it applies
+to internal staff identities: this is an operator tool, and its users are identities that already exist. The
+sign-in page has no form and no email field, because a form invites the reader to believe they can
+authenticate with a password — the single most common way an admin console becomes a phishing target.
+
+**The guard distinguishes three states, not two.** `signed-out` goes to `/sign-in`; a session without the
+admin role goes to `/403`; `pending` renders a skeleton. Collapsing the first two is the obvious
+implementation and it loops forever in both directions — a signed-out operator is bounced to sign-in, signs
+in, lands back and is bounced again; a signed-in non-admin sent to sign-in authenticates successfully and is
+bounced forever. `resolveAuthStatus` is a pure function for exactly one reason: that loop only reproduces with
+a real session, a real router and a browser, so all four branches are unit-tested instead.
+
+**It fails closed.** A *failed* role read returns `not-admin`, not `admin`. Showing admin controls to someone
+who could not be verified is worse than a 403 for someone who was about to be let in, and the 403 page says
+"ask an admin" — the correct next step either way.
+
+**The role comes from the database, never from a token.** `user_roles` is read through RLS, whose policy is
+`(user_id = auth.uid()) or is_admin()`. The console's job is to avoid *showing* what an operator cannot *do*,
+never to decide what they may do — every RPC re-checks via `private.is_admin()` regardless.
+
+**One session subscriber, in `providers.tsx`.** The obvious implementation opens an `onAuthStateChange`
+listener inside `useSession`, which means every caller opens its own and two readers can disagree about whether
+a session exists — visible as a screen that renders while the guard still believes you are signed out. The
+session is a query-cache entry and one listener writes into it. That listener also clears the whole cache on
+sign-out, because otherwise the next operator on a shared tablet sees the previous one's cached merchants for
+up to `staleTime`. On a shared device that is a data leak, not a stale read.
+
+`handle_new_user` was left alone deliberately: it grants `customer` and never `admin`. Being an admin stays a
+separate, deliberate act — one `insert into user_roles`. That is correct as written and worth preserving.
+
+### Verified against the live project — Google OAuth is configured and working
+
+Probed directly, not assumed:
+
+- `/auth/v1/settings` reports `external.google: true`
+- `/auth/v1/authorize` returned **400 `Unsupported provider: missing OAuth secret`** before the client secret
+  was pasted, and **302 to `accounts.google.com/v3/signin/identifier`** after
+- following that redirect returns Google's sign-in screen with a real `client_id` and `scope=email profile`,
+  and no error — so the OAuth consent screen is configured too
+
+**Still unproven: the redirect allowlist.** A bogus `redirect_to` also returns 302, including through the PKCE
+path, so *no* server-side probe can distinguish an allowlisted URL from a disallowed one — GoTrue defers the
+check to the callback. It is confirmed by configuration, and one click-through settles it.
+
+**Also enabled, and worth deciding on:** `external.email: true`. Password sign-in is live and project-wide, so
+`signInWithPassword` works for any row in `auth.users`, not just staff. No console code uses it. It is not
+blocking, and it is now recorded rather than left for someone to discover.
+
+**And there is still no admin account.** The only `admin` role in the database belongs to the live-drain
+fixture `live-staff@test.local` — a synthetic uuid, not a person, and `auth.identities` is 0. So signing in
+works but lands you as a `customer` and hits the 403, which is the correct behaviour.
+
+### Fixed - the test-integrity guard was covering 8 of 12 test files
+
+`scripts/check-test-integrity.mjs` walked `packages` and `functions` only, and matched `.test.ts` only. Adding
+the admin console in A0 left four of twelve files uncovered while the script **still reported OK** — "8
+file(s)" next to vitest's twelve. Then `.tsx` left one more out.
+
+This is the failure `AGENTS.md` rule 4 exists to prevent, caused by the guard itself: a check that reports
+green while covering less than the suite is worse than no check, because it is believed. Both roots are fixed
+(`apps` added to the walk, `.tsx` matched), and the counts now agree at 12.
+
+`196 tests pass`, up from 186. Entry chunk is 227 KB gzipped.
+
 ### Added - `apps/admin-web`: the admin console, phase A0
 
 Scaffold and tokens only. **One screen works.** The other 27 are rows in `app/routes.tsx` with no component.

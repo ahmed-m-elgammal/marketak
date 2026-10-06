@@ -82,32 +82,60 @@ requires `src/theme/`. Scaffolding afterwards means ripping out a stylesheet.
 
 **Exit:** a page renders with tokens, no inline styles, and `verify` is green.
 
-### A1 — Audit trail (database, must precede every write screen)
+### A1 — Audit trail — **DEFERRED, do not do this yet**
 
-- [ ] **A1.1** Migration `039_admin_audit`: a `private.write_audit(p_action, p_entity_type, p_entity_id,
-      p_before, p_after)` helper that snapshots `row_to_json` before and after
-- [ ] **A1.2** Call it from all 48 `admin_*` RPCs, plus `adjust_wallet_v1`, `freeze_wallet_v1`,
-      `run_payout_v1`, `set_fee_tier_v1`, `set_commission_rule_v1`
-- [ ] **A1.3** `reconcile_day_v1` writes its `variance_explanation` to `audit_log` too — it is a
-      justification for money, which is the highest-value audit row in the system
-- [ ] **A1.4** **Keep** the existing `events` rows. They drive push routing; `audit_log` is the compliance
-      record. Two logs, different jobs
-- [ ] **A1.5** Migration already exists locally as `038i` but was **never written to disk** — write the
-      file so a fresh `supabase db reset` reproduces `currency` in the claim
-- [ ] **A1.6** Adversarial probes: non-admin cannot write an audit row; `before`/`after` differ on update;
-      deleting a user nulls `actor_user_id` and **keeps the row**; a failing RPC leaves no partial audit row
+**Deferred on 2026-10-06, and the reasoning matters more than the deferral.**
 
-**Exit:** an admin edits a vendor price, and `audit_log` holds the old and new values with the actor id.
+The original A1 claimed it "must precede every write screen". That was checked against the function bodies
+and is **wrong**:
 
-### A2 — Auth and shell
+- `adjust_wallet_v1` already writes a `ledger_entries` row with `signed_amount`, `note = reason`,
+  `metadata = {actor, reference}` and a `ledger_entry_id` linked into `events`. That ledger is append-only and
+  `wallets.balance` is *derived* from it. `audit_log` would be a strictly worse copy of a record that already
+  exists. `freeze_wallet_v1` is the same.
+- `admin_delete_vendor_v1` already refuses an empty `p_reason` (`REASON_REQUIRED`) and records
+  `{'actor', 'reason'}` in `events`. "Who removed this merchant and why" is answerable today.
 
-- [ ] **A2.1** Google sign-in only. No email, no password, no OTP (constitution)
-- [ ] **A2.2** Role gate: read `user_roles` for `auth.uid()`. Not admin → a real 403 page, not a blank
-      screen and not a redirect loop
-- [ ] **A2.3** Route guard on every route, not just the root
-- [ ] **A2.4** Shell: sidebar, header, language switch (ar/en), sign-out
-- [ ] **A2.5** Loading, empty, and error states on the shell itself — rule A4 requires all three designed,
-      not just the happy path
+So the only genuine gap is `admin_upsert_*` recording field **names** but not **values** — the least urgent
+category. Nobody needs last month's delivery fee.
+
+**Reopen A1 when either is true:**
+
+- a **second admin** exists, or
+- a merchant disputes a fee change and the old value cannot be produced, or
+- a payout approval needs attributing to a person for a regulator or an investor.
+
+Until then the 48-function migration buys nothing a single-admin pre-launch MVP uses. `audit_log` stays
+orphaned in the meantime — partitioned, indexed, readable by admins and written by nothing.
+
+- [ ] **A1.1** `private.write_audit(p_action, p_entity_type, p_entity_id, p_before, p_after)` helper
+- [ ] **A1.2** Call it from the `admin_upsert_*` RPCs only. **Not** the deletes or the money functions — they
+      are already audited, and duplicating them creates two sources of truth for one fact
+- [ ] **A1.3** Keep the existing `events` rows. They drive push routing; a compliance log is a different job
+- [ ] **A1.4** Migration `038i` was applied live but **never written to disk** — write the file so a fresh
+      `supabase db reset` reproduces `currency` in the claim
+- [ ] **A1.5** Adversarial probes: a non-admin cannot write an audit row; `before`/`after` differ on update;
+      deleting a user nulls `actor_user_id` and **keeps** the row
+
+### A2 — Auth and shell — **DONE**
+
+- [x] **A2.1** Google sign-in only. `signInWithGoogle()` takes no arguments, so there is no second path
+- [x] **A2.2** Role gate reading `user_roles` through RLS. Not admin → a real 403 that explains itself
+- [x] **A2.3** Route guard wrapping the route group, not a hook inside each page
+- [x] **A2.4** Shell: sidebar, header, language switch (ar/en), sign-out
+- [x] **A2.5** Loading, empty and error states on the shell and the sign-in page
+
+Two things the plan did not anticipate and the implementation had to add:
+
+- **`pending` vs `signed-out` vs `not-admin` are three states, not two.** `signed-out` goes to `/sign-in`,
+  `not-admin` goes to `/403`. Collapsing them loops forever in both directions. `resolveAuthStatus` is a pure
+  function so all four branches are unit-tested — the loop otherwise only reproduces in a real browser.
+- **A *failed* role read is `not-admin`.** Failing closed. Showing admin controls to someone who could not be
+  verified is worse than a 403 for someone about to be let in.
+
+**Not verified end to end:** the Google round trip. The provider is confirmed working against the live
+project, but **there is no admin account** — the only `admin` row is the `live-staff@test.local` fixture — and
+the redirect allowlist can only be proved by completing the browser flow.
 
 **Exit:** an admin signs in with Google and lands on a populated shell; a signed-in non-admin gets 403.
 
