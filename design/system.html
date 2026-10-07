@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام التصميم — Marketak · ماركتك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens/tokens.css">
+<script src="assets/icons.js"></script>
+<style>
+  /* ---- documentation page chrome (reads tokens; canvas neutrals only) ---- */
+  body { margin:0; font-family:var(--mk-font); background:#EFEDEA; color:var(--mk-text-primary);
+         -webkit-font-smoothing:antialiased; }
+  .page { max-width:1200px; margin:0 auto; padding:32px 24px 96px; }
+  .bp-hero { background:var(--mk-surface-chrome); color:var(--mk-text-on-dark); border-radius:var(--mk-radius-xl);
+             padding:40px; margin-bottom:32px; position:relative; overflow:hidden; }
+  .bp-hero .mark { color:var(--mk-brand-primary); width:56px; height:56px; }
+  .bp-hero h1 { font-size:var(--mk-fs-display); line-height:var(--mk-lh-display); margin:16px 0 8px; font-weight:700; }
+  .bp-hero p { margin:0; color:var(--mk-text-on-dark-secondary); font-size:var(--mk-fs-body); max-width:640px; line-height:var(--mk-lh-body); }
+  .bp-hero .en { direction:ltr; text-align:left; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; }
+  .chip { background:rgba(255,255,255,.08); color:var(--mk-text-on-dark-secondary); border:1px solid rgba(255,255,255,.14);
+          padding:6px 12px; border-radius:var(--mk-radius-pill); font-size:var(--mk-fs-caption); }
+  .chip b { color:#F2A76C; font-weight:600; }
+  section { margin-bottom:40px; }
+  h2.sec { font-size:var(--mk-fs-title-1); margin:0 0 4px; font-weight:700; }
+  p.sec-note { margin:0 0 20px; color:var(--mk-text-secondary); font-size:var(--mk-fs-body); max-width:760px; line-height:var(--mk-lh-body); }
+  .card { background:#fff; border:1px solid var(--mk-border-subtle); border-radius:var(--mk-radius-lg); padding:24px; margin-bottom:16px; }
+  .card h3 { margin:0 0 4px; font-size:var(--mk-fs-title-3); font-weight:600; }
+  .card .why { color:var(--mk-text-secondary); font-size:var(--mk-fs-body-sm); margin:0 0 16px; line-height:var(--mk-lh-body-sm); }
+  .grid { display:grid; gap:12px; }
+  .g4 { grid-template-columns:repeat(4,1fr); } .g6 { grid-template-columns:repeat(6,1fr); }
+  .g3 { grid-template-columns:repeat(3,1fr); } .g2 { grid-template-columns:repeat(2,1fr); }
+  @media (max-width:900px){ .g4,.g6{grid-template-columns:repeat(3,1fr);} .g3{grid-template-columns:1fr;} }
+  /* swatches */
+  .sw { border-radius:var(--mk-radius-md); overflow:hidden; border:1px solid var(--mk-border-subtle); background:#fff; }
+  .sw .fill { height:64px; }
+  .sw .meta { padding:10px 12px; }
+  .sw .name { font-size:var(--mk-fs-caption); font-weight:600; direction:ltr; text-align:left; }
+  .sw .hex { font-size:var(--mk-fs-micro); color:var(--mk-text-subtle); direction:ltr; text-align:left; font-family:ui-monospace,monospace; }
+  .sw .use { font-size:var(--mk-fs-micro); color:var(--mk-text-secondary); margin-top:2px; line-height:1.5; }
+  /* type specimens */
+  .type-row { display:flex; align-items:baseline; gap:20px; padding:14px 0; border-bottom:1px dashed var(--mk-border-subtle); }
+  .type-row:last-child { border-bottom:none; }
+  .type-meta { width:210px; flex:none; font-size:var(--mk-fs-caption); color:var(--mk-text-subtle); direction:ltr; text-align:left;
+               font-family:ui-monospace,monospace; }
+  /* icon grid */
+  .icons { display:grid; grid-template-columns:repeat(12,1fr); gap:8px; }
+  @media (max-width:900px){ .icons{grid-template-columns:repeat(6,1fr);} }
+  .ic { display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 4px; border-radius:var(--mk-radius-sm);
+        background:var(--mk-bg-sunken); }
+  .ic [data-icon] { color:var(--mk-text-primary); }
+  .ic span { font-size:9px; color:var(--mk-text-subtle); direction:ltr; font-family:ui-monospace,monospace; }
+  /* component demo wells */
+  .well { background:var(--mk-bg-sunken); border-radius:var(--mk-radius-md); padding:24px; display:flex; gap:16px;
+          flex-wrap:wrap; align-items:center; }
+  .well.column { flex-direction:column; align-items:stretch; }
+  .well-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  /* phone-ish preview for theme skins */
+  .skins { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media (max-width:900px){ .skins{grid-template-columns:1fr;} }
+  .skin { border-radius:var(--mk-radius-lg); padding:20px; min-height:180px; }
+  table.spec { width:100%; border-collapse:collapse; font-size:var(--mk-fs-body-sm); }
+  table.spec th { text-align:right; font-size:var(--mk-fs-caption); color:var(--mk-text-subtle); font-weight:500;
+                  padding:8px 12px; border-bottom:1px solid var(--mk-border-subtle); }
+  table.spec td { padding:10px 12px; border-bottom:1px dashed var(--mk-border-subtle); vertical-align:middle; }
+  code.tok { direction:ltr; display:inline-block; font-family:ui-monospace,monospace; font-size:var(--mk-fs-caption);
+             background:var(--mk-bg-sunken); padding:2px 6px; border-radius:var(--mk-radius-xs); color:var(--mk-status-info); }
+  .note { display:flex; gap:10px; background:var(--mk-wash-warning); border:1px solid #F5E4BC; padding:12px 16px;
+          border-radius:var(--mk-radius-md); font-size:var(--mk-fs-body-sm); color:var(--mk-text-primary); line-height:var(--mk-lh-body-sm); }
+  .note [data-icon] { color:var(--mk-status-warning); margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= HERO ================= -->
+  <div class="bp-hero">
+    <i data-icon="logo-mark" class="mark"></i>
+    <h1>نظام التصميم — ماركتك</h1>
+    <p>المصدر الوحيد للحقيقة لكل ما يخص واجهة تطبيق الموبايل (العميل + المندوب). كل شاشة في <span class="mk-ltr">design/screens/</span> تقرأ من نفس الرموز (tokens) — لا قيم تصميم مكتوبة يدويًا في أي شاشة. اللغة الافتراضية هي العربية (من اليمين لليسار)، والعلامة مأخوذة حرفيًا من <span class="mk-ltr">packages/ui/src/theme/</span> حتى يبدو التطبيق والإدارة كمنظومة واحدة.</p>
+    <div class="chips" dir="ltr">
+      <span class="chip">Source: <b>packages/ui theme</b> (mirrored verbatim)</span>
+      <span class="chip">Arabic-first · <b>RTL default</b></span>
+      <span class="chip">Touch target <b>48px</b></span>
+      <span class="chip">Money always with currency · <b>ج.م</b></span>
+      <span class="chip">Status = <b>word + colour</b>, never colour alone</span>
+    </div>
+  </div>
+
+  <!-- ================= 1. COLOUR ================= -->
+  <section id="color">
+    <h2 class="sec">١ · اللون</h2>
+    <p class="sec-note">ألوان دلالية، وليست لوحة ألوان — الاسم يصف الوظيفة (<span class="mk-ltr">surface.sunken</span>) لا القيمة (<span class="mk-ltr">grey.100</span>)، حتى تنجو أي إعادة تسمية للعلامة بدون لمس شاشة واحدة. كل الأزواج مقاسة مقابل حد التباين AA في <span class="mk-ltr">packages/ui</span>؛ أي تعديل هنا يجب أن يُقاس من جديد.</p>
+
+    <div class="card">
+      <h3>العلامة والتفاعل — Brand &amp; action</h3>
+      <p class="why" dir="ltr">The one colour an operator/customer associates with Marketak. White on primary = 5.43:1.</p>
+      <div class="grid g4">
+        <div class="sw"><div class="fill" style="background:var(--mk-brand-primary)"></div><div class="meta"><div class="name">brand.primary</div><div class="hex">#B54708</div><div class="use">الأزرار الأساسية، التبويب النشط</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-brand-primary-hover)"></div><div class="meta"><div class="name">brand.primaryHover</div><div class="hex">#93370D</div><div class="use">الضغط والتحويم</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-brand-subtle)"></div><div class="meta"><div class="name">brand.subtle</div><div class="hex">#FEF6F2</div><div class="use">خلفيات مختارة ناعمة</div></div></div>
+        <div class="sw"><div class="fill" style="background:#F2A76C"></div><div class="meta"><div class="name">brand.onDarkText <span style="color:var(--mk-status-danger)">skin B only</span></div><div class="hex">#F2A76C</div><div class="use">نص برتقالي على الخلفيات الداكنة (≥4.5:1)</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>الأسطح والنصوص والحدود — Surfaces, text, borders</h3>
+      <p class="why" dir="ltr">17.49:1 / 7.63:1 / 4.80:1 for primary / secondary / subtle text on white. Disabled is exempt from AA by design — a disabled control must look disabled.</p>
+      <div class="grid g6">
+        <div class="sw"><div class="fill" style="background:var(--mk-surface-base); border-bottom:1px solid var(--mk-border-subtle)"></div><div class="meta"><div class="name">surface.base</div><div class="hex">#FFFFFF</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-surface-sunken)"></div><div class="meta"><div class="name">surface.sunken</div><div class="hex">#F9FAFB</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-surface-hover)"></div><div class="meta"><div class="name">surface.hover</div><div class="hex">#F3F4F6</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-surface-chrome)"></div><div class="meta"><div class="name" style="color:#fff">surface.chrome</div><div class="hex">#1C1917</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-border-subtle)"></div><div class="meta"><div class="name">border.subtle</div><div class="hex">#EAEAEA</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-border-strong)"></div><div class="meta"><div class="name">border.strong</div><div class="hex">#94908C</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-text-primary)"></div><div class="meta"><div class="name">text.primary</div><div class="hex">#1C1917</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-text-secondary)"></div><div class="meta"><div class="name">text.secondary</div><div class="hex">#57534E</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-text-subtle)"></div><div class="meta"><div class="name">text.subtle</div><div class="hex">#78716C</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-text-disabled)"></div><div class="meta"><div class="name">text.disabled</div><div class="hex">#A8A29E</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-text-on-dark-secondary)"></div><div class="meta"><div class="name">text.onDark2nd</div><div class="hex">#D6D3D1</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-scrim)"></div><div class="meta"><div class="name">surface.scrim</div><div class="hex">rgba…45%</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>الحالات — Status (الكلمة أولًا، ثم اللون)</h3>
+      <p class="why">لا تُقال الحالة باللون وحده أبدًا — كل شارة تحمل نصًا. التطبيق يربط: تم التوصيل/مدفوع ← نجاح، قيد التحضير/قيد التنفيذ ← معلومات، مرفوض/ملغي ← خطر، مشغول ← تحذير.</p>
+      <div class="grid g4" dir="ltr">
+        <div class="sw"><div class="fill" style="background:var(--mk-wash-success)"></div><div class="meta"><div class="name">success / wash</div><div class="hex">#067647 / #ECFDF3</div><div class="use">تم التوصيل · مفتوح · مدفوع</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-wash-info)"></div><div class="meta"><div class="name">info / wash</div><div class="hex">#175CD3 / #EFF8FF</div><div class="use">قيد التحضير · بانتظار القبول</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-wash-warning)"></div><div class="meta"><div class="name">warning / wash</div><div class="hex">#B54708 / #FFFAEB</div><div class="use">مشغول · تحذير حد النقد 80%</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-wash-danger)"></div><div class="meta"><div class="name">danger / wash</div><div class="hex">#B42318 / #FEF3F2</div><div class="use">مرفوض · ملغي · خطأ</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>لوحة الرسم التوضيحي — Illustration palette (أصول مولّدة SVG)</h3>
+      <p class="why">كل الأصول (شعار، طعام، خرائط، رسوم البطل) تُرسم SVG بمفردنا لأن التطبيق يخدم مصر ولا نعتمد على مصادر خارجية. اللوحة مشتقة من ألوان العلامة والحالة — لا لون جديد بلا رمز.</p>
+      <div class="grid g6" dir="ltr">
+        <div class="sw"><div class="fill" style="background:var(--mk-illu-bg)"></div><div class="meta"><div class="name">illu.bg</div><div class="hex">#FFF7EF</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-illu-1)"></div><div class="meta"><div class="name">illu.1</div><div class="hex">#B54708</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-illu-2)"></div><div class="meta"><div class="name">illu.2</div><div class="hex">#E58B54</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-illu-3)"></div><div class="meta"><div class="name">illu.3</div><div class="hex">#F3C9A8</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-illu-4)"></div><div class="meta"><div class="name">illu.4</div><div class="hex">#067647</div></div></div>
+        <div class="sw"><div class="fill" style="background:var(--mk-illu-5)"></div><div class="meta"><div class="name">illu.5</div><div class="hex">#7FC49E</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. TYPOGRAPHY ================= -->
+  <section id="type">
+    <h2 class="sec">٢ · الخطوط والمقاسات</h2>
+    <p class="sec-note">عائلة واحدة للغتين: <span class="mk-ltr">IBM Plex Sans Arabic + IBM Plex Sans</span> — نفس الهيكل العظمي حتى لا تظهر «درزة» بين سطر عربي وسطر لاتيني في نفس البطاقة (نفس اختيار الإدارة). سلم الموبايل أكبر خطوة من سلم الإدارة لأن القراءة باليد وبتعجل.</p>
+
+    <div class="card">
+      <h3>سلّم الخط — Type scale</h3>
+      <p class="why" dir="ltr">Mobile reads 1 step larger than the console scale. Weights: 700 display, 600 titles, 500 labels, 400 body.</p>
+      <div class="type-row"><div class="type-meta">display-xl · 32/42 · 700</div><div style="font-size:var(--mk-fs-display-xl);line-height:var(--mk-lh-display-xl);font-weight:700">أسواق مدينتك بسرعة</div></div>
+      <div class="type-row"><div class="type-meta">display · 28/36 · 700</div><div style="font-size:var(--mk-fs-display);line-height:var(--mk-lh-display);font-weight:700">أهلاً يا سارة</div></div>
+      <div class="type-row"><div class="type-meta">title-1 · 24/32 · 600</div><div style="font-size:var(--mk-fs-title-1);line-height:var(--mk-lh-title-1);font-weight:600">أكمل ملفك الشخصي</div></div>
+      <div class="type-row"><div class="type-meta">title-2 · 20/28 · 600</div><div style="font-size:var(--mk-fs-title-2);line-height:var(--mk-lh-title-2);font-weight:600">أقرب المحلات المفتوحة الآن</div></div>
+      <div class="type-row"><div class="type-meta">title-3 · 17/24 · 600</div><div style="font-size:var(--mk-fs-title-3);line-height:var(--mk-lh-title-3);font-weight:600">بيتزا بليس — الزمالك</div></div>
+      <div class="type-row"><div class="type-meta">body · 15/22 · 400</div><div style="font-size:var(--mk-fs-body);line-height:var(--mk-lh-body)">طلبك من محلتين في رحلة واحدة — مندوب واحد يجمعه ويوصّله لبابك.</div></div>
+      <div class="type-row"><div class="type-meta">body-sm · 13/18 · 400</div><div style="font-size:var(--mk-fs-body-sm);line-height:var(--mk-lh-body-sm);color:var(--mk-text-secondary)">التوصيل 20–40 دقيقة · رسوم التوصيل 25.00 ج.م</div></div>
+      <div class="type-row"><div class="type-meta">label · 13/18 · 500</div><div style="font-size:var(--mk-fs-label);line-height:var(--mk-lh-label);font-weight:500;color:var(--mk-text-secondary)">رقم الموبايل</div></div>
+      <div class="type-row"><div class="type-meta">caption · 12/16 · 400</div><div style="font-size:var(--mk-fs-caption);line-height:var(--mk-lh-caption);color:var(--mk-text-subtle)">طلب <span class="mk-ltr">MK-261004-7F3K9</span> · 12:40 م</div></div>
+      <div class="type-row"><div class="type-meta">micro · 11/14 · 500</div><div style="font-size:var(--mk-fs-micro);line-height:var(--mk-lh-micro);font-weight:500">للشارات والوسوم فقط</div></div>
+    </div>
+
+    <div class="note">
+      <i data-icon="alert"></i>
+      <div><b>قاعدتان صارمتان للغتين:</b> لا <span class="mk-ltr">text-transform: uppercase</span> إطلاقًا (لا معنى لها في العربية وتُخفي الفرق في الإنجليزية)، ولا <span class="mk-ltr">letter-spacing</span> على أي نص عربي (يقطع اتصال الحروف). الترقيم: أرقام غربية <span class="mk-ltr">0-9</span> مع «ج.م» ملتصقة بالمبلغ دائمًا، والعملة تُقرأ من إعدادات الصف (<span class="mk-ltr">currency</span>) وليست ثابتة في الكود.</div>
+    </div>
+  </section>
+
+  <!-- ================= 3. GEOMETRY ================= -->
+  <section id="geometry">
+    <h2 class="sec">٣ · الفراغات والانحناءات والرفع</h2>
+    <p class="sec-note">شبكة 4px — كل رقم من مضاعفاتها، فأي مكوّنين يستخدمان نفس الخطوة يتصاذبان تمامًا. الحد الأدنى لكل هدف لمس <b>48px</b> (المندوب يستخدم التطبيق بإيد واحدة وفي الشارع).</p>
+
+    <div class="card">
+      <h3>الفراغ — Spacing</h3>
+      <div class="well" dir="ltr" style="gap:8px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:4px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">4</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:8px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">8</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:12px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">12</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:16px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">16 — gutter</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:20px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">20</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:24px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">24</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:32px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">32</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:center"><div style="width:48px;height:32px;background:var(--mk-brand-primary);border-radius:2px"></div><span class="type-meta" style="width:auto">48</span></div>
+      </div>
+    </div>
+
+    <div class="grid g3">
+      <div class="card" style="margin:0">
+        <h3>الانحناء — Radius</h3>
+        <p class="why" dir="ltr">Mobile is one step softer than the console: control 12, card 16, sheet 20. Pills for chips/badges.</p>
+        <div class="well" style="gap:12px">
+          <div style="width:56px;height:56px;background:var(--mk-action-soft);border:1.5px solid var(--mk-brand-primary);border-radius:var(--mk-radius-xs)"></div>
+          <div style="width:56px;height:56px;background:var(--mk-action-soft);border:1.5px solid var(--mk-brand-primary);border-radius:var(--mk-radius-sm)"></div>
+          <div style="width:56px;height:56px;background:var(--mk-action-soft);border:1.5px solid var(--mk-brand-primary);border-radius:var(--mk-radius-md)"></div>
+          <div style="width:56px;height:56px;background:var(--mk-action-soft);border:1.5px solid var(--mk-brand-primary);border-radius:var(--mk-radius-lg)"></div>
+          <div style="width:56px;height:56px;background:var(--mk-action-soft);border:1.5px solid var(--mk-brand-primary);border-radius:var(--mk-radius-xl)"></div>
+          <div style="width:56px;height:56px;background:var(--mk-action-soft);border:1.5px solid var(--mk-brand-primary);border-radius:var(--mk-radius-pill)"></div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <h3>الرفع — Elevation</h3>
+        <p class="why" dir="ltr">Low and soft — outdoor legibility beats drama. Skins retune: B uses hairline rings + depth, C warm-tinted shadows.</p>
+        <div class="well" style="gap:16px;background:var(--mk-bg-sunken)">
+          <div style="width:64px;height:44px;background:#fff;border-radius:var(--mk-radius-md);box-shadow:var(--mk-elev-0);border:1px solid var(--mk-border-subtle)"></div>
+          <div style="width:64px;height:44px;background:#fff;border-radius:var(--mk-radius-md);box-shadow:var(--mk-elev-1)"></div>
+          <div style="width:64px;height:44px;background:#fff;border-radius:var(--mk-radius-md);box-shadow:var(--mk-elev-2)"></div>
+          <div style="width:64px;height:44px;background:#fff;border-radius:var(--mk-radius-md);box-shadow:var(--mk-elev-3)"></div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <h3>الحركة — Motion</h3>
+        <p class="why" dir="ltr">120ms feedback, 200ms transitions, 320ms sheets. Never decorative — a delivery app is used one-handed, in a hurry.</p>
+        <div class="well column" style="gap:10px">
+          <code class="tok">--mk-motion-fast: 120ms</code>
+          <code class="tok">--mk-motion-base: 200ms</code>
+          <code class="tok">--mk-motion-slow: 320ms</code>
+          <code class="tok">--mk-ease: cubic-bezier(.2,0,0,1)</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>جلد التصميم = رموز فقط — Theme skins are token swaps</h3>
+      <p class="why">نفس البطاقة ونفس الزر في الثلاثة اتجاهات المقترحة. لا يوجد أي HTML مختلف — فقط <span class="mk-ltr">.theme-a / .theme-b / .theme-c</span> تعيد ضبط رموز الأسطح والانحناء والرفع. لون العلامة والحالات لا يتغير أبدًا.</p>
+      <div class="skins">
+        <div class="skin theme-a" style="background:var(--mk-bg)">
+          <div style="font-size:var(--mk-fs-caption);font-weight:600;margin-bottom:12px">A · Warm Minimal — فاتح، وفيّ بالعلامة</div>
+          <div style="background:var(--mk-card);border:1px solid var(--mk-card-border);border-radius:var(--mk-radius-lg);box-shadow:var(--mk-shadow-card);padding:14px">
+            <div style="font-size:var(--mk-fs-title-3);font-weight:600">بيتزا بليس</div>
+            <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-3);margin:2px 0 12px">بيتزا · 20–40 دقيقة</div>
+            <button class="mk-btn mk-btn-primary" style="width:100%"><i data-icon="bag"></i>أضف للسلة</button>
+          </div>
+        </div>
+        <div class="skin theme-b" style="background:var(--mk-bg)">
+          <div style="font-size:var(--mk-fs-caption);font-weight:600;margin-bottom:12px;color:var(--mk-text-1)">B · Midnight Chrome — داكن فاخر</div>
+          <div style="background:var(--mk-card);border:1px solid var(--mk-card-border);border-radius:var(--mk-radius-lg);box-shadow:var(--mk-shadow-card);padding:14px">
+            <div style="font-size:var(--mk-fs-title-3);font-weight:600;color:var(--mk-text-1)">بيتزا بليس</div>
+            <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-3);margin:2px 0 12px">بيتزا · 20–40 دقيقة</div>
+            <button class="mk-btn mk-btn-primary" style="width:100%"><i data-icon="bag"></i>أضف للسلة</button>
+          </div>
+        </div>
+        <div class="skin theme-c" style="background:var(--mk-bg)">
+          <div style="font-size:var(--mk-fs-caption);font-weight:600;margin-bottom:12px">C · Fresh Editorial — كريمي ودود</div>
+          <div style="background:var(--mk-card);border:1px solid var(--mk-card-border);border-radius:var(--mk-radius-xl);box-shadow:var(--mk-shadow-card);padding:14px">
+            <div style="font-size:var(--mk-fs-title-3);font-weight:600">بيتزا بليس</div>
+            <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-3);margin:2px 0 12px">بيتزا · 20–40 دقيقة</div>
+            <button class="mk-btn mk-btn-primary" style="width:100%;border-radius:var(--mk-radius-md)"><i data-icon="bag"></i>أضف للسلة</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. ICONS ================= -->
+  <section id="icons">
+    <h2 class="sec">٤ · الأيقونات</h2>
+    <p class="sec-note">شبكة 24px، سماكة 1.8px، أطراف دائرية، تلوّن بـ <span class="mk-ltr">currentColor</span> (تحترم رموز النص في كل جلد). المصدر الوحيد: <span class="mk-ltr">design/assets/icons.js</span> — شعارات Google وApple بألوانها الرسمية، وشعار ماركتك مولّد خصيصًا (شنطة سوق تحمل حرف «م»).</p>
+    <div class="card">
+      <div class="icons" dir="ltr">
+        <div class="ic"><i data-icon="home"></i><span>home</span></div>
+        <div class="ic"><i data-icon="home-fill"></i><span>home-fill</span></div>
+        <div class="ic"><i data-icon="search"></i><span>search</span></div>
+        <div class="ic"><i data-icon="cart"></i><span>cart</span></div>
+        <div class="ic"><i data-icon="cart-fill"></i><span>cart-fill</span></div>
+        <div class="ic"><i data-icon="receipt"></i><span>receipt</span></div>
+        <div class="ic"><i data-icon="user"></i><span>user</span></div>
+        <div class="ic"><i data-icon="user-fill"></i><span>user-fill</span></div>
+        <div class="ic"><i data-icon="helmet"></i><span>helmet</span></div>
+        <div class="ic"><i data-icon="scooter"></i><span>scooter</span></div>
+        <div class="ic"><i data-icon="pin"></i><span>pin</span></div>
+        <div class="ic"><i data-icon="route"></i><span>route</span></div>
+        <div class="ic"><i data-icon="plus"></i><span>plus</span></div>
+        <div class="ic"><i data-icon="minus"></i><span>minus</span></div>
+        <div class="ic"><i data-icon="close"></i><span>close</span></div>
+        <div class="ic"><i data-icon="check"></i><span>check</span></div>
+        <div class="ic"><i data-icon="check-circle"></i><span>check-circle</span></div>
+        <div class="ic"><i data-icon="alert"></i><span>alert</span></div>
+        <div class="ic"><i data-icon="info"></i><span>info</span></div>
+        <div class="ic"><i data-icon="chevron-left"></i><span>chev-left</span></div>
+        <div class="ic"><i data-icon="chevron-right"></i><span>chev-right</span></div>
+        <div class="ic"><i data-icon="chevron-down"></i><span>chev-down</span></div>
+        <div class="ic"><i data-icon="arrow-left"></i><span>arrow-left</span></div>
+        <div class="ic"><i data-icon="sliders"></i><span>sliders</span></div>
+        <div class="ic"><i data-icon="edit"></i><span>edit</span></div>
+        <div class="ic"><i data-icon="trash"></i><span>trash</span></div>
+        <div class="ic"><i data-icon="refresh"></i><span>refresh</span></div>
+        <div class="ic"><i data-icon="logout"></i><span>logout</span></div>
+        <div class="ic"><i data-icon="globe"></i><span>globe</span></div>
+        <div class="ic"><i data-icon="star"></i><span>star</span></div>
+        <div class="ic"><i data-icon="star-fill"></i><span>star-fill</span></div>
+        <div class="ic"><i data-icon="clock"></i><span>clock</span></div>
+        <div class="ic"><i data-icon="cash"></i><span>cash</span></div>
+        <div class="ic"><i data-icon="wallet"></i><span>wallet</span></div>
+        <div class="ic"><i data-icon="gift"></i><span>gift</span></div>
+        <div class="ic"><i data-icon="voucher"></i><span>voucher</span></div>
+        <div class="ic"><i data-icon="store"></i><span>store</span></div>
+        <div class="ic"><i data-icon="bag"></i><span>bag</span></div>
+        <div class="ic"><i data-icon="phone"></i><span>phone</span></div>
+        <div class="ic"><i data-icon="camera"></i><span>camera</span></div>
+        <div class="ic"><i data-icon="image"></i><span>image</span></div>
+        <div class="ic"><i data-icon="bell"></i><span>bell</span></div>
+        <div class="ic"><i data-icon="shield"></i><span>shield</span></div>
+        <div class="ic"><i data-icon="headset"></i><span>headset</span></div>
+        <div class="ic"><i data-icon="offline"></i><span>offline</span></div>
+        <div class="ic"><i data-icon="sparkle"></i><span>sparkle</span></div>
+        <div class="ic"><i data-icon="flame"></i><span>flame</span></div>
+        <div class="ic"><i data-icon="leaf"></i><span>leaf</span></div>
+        <div class="ic"><i data-icon="google"></i><span>google</span></div>
+        <div class="ic"><i data-icon="apple"></i><span>apple</span></div>
+        <div class="ic"><i data-icon="logo-mark"></i><span>logo-mark</span></div>
+        <div class="ic"><i data-icon="vodafone-cash"></i><span>vodafone-cash</span></div>
+        <div class="ic"><i data-icon="instapay"></i><span>instapay</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. COMPONENTS ================= -->
+  <section id="components">
+    <h2 class="sec">٥ · المكوّنات وحالاتها</h2>
+    <p class="sec-note">مكوّنات الطبقة المشتركة (<span class="mk-ltr">tokens.css → component layer</span>). كل حالة موثقة هنا تُبنى مرة واحدة وتُعاد في كل الشاشات — مسارات التحميل والفراغ والفشل ليست «حالات لاحقة» بل جزء من تعريف المكوّن.</p>
+
+    <div class="grid g2">
+      <div class="card" style="margin:0">
+        <h3>الأزرار — Buttons</h3>
+        <p class="why" dir="ltr">Primary · secondary · ghost · dark · danger · disabled. Min height 48px, primary 52px.</p>
+        <div class="well column" style="gap:10px">
+          <div class="well-row">
+            <button class="mk-btn mk-btn-primary">متابعة الدفع</button>
+            <button class="mk-btn mk-btn-secondary">عرض القائمة</button>
+            <button class="mk-btn mk-btn-ghost">إلغاء</button>
+          </div>
+          <div class="well-row">
+            <button class="mk-btn mk-btn-dark"><i data-icon="apple"></i>تسجيل الدخول</button>
+            <button class="mk-btn mk-btn-danger">إزالة المحل</button>
+            <button class="mk-btn mk-btn-primary" disabled>جاري التنفيذ…</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin:0">
+        <h3>الحقول — Inputs &amp; states</h3>
+        <p class="why" dir="ltr">Default · focus (brand ring) · filled · error with «what to do next» text · phone uses E.164 +20.</p>
+        <div class="well column" style="gap:14px">
+          <div class="mk-field">
+            <label>الاسم الأول</label>
+            <div class="mk-input is-focus"><input placeholder="مثال: سارة" value="سارة"></div>
+          </div>
+          <div class="mk-field">
+            <label>رقم الموبايل</label>
+            <div class="mk-input is-error"><span style="font-weight:600;color:var(--mk-text-2)" dir="ltr">+20</span><input value="0101234567" dir="ltr" style="text-align:right"></div>
+            <div class="mk-field-error"><i data-icon="alert" style="width:14px;height:14px"></i>رقم الموبايل غير صحيح — ابدأ بـ 01 واكتب 11 رقمًا</div>
+          </div>
+          <div class="mk-field">
+            <label>معلومة للسائق</label>
+            <div class="mk-input"><input placeholder="مثال: عند سلم العمارة، فيلا 7" disabled></div>
+            <div class="mk-field-hint">اختياري — يساعد المندوب يوصلك أسرع</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin:0">
+        <h3>شارات الحالة — Status pills (كلمة + لون)</h3>
+        <p class="why" dir="ltr">order.status vocabulary the customer sees. Dot reinforces; the word carries the meaning.</p>
+        <div class="well column" style="gap:10px">
+          <div class="well-row">
+            <span class="mk-badge mk-badge-info"><span class="dot"></span>بانتظار تأكيد المحل</span>
+            <span class="mk-badge mk-badge-info"><span class="dot"></span>قيد التحضير</span>
+            <span class="mk-badge mk-badge-warning"><span class="dot"></span>المحل مشغول</span>
+          </div>
+          <div class="well-row">
+            <span class="mk-badge mk-badge-success"><span class="dot"></span>تم التوصيل</span>
+            <span class="mk-badge mk-badge-danger"><span class="dot"></span>تم الرفض</span>
+            <span class="mk-badge mk-badge-neutral"><span class="dot"></span>ملغي</span>
+            <span class="mk-badge mk-badge-brand">مفتوح الآن</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin:0">
+        <h3>بطاقة محل — Vendor card</h3>
+        <p class="why" dir="ltr">Data from get_vendor_feed_v1: name_ar, vertical, rating_avg, eta range, delivery fee, minimum order, open/busy. Closed vendors render at 60% opacity with word, not grey alone.</div>
+        <div class="well column">
+          <div class="mk-card" style="display:flex;gap:14px;padding:14px;align-items:center">
+            <div style="width:64px;height:64px;border-radius:var(--mk-radius-md);background:var(--mk-action-soft);display:flex;align-items:center;justify-content:center;flex:none">
+              <svg viewBox="0 0 48 48" width="40" height="40"><path fill="var(--mk-illu-1)" d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z"/><path fill="var(--mk-illu-3)" d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z"/></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+                <div style="font-size:var(--mk-fs-title-3);font-weight:600">بيتزا بليس</div>
+                <span class="mk-badge mk-badge-brand"><span class="dot" style="background:var(--mk-brand-primary)"></span>مفتوح الآن</span>
+              </div>
+              <div style="font-size:var(--mk-fs-body-sm);color:var(--mk-text-3);margin:2px 0 8px">بيتزا ومأكولات إيطالية · الزمالك</div>
+              <div style="display:flex;gap:14px;font-size:var(--mk-fs-body-sm);color:var(--mk-text-2)">
+                <span style="display:inline-flex;align-items:center;gap:4px"><i data-icon="star-fill" style="width:14px;height:14px;color:var(--mk-brand-primary)"></i><b>4.6</b> (320)</span>
+                <span style="display:inline-flex;align-items:center;gap:4px"><i data-icon="clock" style="width:14px;height:14px"></i>20–40 د</span>
+                <span class="mk-money"><i data-icon="scooter" style="width:14px;height:14px"></i> 25.00 ج.م</span>
+              </div>
+            </div>
+          </div>
+          <div class="mk-card" style="display:flex;gap:14px;padding:14px;align-items:center;opacity:.6">
+            <div style="width:64px;height:64px;border-radius:var(--mk-radius-md);background:var(--mk-bg-sunken);display:flex;align-items:center;justify-content:center;flex:none;color:var(--mk-text-subtle)"><i data-icon="store"></i></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:var(--mk-fs-title-3);font-weight:600">برجر هاوس</div><span class="mk-badge mk-badge-neutral"><span class="dot"></span>مغلق — يفتح 11:30 ص</span></div>
+              <div style="font-size:var(--mk-fs-body-sm);color:var(--mk-text-3);margin-top:2px">برجر · الزمالك</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin:0">
+        <h3>شريط التبويبات — Tab bar (العميل)</h3>
+        <p class="why" dir="ltr">5 tabs, active = brand colour + dot (not colour alone vs inactive). Badge on cart shows vendor-aware item count.</p>
+        <div class="well column" style="padding:0;overflow:hidden">
+          <div class="mk-tabbar" style="border-radius:0">
+            <a class="mk-tab is-active"><i data-icon="home-fill"></i>الرئيسية<span class="tabdot"></span></a>
+            <a class="mk-tab"><i data-icon="search"></i>البحث<span class="tabdot"></span></a>
+            <a class="mk-tab"><i data-icon="cart"></i><span style="position:relative">السلة<span style="position:absolute;top:-4px;inset-inline-start:-10px;background:var(--mk-brand-primary);color:#fff;font-size:10px;font-weight:600;min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px">3</span></span><span class="tabdot"></span></a>
+            <a class="mk-tab"><i data-icon="receipt"></i>طلباتي<span class="tabdot"></span></a>
+            <a class="mk-tab"><i data-icon="user"></i>حسابي<span class="tabdot"></span></a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin:0">
+        <h3>التحميل والفراغ — Skeleton &amp; empty</h3>
+        <p class="why" dir="ltr">Loading mirrors the real card shape. Empty states say <b>why</b> + <b>what to do</b> (console rule 10, carried to mobile).</p>
+        <div class="well column" style="gap:14px">
+          <div class="mk-card" style="display:flex;gap:14px;padding:14px;align-items:center">
+            <div class="mk-skel" style="width:64px;height:64px;border-radius:var(--mk-radius-md)"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div class="mk-skel" style="height:14px;width:55%"></div>
+              <div class="mk-skel" style="height:12px;width:80%"></div>
+              <div class="mk-skel" style="height:12px;width:40%"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;text-align:center">
+            <div style="width:56px;height:56px;border-radius:var(--mk-radius-pill);background:var(--mk-action-soft);display:flex;align-items:center;justify-content:center;color:var(--mk-brand-primary)"><i data-icon="search"></i></div>
+            <div style="font-size:var(--mk-fs-title-3);font-weight:600">مفيش نتائج لـ«شاورما كريزي»</div>
+            <div style="font-size:var(--mk-fs-body-sm);color:var(--mk-text-2);max-width:260px">جرّب كلمة أبسط، أو شوف المحلات المفتوحة دلوقتي في الزمالك.</div>
+            <button class="mk-btn mk-btn-secondary mk-btn-sm">شوف المفتوح الآن</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>لافتات النظام — System banners</h3>
+      <p class="why" dir="ltr">Offline (browse cache still works — display-only), quote expiry countdown (5-minute TTL), PRICE_CHANGED re-confirm. Words first, colour second.</p>
+      <div class="well column" style="gap:10px">
+        <div class="mk-banner mk-banner-offline" style="border-radius:var(--mk-radius-md)"><i data-icon="offline"></i>أنت غير متصل — بتتصفح من الكاش. الأسعار تقديرية حتى رجوع الاتصال.</div>
+        <div class="mk-banner" style="background:var(--mk-wash-warning);color:var(--mk-status-warning);border-radius:var(--mk-radius-md)"><i data-icon="clock"></i>عرض السعر يتحدث بعد <b>02:41</b> — نعيد التسعير تلقائيًا قبل الدفع.</div>
+        <div class="mk-banner" style="background:var(--mk-wash-danger);color:var(--mk-status-danger);border-radius:var(--mk-radius-md)"><i data-icon="alert"></i>اتغير سعر صنفين من طلبك — راجع الفرق وأكّد قبل الإرسال.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. INTERACTION PATTERNS ================= -->
+  <section id="patterns">
+    <h2 class="sec">٦ · أنماط التفاعل</h2>
+    <p class="sec-note">الأنماط التي تحكم كل شاشة — مشتقة من دستور المنصة وقواعدها، وليست ذوقًا شخصيًا.</p>
+    <div class="card">
+      <table class="spec">
+        <tr><th style="width:220px">النمط</th><th>القاعدة</th><th style="width:290px">السبب (من المواصفات)</th></tr>
+        <tr><td><b>أهداف اللمس</b></td><td>الحد الأدنى 48×48px لكل عنصر تفاعلي؛ الأزرار الأساسية 52px ارتفاعًا.</td><td>المندوب يستخدم التطبيق بإيد واحدة وفي الشارع (<span class="mk-ltr">MIN_TOUCH_TARGET</span>).</td></tr>
+        <tr><td><b>الاتجاه والمرآة</b></td><td>العربية RTL افتراضيًا؛ كل الهوامش بخصائص منطقية (<span class="mk-ltr">inline-start</span>) فتنعكس الواجهة كاملة للإنجليزية بلا CSS منفصل.</td><td>اللغة الافتراضية <span class="mk-ltr">ar</span>؛ كيانان <span class="mk-ltr">name/name_ar</span> في كل جدول.</td></tr>
+        <tr><td><b>النقود</b></td><td>المبلغ لا يظهر أبدًا بدون عملته («25.00 ج.م»)؛ الأرقام جدولية (<span class="mk-ltr">tabular-nums</span>)؛ التطبيق لا يحسب — يعرض تسعير السيرفر فقط.</td><td>نقود بياسمات صحيحة؛ <span class="mk-ltr">place_order_v1</span> يعيد التسعير ويرفض بـ <span class="mk-ltr">PRICE_CHANGED</span>.</td></tr>
+        <tr><td><b>عرض السعر المؤقت</b></td><td>عد تنازلي مرئي 5:00 دقائق؛ عند الانتهاء إعادة تسعير تلقائية مع شرح الفرق بدل فشل صامت.</td><td><span class="mk-ltr">QUOTE_EXPIRED</span> / TTL خمس دقائق في <span class="mk-ltr">quote_order_v1</span>.</td></tr>
+        <tr><td><b>طريقة الدفع عند التوصيل</b></td><td>كاش أو محفظة (فودافون كاش/إنستاباي) — تُختار وتُغيّر حتى لحظة التسليم، لا عند الدفع.</td><td>FR-C-09: الدفع يُختار «at delivery»؛ لا محفظة عميل (ADR 2).</td></tr>
+        <tr><td><b>السلة متعددة المحلات</b></td><td>مقياس مرئي 3/3 محلات؛ منع الدفع بالتسمية: «شيل محل X للمتابعة».</td><td>حد 3 محلات/طلب؛ <span class="mk-ltr">TOO_MANY_VENDORS</span>.</td></tr>
+        <tr><td><b>التحديث أثناء الطلب</b></td><td>سحب للتحديث + تحديث عند العودة للتطبيق؛ لا استطلاع أسرع من 45 ثانية؛ الجديد يصل إشعارًا.</td><td>الدستور V (الكوست محسوب)؛ P-07: التحديثات بدفعات.</td></tr>
+        <tr><td><b>العمل بلا إنترنت</b></td><td>الكتالوج والسلة من كاش مشفر (عرض فقط) — أي سعر من الكاش يوسم «تقديري». الطلب نفسه لا يُنشأ على الجهاز أبدًا.</td><td>§6.2 — SQLite cache display-only؛ الطلب عبر RPC فقط.</td></tr>
+        <tr><td><b>الإشعارات والروابط العميقة</b></td><td>كل إشعار له مقابله داخل التطبيق؛ «تغيّر طلبك» يفتح شاشة الحل (إزالة المحل أو المتابعة) مباشرة.</td><td><span class="mk-ltr">vendor_rejected</span> = الإشعار الذي يقرر عودة العميل.</td></tr>
+        <tr><td><b>الحالات الإلزامية</b></td><td>كل شاشة تُصمم بحالاتها الخمس: تحميل، فراغ، نجاح، خطأ، غير متصل — قبل اعتبارها جاهزة.</td><td>Checklist A4: «empty, loading and failure states all designed».</td></tr>
+        <tr><td><b>الوصولية</b></td><td>تباين AA في كل الأزواج (المقاسة في packages/ui)؛ الحالة بالكلمة واللون؛ دعم تكبير خط النظام حتى 130%؛ حلقة تركيز برتقالية موحدة.</td><td>جدول التباين في <span class="mk-ltr">colors.ts</span>؛ SC 1.4.11/2.4.11.</td></tr>
+      </table>
+    </div>
+  </section>
+
+</div>
+<script>window.MarketakIcons && MarketakIcons.inject();</script>
+</body>
+</html>

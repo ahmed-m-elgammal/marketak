@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketak · ماركتك — المعرض المصمم للموبايل (الدفعة 1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens/tokens.css">
+<script src="assets/icons.js"></script>
+<style>
+  body { margin:0; font-family:var(--mk-font); background:#171412; color:#fff; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1280px; margin:0 auto; padding:48px 28px 96px; }
+  .hero { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .hero .mark { width:56px; height:56px; color:var(--mk-brand-primary); }
+  .hero h1 { font-size:32px; margin:0; font-weight:700; }
+  .hero h1 small { display:block; font-size:14px; font-weight:400; color:#A8A29E; margin-top:4px; }
+  .hero .links { margin-inline-start:auto; display:flex; gap:10px; flex-wrap:wrap; }
+  .hero .links a { display:inline-flex; align-items:center; gap:8px; color:#F2A76C; text-decoration:none; font-size:14px; font-weight:600;
+                   border:1px solid rgba(242,167,108,.4); padding:10px 16px; border-radius:999px; transition:all .15s; }
+  .hero .links a:hover { background:rgba(181,71,8,.25); }
+  .note { margin:28px 0 0; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:18px 22px;
+          font-size:14px; color:#D6D3D1; line-height:1.8; }
+  .note b { color:#F2A76C; }
+  .sec-title { margin:44px 0 6px; font-size:22px; font-weight:700; display:flex; align-items:center; gap:10px; }
+  .sec-title [data-icon] { color:#F2A76C; }
+  .sec-sub { margin:0 0 18px; color:#A8A29E; font-size:13.5px; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  @media (max-width:1000px){ .grid { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:700px){ .grid { grid-template-columns:1fr; } }
+  .gal { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:20px; overflow:hidden; transition:all .2s;
+         color:inherit; text-decoration:none; display:block; }
+  .gal:hover { border-color:rgba(242,167,108,.5); transform:translateY(-3px); }
+  .gal .prev { position:relative; height:300px; overflow:hidden; display:block; }
+  .gal iframe { width:393px; height:680px; border:0; transform:scale(0.75); transform-origin:top center; position:absolute; top:-6px; left:50%; margin-left:-196px; pointer-events:none; }
+  .gal .meta { padding:16px 18px 18px; border-top:1px solid rgba(255,255,255,.08); }
+  .gal .meta .nm { font-size:15.5px; font-weight:700; }
+  .gal .meta .ds { font-size:12.5px; color:#A8A29E; margin-top:4px; line-height:1.7; }
+  .gal .meta .lnk { display:inline-flex; align-items:center; gap:6px; margin-top:10px; color:#F2A76C; font-size:13px; font-weight:600; text-decoration:none; }
+  .b1 { display:inline-block; background:#B54708; color:#fff; font-size:10.5px; font-weight:700; border-radius:999px; padding:3px 10px; margin-inline-start:8px; vertical-align:2px; }
+  .footer { margin-top:56px; text-align:center; color:#78716C; font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <i data-icon="logo-mark" class="mark"></i>
+    <h1>ماركتك — مخطط واجهة الموبايل<small>دفعة 1: نظام التصميم + المعمارية + 3 شاشات × 3 اتجاهات تصميم · HTML فقط</small></h1>
+    <div class="links">
+      <a href="system.html"><i data-icon="sparkle" style="width:16px;height:16px"></i>نظام التصميم</a>
+      <a href="architecture.html"><i data-icon="route" style="width:16px;height:16px"></i>المعمارية والتنقّل</a>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>كيف تقرأ هذا المعرض:</b> كل شاشة معروضة بحيّة (iframe حقيقي للصفحة نفسها — افتح الرابط لرؤية الإطار الكامل مع الملاحظات وحالات الحافة). ثلاثة اتجاهات لكل شاشة:
+    <b>A · Warm Minimal</b> (فاتح وفيّ بالعلامة — الأوضح)،
+    <b>B · Midnight Chrome</b> (داكن فاخر — الأكثر تميّزًا)،
+    <b>C · Fresh Editorial</b> (كريمي مرسوم — الأكثر ألفة).
+    الثلاثة تشارك نفس رموز <span dir="ltr">design/tokens/tokens.css</span> — اختيارك يعني اختيار «جلد»، وليس إعادة بناء.
+  </div>
+
+  <!-- ============ SYSTEM DOCS ============ -->
+  <div class="sec-title"><i data-icon="sparkle"></i>الأساس — نظام التصميم ومعمارية التطبيق</div>
+  <div class="grid">
+    <a class="gal" href="system.html">
+      <div class="prev"><iframe src="system.html" title="نظام التصميم" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">نظام التصميم</div>
+      <div class="ds">الرموز (ألوان/خطوط/فراغات/انحناءات)، 56 أيقونة، المكوّنات بحالاتها، وأنماط التفاعل المستمدة من دستور المنصة.</div>
+      <div class="lnk">افتح <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="architecture.html">
+      <div class="prev"><iframe src="architecture.html" title="المعمارية" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">المعمارية وخريطة التنقّل</div>
+      <div class="ds">تدفق الإقلاع والدخول، تبويبات العميل والمندوب، آلات الحالة، جرد الشاشات بخطة الدفعات، وخريطة الإشعارات.</div>
+      <div class="lnk">افتح <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <div class="gal" style="background:rgba(181,71,8,.1);border-color:rgba(242,167,108,.35)">
+      <div class="prev" style="display:flex;flex-direction:column;justify-content:center;gap:12px;padding:28px">
+        <div style="font-size:15px;font-weight:700;color:#F2A76C">المنهجية</div>
+        <div style="font-size:13px;color:#D6D3D1;line-height:1.9">كل شاشة مربوطة بمخطط قاعدة البيانات ومواصفات <span dir="ltr">specs/001-platform-foundation</span>: أسماء الحقول، رسائل الأخطاء، حالات التحميل والفراغ — مصممة قبل أي كود React Native.</div>
+        <div style="font-size:13px;color:#D6D3D1;line-height:1.9">القاعدة 7: لا قيم تصميم يدوية — كل ما تراه يقرأ من <span dir="ltr">tokens.css</span>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN 1 ============ -->
+  <div class="sec-title"><i data-icon="shield"></i>الشاشة 01 · تسجيل الدخول — جوجل وآبل فقط<span class="b1">الدفعة 1</span></div>
+  <p class="sec-sub">لا بريد ولا كلمة مرور ولا OTP (دستور الهوية). زر آبل أولًا على iOS. اختيار اللغة يقلب الاتجاه كاملًا.</p>
+  <div class="grid">
+    <a class="gal" href="screens/01-sign-in/a-warm-minimal.html">
+      <div class="prev"><iframe src="screens/01-sign-in/a-warm-minimal.html" title="دخول A" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">A · Warm Minimal</div>
+      <div class="ds">أبيض هادئ، شعار ماركتك ووعد واحد: «كل أسواق منطقتك في رحلة واحدة». أسرع قراءة وأوضح قرار.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="screens/01-sign-in/b-midnight-chrome.html">
+      <div class="prev"><iframe src="screens/01-sign-in/b-midnight-chrome.html" title="دخول B" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">B · Midnight Chrome</div>
+      <div class="ds">امتداد داكن لسطح إدارة ماركتك مع توهج برتقالي واحد — أول تطبيق توصيل «ليلي» في السوق المصري.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="screens/01-sign-in/c-fresh-editorial.html">
+      <div class="prev"><iframe src="screens/01-sign-in/c-fresh-editorial.html" title="دخول C" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">C · Fresh Editorial</div>
+      <div class="ds">لوحة مرسومة SVG (مندوب في سوق الزمالك) وورقة سفلية ودودة — أقوى ألفة عائلية.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+  </div>
+
+  <!-- ============ SCREEN 2 ============ -->
+  <div class="sec-title"><i data-icon="user"></i>الشاشة 02 · أكمل ملفك — بوابة الطلب<span class="b1">الدفعة 1</span></div>
+  <p class="sec-sub">الحقول مبنية من <span dir="ltr">missing[]</span>: الاسم ← الموبايل (+20) ← أول عنوان. التصفح لا يُقفل خلفها أبداً.</p>
+  <div class="grid">
+    <a class="gal" href="screens/02-profile-completion/a-warm-minimal.html">
+      <div class="prev"><iframe src="screens/02-profile-completion/a-warm-minimal.html" title="ملف A" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">A · نموذج واحد مريح</div>
+      <div class="ds">بطاقتان (بياناتك / عنوانك الأول) مع شريط تقدم وحفظ ثابت — الأسرع للمستعجل.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="screens/02-profile-completion/b-midnight-chrome.html">
+      <div class="prev"><iframe src="screens/02-profile-completion/b-midnight-chrome.html" title="ملف B" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">B · خطوات + خريطة داكنة</div>
+      <div class="ds">3 خطوات قصيرة بخريطة تحديد الموقع — أعلى نسب إكمال، ولحظة علامة لا تُنسى.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="screens/02-profile-completion/c-fresh-editorial.html">
+      <div class="prev"><iframe src="screens/02-profile-completion/c-fresh-editorial.html" title="ملف C" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">C · محادثة ودّية</div>
+      <div class="ds">أسئلة مرقّمة ببطاقات كبيرة، وما اكتمل يصبح شارة «تم» — أقل إرهاقًا للجمهور الجديد.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+  </div>
+
+  <!-- ============ SCREEN 3 ============ -->
+  <div class="sec-title"><i data-icon="home"></i>الشاشة 03 · الرئيسية (العميل) — الفيد والتصفح<span class="b1">الدفعة 1</span></div>
+  <p class="sec-sub">بيانات حقيقية من البذرة: بيتزا بليس، برجر هاوس، سوق الحديقة · رسوم 25.00 ج.م · ETA 20–40 د · قسيمة SAVE10.</p>
+  <div class="grid">
+    <a class="gal" href="screens/03-customer-home/a-warm-minimal.html">
+      <div class="prev"><iframe src="screens/03-customer-home/a-warm-minimal.html" title="رئيسية A" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">A · الفيد الكلاسيكي</div>
+      <div class="ds">عنوان + بحث + أقسام + مفتاح «المفتوح الآن» + بطاقات بمقاييس ثابتة. الأقل مفاجآت.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="screens/03-customer-home/b-midnight-chrome.html">
+      <div class="prev"><iframe src="screens/03-customer-home/b-midnight-chrome.html" title="رئيسية B" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">B · غامرة بغطاء بصري</div>
+      <div class="ds">تحية شخصية، شريط حالة المدينة، بطاقات بأغطية واسعة وETA شفاف، وسلة عائمة بالمجموع.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+    <a class="gal" href="screens/03-customer-home/c-fresh-editorial.html">
+      <div class="prev"><iframe src="screens/03-customer-home/c-fresh-editorial.html" title="رئيسية C" scrolling="no"></iframe></div>
+      <div class="meta"><div class="nm">C · عناية استباقية</div>
+      <div class="ds">قسيمة SAVE10 + بلاطات مرسومة + «اطلب تاني بضغطة» من طلبك الأخير — أقوى بناء عادة.</div>
+      <div class="lnk">افتح المخطط الكامل <i data-icon="chevron-left" style="width:14px;height:14px"></i></div></div>
+    </a>
+  </div>
+
+  <div class="footer">Marketak · ماركتك — مخطط واجهة الموبايل · الدفعة 1 من 6 · الأصول (الشعار/الأيقونات/الرسوم) مولّدة SVG بالكامل</div>
+</div>
+<script>window.MarketakIcons && MarketakIcons.inject();</script>
+</body>
+</html>

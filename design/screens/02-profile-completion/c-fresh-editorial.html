@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>أكمل ملفك — مثال C · Fresh Editorial — Marketak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens/tokens.css">
+<link rel="stylesheet" href="../../assets/blueprint.css">
+<script src="../../assets/icons.js"></script>
+<style>
+  .pc-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
+  .pc-head { padding:var(--mk-space-5) var(--mk-gutter) 0; display:flex; align-items:center; gap:12px; }
+  .pc-head .avatar { width:52px; height:52px; border-radius:50%; background:var(--mk-action-soft); display:flex; align-items:center; justify-content:center; color:var(--mk-brand-primary); flex:none; }
+  .pc-head .avatar [data-icon] { width:26px; height:26px; }
+  .pc-head h1 { margin:0; font-size:var(--mk-fs-title-2); font-weight:700; }
+  .pc-head p { margin:2px 0 0; font-size:var(--mk-fs-body-sm); color:var(--mk-text-2); line-height:var(--mk-lh-body-sm); }
+  .pc-dots { display:flex; gap:6px; padding:var(--mk-space-4) var(--mk-gutter) 0; }
+  .pc-dots i { height:6px; flex:1; border-radius:3px; background:var(--mk-bg-sunken); }
+  .pc-dots i.on { background:var(--mk-brand-primary); }
+  .pc-dots i.half { background:linear-gradient(to left, var(--mk-brand-primary) 50%, var(--mk-bg-sunken) 50%); }
+  .pc-scroll { flex:1; min-height:0; overflow-y:auto; padding:var(--mk-space-4) var(--mk-gutter) 120px; scrollbar-width:none; }
+  .pc-scroll::-webkit-scrollbar { display:none; }
+  .q-card { background:var(--mk-card); border:1px solid var(--mk-card-border); border-radius:var(--mk-radius-xl); padding:var(--mk-space-5);
+            box-shadow:var(--mk-shadow-card); display:flex; flex-direction:column; gap:var(--mk-space-4); margin-bottom:var(--mk-space-4); }
+  .q-card .q { font-size:var(--mk-fs-title-3); font-weight:700; display:flex; align-items:center; gap:10px; }
+  .q-card .q .qn { width:28px; height:28px; border-radius:50%; background:var(--mk-action-soft); color:var(--mk-brand-primary-text);
+                   display:inline-flex; align-items:center; justify-content:center; font-size:var(--mk-fs-caption); font-weight:700; flex:none; }
+  .q-card .hint { font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:-8px; }
+  .pc-done { display:flex; gap:10px; background:var(--mk-accent-2-soft); border-radius:var(--mk-radius-lg); padding:12px 14px;
+             font-size:var(--mk-fs-body-sm); color:var(--mk-accent-2); align-items:center; margin-bottom:var(--mk-space-4); }
+  .pc-sticky { position:absolute; bottom:0; inset-inline:0; padding:var(--mk-space-3) var(--mk-gutter) var(--mk-space-6);
+               background:linear-gradient(to top, var(--mk-bg) 72%, transparent); z-index:10; }
+  .pc-sticky .note { text-align:center; font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:var(--mk-space-2); }
+</style>
+</head>
+<body class="bp-body">
+
+  <div class="bp-top">
+    <a class="crumb" href="../index.html"><i data-icon="chevron-right" style="width:16px;height:16px"></i> معرض التصميم</a>
+    <a class="crumb" href="javascript:void(0)">الشاشة 02 — أكمل ملفك (البوابة)</a>
+    <span class="tag"><span class="dot"></span>مثال C · Fresh Editorial</span>
+  </div>
+  <p class="bp-desc"><b>الفكرة:</b> محادثة ودّية بدل نموذج — سؤال واحد في بطاقة كبيرة (رقم ١، ٢، ٣) وما اكتمل يتحول لشارة خضراء «تم». الأقل إرهاقًا نفسيًا، والأقرب لجمهور «أول مرة أطلب أونلاين». النقود تظهر صفر هنا بوضوح: «مش هنطلب منك أي دفع».</p>
+
+  <div class="stage">
+    <div class="phone theme-c">
+      <div class="island"></div>
+      <div class="screen">
+        <div class="statusbar"><span>٩:٤١</span><i data-icon="statusbar" style="width:55px;height:13px"></i></div>
+
+        <div class="pc-wrap">
+          <div class="pc-head">
+            <div class="avatar"><i data-icon="user"></i></div>
+            <div>
+              <h1>عشان نوصل لبابك…</h1>
+              <p>3 أسئلة صغيرة وأنت جاهز. بياناتك عندنا بس للتوصيل.</p>
+            </div>
+          </div>
+          <div class="pc-dots"><i class="on"></i><i class="on"></i><i class="half"></i></div>
+
+          <div class="pc-scroll">
+            <div class="pc-done"><i data-icon="check-circle"></i>تم الاسم والموبايل — فاضل العنوان بس</div>
+
+            <div class="q-card">
+              <div class="q"><span class="qn">٣</span>فين نوصّلك المرة دي؟</div>
+              <div class="hint">لو هتطلب لمكان تاني بعدين، تقدر تضيف أكتر من عنوان وتنقل بينهم بضغطة.</div>
+              <div style="display:flex;gap:8px">
+                <span class="mk-chip is-active"><i data-icon="home" style="width:16px;height:16px"></i>المنزل</span>
+                <span class="mk-chip"><i data-icon="bag" style="width:16px;height:16px"></i>الشغل</span>
+                <span class="mk-chip">آخر</span>
+              </div>
+              <div class="mk-field">
+                <label>المنطقة</label>
+                <div class="mk-input"><i data-icon="pin" style="width:18px;height:18px;color:var(--mk-text-subtle)"></i><input value="الزمالك — القاهرة"><i data-icon="chevron-down" style="width:18px;height:18px;color:var(--mk-text-subtle)"></i></div>
+              </div>
+              <div class="mk-field">
+                <label>العمارة / الشارع</label>
+                <div class="mk-input"><input value="12 شارع شريف"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="mk-field"><label>الدور</label><div class="mk-input"><input value="3"></div></div>
+                <div class="mk-field"><label>الشقة</label><div class="mk-input"><input value="7"></div></div>
+              </div>
+              <div class="mk-field">
+                <label>علامة مميزة</label>
+                <div class="mk-input is-focus"><input placeholder="جنب إيه؟ مثال: مسجد النور، الكشك الأبيض" value="جنب مسجد النور"></div>
+                <div class="mk-field-hint" style="display:flex;gap:6px"><i data-icon="sparkle" style="width:14px;height:14px;color:var(--mk-brand-primary-text)"></i>العلامة المميزة بتفرق كتير — المندوب بيوصل أسرع بيها</div>
+              </div>
+              <div class="mk-field">
+                <label>ملاحظة للمندوب <span style="color:var(--mk-text-3);font-weight:400">(اختياري)</span></label>
+                <div class="mk-input"><input placeholder="مثال: اتصل أول ما توصل"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pc-sticky">
+            <button class="mk-btn mk-btn-primary" style="width:100%;border-radius:var(--mk-radius-md)">خلّص — وأنا جاهز أطلب</button>
+            <div class="note"><i data-icon="cash" style="width:14px;height:14px"></i>مش هنطلب منك أي دفع هنا — كاش أو فودافون كاش عند الاستلام.</div>
+          </div>
+        </div>
+
+        <div class="home-ind"></div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3><i data-icon="shield"></i>نفس بوابة قاعدة البيانات — بنبرة إنسان</h3>
+        <ul>
+          <li>الأسئلة الثلاثة هي حرفيًا <code class="rpc">missing[]</code>: الاسم، الموبايل، العنوان — ما يظهر فقط ما ينقص؛ ما اكتمل يظهر شارة «تم» خضراء لا حقلًا معطلًا.</li>
+          <li>نفس عقود الحفظ: <code class="rpc">complete_profile_v1</code> للملف وإنشاء عنوان افتراضي <span dir="ltr">(label: home, is_default: true)</span>.</li>
+          <li>سطر «مش هنطلب أي دفع» يعالج القلق الأول للجمهور الجديد على البوابة — وهو صحيح 100% (لا محفظة ولا دفع إلكتروني في v1).</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="sparkle"></i>لماذا يفوز هذا الاتجاه؟</h3>
+        <ul>
+          <li>الأسئلة المرقّمة + شارات الإنجاز تحول «نموذج إداري» إلى قائمة مهام شبه لعبة — أعلى دافع لإكمال البوابة.</li>
+          <li>البطاقات ذات الانحناء الكبير والظل الدافئ تُشعر المستخدم أن بياناته «في أيد أمينة»، لا في قاعدة بيانات.</li>
+          <li>أفضل اتجاه للوصول لجمهور الأسواق والمحلات العائلية المستهدف في المرحلة الأولى (منطقة واحدة، خدمة غداء).</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="alert"></i>ثمن الاتجاه</h3>
+        <ul>
+          <li>النبرة المصرية يجب أن تُراجع لغويًا للإنجليزية بنفس الروح — ترجمة حرفية ستقتل الشخصية.</li>
+          <li>البطاقات الكبيرة تعني تمريرًا أكثر — على الشاشات الصغيرة نطوي «ملاحظة للمندوب» في رابط «أضف تفاصيل».</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="states-strip">
+    <h2>الحالات الإلزامية لهذه الشاشة</h2>
+    <p class="sub">مقتطفات بنفس جلد theme-c.</p>
+    <div class="states">
+      <div class="state-tile">
+        <h4>1 · خطأ موبايل تحت السؤال</h4>
+        <div class="q-card" style="padding:14px;margin:0">
+          <div class="q" style="font-size:var(--mk-fs-body-sm)"><span class="qn">٢</span>رقم موبايلك؟</div>
+          <div class="mk-input is-error"><span style="font-weight:600" dir="ltr">+20</span><input value="0101234567" dir="ltr"></div>
+          <div class="mk-field-error"><i data-icon="alert" style="width:14px;height:14px"></i>اكتب 11 رقمًا تبدأ بـ 01</div>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>2 · أول عنوان بيتحفظ</h4>
+        <div class="q-card" style="padding:14px;margin:0;background:var(--mk-accent-2-soft);border-color:transparent">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--mk-accent-2);font-weight:700;font-size:var(--mk-fs-body-sm)"><i data-icon="check-circle"></i>بنحفظ عنوانك…</div>
+          <div class="mk-skel" style="height:12px;width:70%;background:#fff"></div>
+          <div class="mk-skel" style="height:12px;width:45%;background:#fff"></div>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>3 · العنوان خارج مناطق التوصيل</h4>
+        <div style="display:flex;gap:10px;background:var(--mk-wash-warning);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-body-sm);color:var(--mk-status-warning);align-items:flex-start">
+          <i data-icon="alert" style="margin-top:1px"></i>
+          <div>لسه بنغطي الزمالك بس — احفظ العنوان براحتك وهنبعتلك أول ما نوصّل لمنطقتك.</div>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>4 · اكتمل الملف (النهاية السعيدة)</h4>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;text-align:center">
+          <div style="width:56px;height:56px;border-radius:50%;background:var(--mk-accent-2-soft);display:flex;align-items:center;justify-content:center;color:var(--mk-accent-2)"><i data-icon="check-circle" style="width:28px;height:28px"></i></div>
+          <div style="font-weight:700;font-size:var(--mk-fs-title-3)">أنت جاهز!</div>
+          <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-2)">خلاص بقت تقدر تطلب — يلا نبدأ بأقرب محل مفتوح.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

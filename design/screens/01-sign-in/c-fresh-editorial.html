@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول — مثال C · Fresh Editorial — Marketak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens/tokens.css">
+<link rel="stylesheet" href="../../assets/blueprint.css">
+<script src="../../assets/icons.js"></script>
+<style>
+  /* ---- Example C: fresh editorial (theme-c tokens) ------------------------ */
+  .si-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
+  .si-art { position:relative; flex:1; min-height:340px; background:var(--mk-illu-bg); overflow:hidden; }
+  .si-art svg.scene { position:absolute; inset:0; width:100%; height:100%; }
+  .si-art .float { position:absolute; z-index:2; }
+  .si-sheet { flex:none; background:var(--mk-card); border-radius:var(--mk-radius-xl) var(--mk-radius-xl) 0 0;
+              padding:var(--mk-space-6) var(--mk-gutter) calc(var(--mk-space-6) + 8px);
+              box-shadow:var(--mk-shadow-sheet); position:relative; z-index:3; margin-top:-28px; }
+  .si-sheet .grab { width:44px; height:5px; border-radius:3px; background:var(--mk-bg-sunken); margin:0 auto var(--mk-space-4); }
+  .si-hello { font-size:var(--mk-fs-title-1); font-weight:700; color:var(--mk-text-1); text-align:center; }
+  .si-hello em { font-style:normal; color:var(--mk-brand-primary-text); }
+  .si-sub { text-align:center; font-size:var(--mk-fs-body); color:var(--mk-text-2); margin-top:6px; line-height:var(--mk-lh-body); }
+  .si-actions { display:flex; flex-direction:column; gap:var(--mk-space-3); margin-top:var(--mk-space-5); }
+  .btn-apple { background:var(--mk-surface-chrome); color:var(--mk-text-on-dark); }
+  .si-lang { display:flex; justify-content:center; gap:8px; margin-top:var(--mk-space-4); }
+  .si-legal { text-align:center; font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:var(--mk-space-4); line-height:var(--mk-lh-caption); }
+  .si-legal a { color:var(--mk-brand-primary-text); font-weight:500; text-decoration:none; }
+</style>
+</head>
+<body class="bp-body">
+
+  <div class="bp-top">
+    <a class="crumb" href="../index.html"><i data-icon="chevron-right" style="width:16px;height:16px"></i> معرض التصميم</a>
+    <a class="crumb" href="javascript:void(0)">الشاشة 01 — تسجيل الدخول</a>
+    <span class="tag"><span class="dot"></span>مثال C · Fresh Editorial</span>
+  </div>
+  <p class="bp-desc"><b>الفكرة:</b> نصف الشاشة الأعلى لوحة رسم توضيحية مولّدة SVG (مندوب ماركتك وسط فواكه وأسواق الزمالك) والنصف الأدنى «ورقة» بيضاء منبثقة كالـ bottom-sheet. دفء وألفة من أول نظرة — أقوى اتجاه للاستهداف العائلي وبناء شخصية للعلامة.</p>
+
+  <div class="stage">
+    <div class="phone theme-c">
+      <div class="island"></div>
+      <div class="screen">
+        <div class="statusbar"><span>٩:٤١</span><i data-icon="statusbar" style="width:55px;height:13px"></i></div>
+
+        <div class="si-wrap">
+          <!-- Generated illustration: Marketak rider in a warm market scene -->
+          <div class="si-art">
+            <svg class="scene" viewBox="0 0 393 380" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
+              <!-- sun -->
+              <circle cx="316" cy="74" r="42" fill="var(--mk-illu-3)" opacity=".6"/>
+              <circle cx="316" cy="74" r="28" fill="var(--mk-illu-2)" opacity=".55"/>
+              <!-- ground -->
+              <ellipse cx="196" cy="330" rx="210" ry="26" fill="var(--mk-illu-3)" opacity=".35"/>
+              <!-- awning stripes (souq) -->
+              <g transform="translate(28 78)">
+                <rect x="0" y="0" width="120" height="10" rx="5" fill="var(--mk-illu-1)"/>
+                <rect x="15" y="10" width="15" height="6" fill="var(--mk-illu-1)" opacity=".8"/>
+                <rect x="45" y="10" width="15" height="6" fill="var(--mk-illu-1)" opacity=".8"/>
+                <rect x="75" y="10" width="15" height="6" fill="var(--mk-illu-1)" opacity=".8"/>
+                <rect x="105" y="10" width="15" height="6" fill="var(--mk-illu-1)" opacity=".8"/>
+              </g>
+              <!-- fruit crate -->
+              <g transform="translate(40 150)">
+                <rect x="0" y="18" width="88" height="52" rx="8" fill="var(--mk-illu-2)"/>
+                <circle cx="22" cy="14" r="13" fill="var(--mk-illu-1)"/>
+                <circle cx="46" cy="10" r="13" fill="var(--mk-illu-4)"/>
+                <circle cx="68" cy="14" r="13" fill="var(--mk-illu-1)"/>
+              </g>
+              <!-- greens bunch -->
+              <g transform="translate(300 170)">
+                <rect x="0" y="20" width="60" height="44" rx="8" fill="var(--mk-illu-5)"/>
+                <path d="M12 22c0-14 8-20 18-22-2 10-6 16-18 22z" fill="var(--mk-illu-4)"/>
+                <path d="M48 22c0-14-8-20-18-22 2 10 6 16 18 22z" fill="var(--mk-illu-4)" opacity=".8"/>
+              </g>
+              <!-- rider scooter -->
+              <g transform="translate(96 128)">
+                <ellipse cx="102" cy="196" rx="96" ry="10" fill="var(--mk-illu-7)" opacity=".08"/>
+                <circle cx="52" cy="176" r="26" fill="none" stroke="var(--mk-illu-7)" stroke-width="7"/>
+                <circle cx="160" cy="176" r="26" fill="none" stroke="var(--mk-illu-7)" stroke-width="7"/>
+                <path d="M52 176 84 118h62l30 58" stroke="var(--mk-illu-1)" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M84 118 74 96h-18" stroke="var(--mk-illu-7)" stroke-width="8" fill="none" stroke-linecap="round"/>
+                <rect x="128" y="86" width="52" height="40" rx="10" fill="var(--mk-illu-1)"/>
+                <rect x="138" y="96" width="32" height="20" rx="6" fill="var(--mk-illu-8)"/>
+                <path d="M154 116v10M146 121h16" stroke="var(--mk-illu-1)" stroke-width="4" stroke-linecap="round"/>
+                <!-- rider body -->
+                <circle cx="118" cy="62" r="17" fill="var(--mk-illu-7)"/>
+                <path d="M104 56c-2-14 10-24 22-20 10 4 12 16 6 24" fill="var(--mk-illu-1)"/>
+                <path d="M112 80c-8 12-16 20-22 36l18 6c4-12 10-22 18-30z" fill="var(--mk-illu-6)"/>
+                <path d="M124 82c8 8 14 20 16 34h-16c-2-10-6-20-10-26z" fill="var(--mk-illu-6)"/>
+              </g>
+              <!-- floating bag -->
+              <g transform="translate(230 60)">
+                <path d="M6 18h44l-4 48a8 8 0 0 1-8 7H18a8 8 0 0 1-8-7z" fill="var(--mk-illu-4)"/>
+                <path d="M16 20V14a12 12 0 0 1 24 0v6" stroke="var(--mk-illu-7)" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <circle cx="22" cy="40" r="5" fill="var(--mk-illu-3)"/>
+                <circle cx="36" cy="46" r="5" fill="var(--mk-illu-2)"/>
+              </g>
+              <!-- sparkles -->
+              <g fill="var(--mk-illu-2)">
+                <path d="M96 60l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+                <path d="M262 30l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" opacity=".7"/>
+                <path d="M356 220l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" opacity=".6"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- bottom sheet -->
+          <div class="si-sheet">
+            <div class="grab"></div>
+            <div class="si-hello">أهلاً بيك في <em>ماركتك</em></div>
+            <div class="si-sub">سوّق من محلات منطقتك — مندوب واحد يجمع طلبك ويوصلك، وماتدفعش غير عند الباب.</div>
+
+            <div class="si-actions">
+              <button class="mk-btn mk-btn-primary"><i data-icon="google" style="width:22px;height:22px"></i>ابدأ بحساب جوجل</button>
+              <button class="mk-btn btn-apple"><i data-icon="apple" style="width:22px;height:22px"></i>أو تابع مع آبل</button>
+              <div class="si-lang">
+                <span class="mk-chip is-active" style="min-height:36px">العربية</span>
+                <span class="mk-chip" style="min-height:36px" dir="ltr">English</span>
+              </div>
+              <div class="si-legal">بالمتابعة أنت موافق على <a href="#">الشروط</a> و<a href="#">سياسة الخصوصية</a>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-ind"></div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3><i data-icon="shield"></i>نفس العقيدة، أدفأ تنفيذًا</h3>
+        <ul>
+          <li>زرّان فقط كبقية الاتجاهات (جوجل/آبل — لا بريد ولا OTP)، لكن اللغة أقرب: «ابدأ بحساب جوجل» بدل «المتابعة».</li>
+          <li>الرسم كله SVG مولّد من لوحة <span dir="ltr">illu.*</span> — بلا صور خارجية إطلاقًا، فالشاشة تحمّل فورًا وتتوسّع بلا ضوضاء.</li>
+          <li>الورقة السفلية (sheet) بظل علوي — نفس نمط الـ bottom-sheet الذي سنستخدمه في اختيار العنوان والدفع، فالتشبيك بصري من أول شاشة.</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="sparkle"></i>لماذا يفوز هذا الاتجاه في الألفة؟</h3>
+        <ul>
+          <li>مشهد «مندوب في سوق» يحكي نموذج العمل كله (تجميع من محلات متعددة) بلا كلمة واحدة.</li>
+          <li>الصيغة المصرية المبتسمة («أهلاً بيك»، «ماتدفعش غير عند الباب») تبني ثقة عائلية من الثانية الأولى.</li>
+          <li>الأخضر (رمز النجاح) يظهر في الرسم كطرف ثاني — يهيئ العين لهويته لاحقًا في حالات «تم التوصيل».</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="alert"></i>ثمن الاتجاه (نقوله بصراحة)</h3>
+        <ul>
+          <li>الرسم يستهلك عمودًا كاملًا — على أجهزة صغيرة (< 667px) نستبدله بنسخة مركبة أقصر (نقطة تحطيم موثقة).</li>
+          <li>يحتاج انضباطًا: نفس عائلة الرسم في كل الشاشات التسويقية وإلا تتحول للفوضى.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="states-strip">
+    <h2>الحالات الإلزامية لهذه الشاشة</h2>
+    <p class="sub">مقتطفات بنفس جلد theme-c.</p>
+    <div class="states">
+      <div class="state-tile">
+        <h4>1 · أثناء تسجيل الدخول</h4>
+        <button class="mk-btn mk-btn-primary" style="width:100%;opacity:.75">
+          <svg viewBox="0 0 24 24" width="20" height="20" style="animation:spinC 1.2s linear infinite"><style>@keyframes spinC{to{transform:rotate(360deg)}}</style><circle cx="12" cy="12" r="8.5" stroke="rgba(255,255,255,.4)" stroke-width="2.4" fill="none"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
+          لحظة واحدة…
+        </button>
+      </div>
+      <div class="state-tile">
+        <h4>2 · فشل الدخول</h4>
+        <div style="display:flex;gap:10px;background:var(--mk-wash-danger);border:1px solid #F3C6C1;border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-body-sm);color:var(--mk-status-danger);align-items:flex-start">
+          <i data-icon="alert" style="margin-top:1px"></i>
+          <div>حصلت مشكلة بسيطة — جرّب تاني، ولو استمرت كلّمنا والدعم يظبطها.</div>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>3 · English → LTR</h4>
+        <div dir="ltr" style="border:1px solid var(--mk-card-border);border-radius:var(--mk-radius-md);padding:14px;background:var(--mk-card)">
+          <div style="font-size:var(--mk-fs-title-3);font-weight:700">Welcome to Marketak</div>
+          <button class="mk-btn mk-btn-primary" style="width:100%;margin-top:12px"><i data-icon="google" style="width:20px;height:20px"></i>Start with Google</button>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>4 · وضع التوفير (شاشة صغيرة)</h4>
+        <div style="border:1px dashed var(--mk-border-strong);border-radius:var(--mk-radius-md);padding:12px;display:flex;align-items:center;gap:10px;background:var(--mk-illu-bg)">
+          <svg viewBox="0 0 48 48" width="44" height="44"><path fill="var(--mk-illu-1)" d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z"/><path fill="var(--mk-illu-3)" d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z"/></svg>
+          <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-2)">تحت 667px: الرسم يتحول لشارة مصغّرة أعلى الورقة — والأزرار تبقى كما هي.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

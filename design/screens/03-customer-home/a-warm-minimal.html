@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الرئيسية — مثال A · Warm Minimal — Marketak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens/tokens.css">
+<link rel="stylesheet" href="../../assets/blueprint.css">
+<script src="../../assets/icons.js"></script>
+<style>
+  .hm-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
+  .hm-top { padding:var(--mk-space-2) var(--mk-gutter) var(--mk-space-3); }
+  .hm-addr { display:flex; align-items:center; gap:10px; min-height:var(--mk-touch); }
+  .hm-addr .t { flex:1; min-width:0; }
+  .hm-addr .lbl { font-size:var(--mk-fs-caption); color:var(--mk-text-subtle); display:flex; align-items:center; gap:4px; }
+  .hm-addr .val { font-size:var(--mk-fs-body); font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hm-search { margin-top:var(--mk-space-3); }
+  .hm-chips { display:flex; gap:8px; overflow-x:auto; padding:var(--mk-space-4) var(--mk-gutter) var(--mk-space-2); scrollbar-width:none; }
+  .hm-chips::-webkit-scrollbar { display:none; }
+  .hm-filterrow { display:flex; align-items:center; justify-content:space-between; padding:0 var(--mk-gutter); }
+  .hm-toggle { display:inline-flex; align-items:center; gap:8px; font-size:var(--mk-fs-body-sm); font-weight:600; color:var(--mk-text-2); min-height:var(--mk-touch); }
+  .sw { width:44px; height:26px; border-radius:13px; background:var(--mk-brand-primary); position:relative; flex:none; }
+  .sw i { position:absolute; top:3px; inset-inline-end:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+  .hm-sort { display:inline-flex; align-items:center; gap:6px; font-size:var(--mk-fs-body-sm); font-weight:600; color:var(--mk-text-2); min-height:var(--mk-touch); }
+  .hm-body { flex:1; min-height:0; overflow-y:auto; padding-bottom:var(--mk-space-4); scrollbar-width:none; }
+  .hm-body::-webkit-scrollbar { display:none; }
+  .hm-sec { display:flex; align-items:baseline; justify-content:space-between; padding:var(--mk-space-4) var(--mk-gutter) var(--mk-space-2); }
+  .hm-sec h2 { margin:0; font-size:var(--mk-fs-title-3); font-weight:700; }
+  .hm-sec a { font-size:var(--mk-fs-caption); color:var(--mk-brand-primary-text); font-weight:600; text-decoration:none; }
+  .hm-rail { display:flex; gap:12px; overflow-x:auto; padding:0 var(--mk-gutter) var(--mk-space-2); scrollbar-width:none; }
+  .hm-rail::-webkit-scrollbar { display:none; }
+  .mini { flex:none; width:150px; border-radius:var(--mk-radius-lg); border:1px solid var(--mk-card-border); background:var(--mk-card); overflow:hidden; }
+  .mini .thumb { height:86px; display:flex; align-items:center; justify-content:center; }
+  .mini .bd { padding:10px 12px 12px; }
+  .mini .nm { font-size:var(--mk-fs-body-sm); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mini .mt { font-size:var(--mk-fs-micro); color:var(--mk-text-subtle); margin-top:2px; }
+  .vend { margin:0 var(--mk-gutter) 12px; padding:14px; display:flex; gap:14px; align-items:center; }
+  .vend .logo { width:64px; height:64px; border-radius:var(--mk-radius-md); display:flex; align-items:center; justify-content:center; flex:none; }
+  .vend .meta { flex:1; min-width:0; }
+  .vend .r1 { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .vend .nm { font-size:var(--mk-fs-title-3); font-weight:700; }
+  .vend .sub { font-size:var(--mk-fs-body-sm); color:var(--mk-text-3); margin:2px 0 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vend .stats { display:flex; gap:12px; font-size:var(--mk-fs-body-sm); color:var(--mk-text-2); flex-wrap:wrap; }
+  .vend .stats span { display:inline-flex; align-items:center; gap:4px; }
+  .vend .stats [data-icon] { width:14px; height:14px; color:var(--mk-text-subtle); }
+  .hm-tabfix { flex:none; }
+</style>
+</head>
+<body class="bp-body">
+
+  <div class="bp-top">
+    <a class="crumb" href="../index.html"><i data-icon="chevron-right" style="width:16px;height:16px"></i> معرض التصميم</a>
+    <a class="crumb" href="javascript:void(0)">الشاشة 03 — الرئيسية (العميل)</a>
+    <span class="tag"><span class="dot"></span>مثال A · Warm Minimal</span>
+  </div>
+  <p class="bp-desc"><b>الفكرة:</b> القالب الكلاسيكي الذي يتقنه كل مستخدم توصيل — عنوان في الأعلى، بحث، أقسام، «المفتوح الآن» مفتاحًا شفافًا، وبطاقات محلات بمقاييس ثابتة (تقييم/ETA/رسوم). الأسرع في التصفح، وأقل مفاجآت — القاعدة التي نبني عليها الدفعات القادمة (المحل والقائمة تحمل نفس اللغة البصرية).</p>
+
+  <div class="stage">
+    <div class="phone theme-a">
+      <div class="island"></div>
+      <div class="screen">
+        <div class="statusbar"><span>٩:٤١</span><i data-icon="statusbar" style="width:55px;height:13px"></i></div>
+
+        <div class="hm-wrap">
+          <div class="hm-top">
+            <div class="hm-addr">
+              <div class="t">
+                <div class="lbl"><i data-icon="pin" style="width:14px;height:14px"></i>التوصيل إلى</div>
+                <div class="val">المنزل — 12 ش شريف، الزمالك <i data-icon="chevron-down" style="width:16px;height:16px;color:var(--mk-text-subtle)"></i></div>
+              </div>
+              <button class="mk-iconbtn"><i data-icon="bell"></i></button>
+            </div>
+            <div class="mk-input hm-search"><i data-icon="search" style="color:var(--mk-text-subtle)"></i><input placeholder="ابحث عن محل أو صنف… «بيتزا»"></div>
+          </div>
+
+          <div class="hm-chips">
+            <span class="mk-chip is-active">الكل</span>
+            <span class="mk-chip">مطاعم</span>
+            <span class="mk-chip">بقالة</span>
+            <span class="mk-chip">مخبوزات</span>
+            <span class="mk-chip">صيدلية</span>
+            <span class="mk-chip">ورد</span>
+          </div>
+
+          <div class="hm-filterrow">
+            <span class="hm-toggle"><span class="sw"><i></i></span>المفتوح الآن</span>
+            <span class="hm-sort"><i data-icon="sliders" style="width:18px;height:18px"></i>الأقرب إليك</span>
+          </div>
+
+          <div class="hm-body">
+            <div class="hm-sec"><h2>مميز اليوم</h2><a href="#">الكل</a></div>
+            <div class="hm-rail">
+              <div class="mini">
+                <div class="thumb" style="background:var(--mk-action-soft)">
+                  <svg viewBox="0 0 64 48" width="64" height="48"><path d="M32 6 56 40H8z" fill="var(--mk-illu-3)"/><path d="M32 10 52 38H12z" fill="var(--mk-illu-1)"/><circle cx="28" cy="24" r="3" fill="var(--mk-illu-3)"/><circle cx="37" cy="30" r="3" fill="var(--mk-illu-8)"/><circle cx="27" cy="33" r="2.4" fill="var(--mk-illu-8)"/></svg>
+                </div>
+                <div class="bd"><div class="nm">بيتزا بليس</div><div class="mt">⭐ 4.6 · 20–40 د</div></div>
+              </div>
+              <div class="mini">
+                <div class="thumb" style="background:var(--mk-wash-success)">
+                  <svg viewBox="0 0 64 48" width="64" height="48"><rect x="14" y="8" width="36" height="12" rx="6" fill="var(--mk-illu-3)"/><rect x="10" y="18" width="44" height="10" rx="5" fill="var(--mk-illu-1)"/><rect x="14" y="26" width="36" height="12" rx="6" fill="var(--mk-illu-5)"/></svg>
+                </div>
+                <div class="bd"><div class="nm">برجر هاوس</div><div class="mt">⭐ 4.4 · 25–45 د</div></div>
+              </div>
+              <div class="mini">
+                <div class="thumb" style="background:var(--mk-wash-info)">
+                  <svg viewBox="0 0 64 48" width="64" height="48"><path d="M12 20h40l-6 22H18z" fill="var(--mk-illu-6)" opacity=".85"/><path d="M20 20V14a12 12 0 0 1 24 0v6" stroke="var(--mk-illu-6)" stroke-width="4" fill="none"/></svg>
+                </div>
+                <div class="bd"><div class="nm">سوق الحديقة</div><div class="mt">⭐ 4.7 · 15–30 د</div></div>
+              </div>
+            </div>
+
+            <div class="hm-sec"><h2>المفتوح الآن في الزمالك</h2><a href="#">8 محلات</a></div>
+
+            <div class="mk-card vend">
+              <div class="logo" style="background:var(--mk-action-soft)">
+                <svg viewBox="0 0 48 48" width="40" height="40"><path d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z" fill="var(--mk-illu-1)"/><path d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="var(--mk-illu-3)"/></svg>
+              </div>
+              <div class="meta">
+                <div class="r1"><span class="nm">بيتزا بليس</span><span class="mk-badge mk-badge-brand"><span class="dot"></span>مفتوح</span></div>
+                <div class="sub">بيتزا ومأكولات إيطالية · بيتزا · فطائر</div>
+                <div class="stats">
+                  <span><i data-icon="star-fill" style="color:var(--mk-brand-primary)"></i><b>4.6</b> (320)</span>
+                  <span><i data-icon="clock"></i>20–40 د</span>
+                  <span><i data-icon="scooter"></i>25.00 ج.م</span>
+                  <span><i data-icon="voucher"></i>حد أدنى 100</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mk-card vend">
+              <div class="logo" style="background:var(--mk-wash-success)">
+                <svg viewBox="0 0 48 48" width="40" height="40"><rect x="9" y="12" width="30" height="10" rx="5" fill="var(--mk-illu-3)"/><rect x="6" y="20" width="36" height="8" rx="4" fill="var(--mk-illu-1)"/><rect x="9" y="26" width="30" height="10" rx="5" fill="var(--mk-illu-5)"/></svg>
+              </div>
+              <div class="meta">
+                <div class="r1"><span class="nm">برجر هاوس</span><span class="mk-badge mk-badge-warning"><span class="dot"></span>مشغول — التأخير ~15 د</span></div>
+                <div class="sub">برجر · بطاطس · ساندويتشات</div>
+                <div class="stats">
+                  <span><i data-icon="star-fill" style="color:var(--mk-brand-primary)"></i><b>4.4</b> (180)</span>
+                  <span><i data-icon="clock"></i>25–45 د</span>
+                  <span><i data-icon="scooter"></i>25.00 ج.م</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mk-card vend">
+              <div class="logo" style="background:var(--mk-wash-info)">
+                <svg viewBox="0 0 48 48" width="40" height="40"><path d="M10 20h28l-4 18H14z" fill="var(--mk-illu-6)" opacity=".9"/><path d="M17 20v-5a7 7 0 0 1 14 0v5" stroke="var(--mk-illu-6)" stroke-width="3" fill="none"/><circle cx="19" cy="27" r="2" fill="#fff"/><circle cx="26" cy="31" r="2" fill="#fff"/><circle cx="30" cy="25" r="2" fill="#fff"/></svg>
+              </div>
+              <div class="meta">
+                <div class="r1"><span class="nm">سوق الحديقة</span><span class="mk-badge mk-badge-brand"><span class="dot"></span>مفتوح</span></div>
+                <div class="sub">بقالة · خضار وفاكهة · أجبان</div>
+                <div class="stats">
+                  <span><i data-icon="star-fill" style="color:var(--mk-brand-primary)"></i><b>4.7</b> (512)</span>
+                  <span><i data-icon="clock"></i>15–30 د</span>
+                  <span style="color:var(--mk-status-success);font-weight:600"><i data-icon="scooter" style="color:var(--mk-status-success)"></i>توصيل مجاني فوق 100</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hm-tabfix">
+            <div class="mk-tabbar">
+              <a class="mk-tab is-active"><i data-icon="home-fill"></i>الرئيسية<span class="tabdot"></span></a>
+              <a class="mk-tab"><i data-icon="search"></i>البحث<span class="tabdot"></span></a>
+              <a class="mk-tab"><i data-icon="cart"></i>السلة<span class="tabdot"></span></a>
+              <a class="mk-tab"><i data-icon="receipt"></i>طلباتي<span class="tabdot"></span></a>
+              <a class="mk-tab"><i data-icon="user"></i>حسابي<span class="tabdot"></span></a>
+            </div>
+            <div class="home-ind" style="position:static;transform:none;margin:2px auto 6px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3><i data-icon="bag"></i>كل رقم على البطاقة من المخطط</h3>
+        <ul>
+          <li>الاسم بالعربية (<span dir="ltr">name_ar</span>)، النوع من <span dir="ltr">vertical_type</span>، التقييم <span dir="ltr">rating_avg/rating_count</span>، النطاق الزمني من <span dir="ltr">vendor_areas.eta_minutes/eta_max</span>.</li>
+          <li>الرسوم رقم واحد «25.00 ج.م» — أساس منطقة الزمالك 2500 بياسة. حين تُفعّل مضاعفات المحلات يظهر الشرح بلغة بشرية («محلتين = +5.00») لا بالنِسب.</li>
+          <li>«حد أدنى 100» من <span dir="ltr">minimum_order_value</span> — يظهر كنص لا كشرط مخفي، والسلة ستعيد التذكير عند النقص (<code class="err rpc">BELOW_MINIMUM</code>).</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="alert"></i>حالة «مشغول» بلا كذب</h3>
+        <ul>
+          <li><span dir="ltr">is_busy</span> يظهر «مشغول — التأخير ~15 د» (كلمة + لون تحذيري) — والـ ETA على البطاقة تحدّث معه. لا نعرض المطعم عاديًا ثم نصدم المستخدم عند الطلب.</li>
+          <li>«المغلق» يظهر بشفافية 60% مع «يفتح 11:30 ص» من جدول <span dir="ltr">vendor_schedules</span> — لا نحذفه من الفيد إطلاقًا.</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="info"></i>قرارات تصفح مبنية على الدستور</h3>
+        <ul>
+          <li>الفيد يجي من <code class="rpc">get_vendor_feed_v1</code> مع لقطة R2 للكتالوج — التصفح يعمل بلا إنترنت (كاش مشفر) وتُوسم الأسعار «تقديرية» حينها.</li>
+          <li>لا موقع حي في الإقلاع: المنطقة تأتي من عنوانك الافتراضي، فالشاشة تعمل فورًا بلا إذن GPS.</li>
+          <li>سلة فارغة اليوم = شارة مخفية — الشارة تظهر بعدد الأصناف فور أول إضافة.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="states-strip">
+    <h2>الحالات الإلزامية لهذه الشاشة</h2>
+    <p class="sub">مقتطفات من نفس القالب.</p>
+    <div class="states">
+      <div class="state-tile">
+        <h4>1 · تحميل الفيد (skeleton)</h4>
+        <div class="mk-card" style="padding:14px;display:flex;gap:14px;align-items:center">
+          <div class="mk-skel" style="width:64px;height:64px;border-radius:12px"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+            <div class="mk-skel" style="height:14px;width:50%"></div><div class="mk-skel" style="height:12px;width:80%"></div><div class="mk-skel" style="height:12px;width:60%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>2 · غير متصل (تصفح الكاش)</h4>
+        <div class="mk-banner mk-banner-offline" style="border-radius:12px;border:1px solid var(--mk-border-subtle)"><i data-icon="offline"></i>أوف لاين — بتتصفح من الكاش، الأسعار تقديرية.</div>
+        <div class="mk-card" style="margin-top:10px;padding:12px;display:flex;gap:12px;align-items:center;opacity:.85">
+          <div style="width:48px;height:48px;border-radius:10px;background:var(--mk-bg-sunken)"></div>
+          <div style="flex:1"><div style="font-weight:700;font-size:var(--mk-fs-body-sm)">بيتزا بليس</div><div style="font-size:var(--mk-fs-caption);color:var(--mk-text-3)">آخر تحديث للكتالوج: أمس 3:20 م</div></div>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>3 · منطقة بلا محلات مفتوحة (فجوة الغداء)</h4>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px;text-align:center">
+          <div style="width:52px;height:52px;border-radius:50%;background:var(--mk-action-soft);display:flex;align-items:center;justify-content:center;color:var(--mk-brand-primary)"><i data-icon="clock" style="width:24px;height:24px"></i></div>
+          <div style="font-weight:700;font-size:var(--mk-fs-body-sm)">كل المحلات مقفولة دلوقتي</div>
+          <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-2)">الفريش يبدأ 11:30 ص — فعّل تنبيه «قول لي لما يفتحوا».</div>
+          <button class="mk-btn mk-btn-secondary mk-btn-sm">فعّل التنبيه</button>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>4 · نتائج بحث فاضية</h4>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px;text-align:center">
+          <div style="width:52px;height:52px;border-radius:50%;background:var(--mk-bg-sunken);display:flex;align-items:center;justify-content:center;color:var(--mk-text-subtle)"><i data-icon="search" style="width:24px;height:24px"></i></div>
+          <div style="font-weight:700;font-size:var(--mk-fs-body-sm)">مفيش نتائج لـ«شاورما كريزي»</div>
+          <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-2)">جرّب «بيتزا» أو «برجر» — أو شوف المفتوح الآن.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

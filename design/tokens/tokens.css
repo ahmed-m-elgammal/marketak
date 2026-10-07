@@ -1,0 +1,383 @@
+/* ============================================================================
+   MARKETAK · ماركتك — MOBILE DESIGN TOKENS  (single source of truth for design/)
+   ============================================================================
+   Mirrors `packages/ui/src/theme/` (the admin console token module) so the
+   mobile app and the console speak the same brand. That file is the only place
+   in the repo allowed to hold raw hex literals in application code; this file
+   is the design-blueprint equivalent: every screen under design/screens/ reads
+   ONLY the custom properties defined here — zero hardcoded values in screens.
+
+   Layers:
+     1. Core tokens   — brand, surface, border, text, status (verbatim from packages/ui)
+     2. Mobile scale  — type, spacing, radius, elevation, motion, layout
+     3. Component     — control heights, tab bar, app bar, touch targets
+     4. Illustration  — the flat SVG illustration palette (food, map, hero art)
+     5. Theme skins   — .theme-a / .theme-b / .theme-c design directions.
+                        Brand + status never change; skins retune surfaces,
+                        radii, elevation and illustration mood only.
+   Rules carried over from the console (non-negotiable):
+     · No text-transform: uppercase and no letter-spacing on Arabic.
+     · Status is never colour alone — always word + colour.
+     · Money always carries the currency (ج.م).
+     · 48px minimum touch target.
+     · Arabic is the default language; layouts mirror with logical properties.
+   ========================================================================== */
+
+:root {
+  /* ---- 1. CORE · brand (verbatim: packages/ui colors.ts) ----------------- */
+  --mk-brand-primary: #B54708;          /* the Marketak colour. white on it = 5.43:1 */
+  --mk-brand-primary-hover: #93370D;
+  --mk-brand-subtle: #FEF6F2;           /* selected rows, soft washes */
+  --mk-brand-primary-text: #B54708;     /* orange as text: 4.80:1 on white */
+
+  /* ---- 1. CORE · surface ------------------------------------------------- */
+  --mk-surface-base: #FFFFFF;
+  --mk-surface-raised: #FFFFFF;
+  --mk-surface-sunken: #F9FAFB;
+  --mk-surface-hover: #F3F4F6;
+  --mk-surface-selected: #FEF6F2;
+  --mk-surface-chrome: #1C1917;         /* warm near-black chrome */
+  --mk-scrim: rgba(28, 25, 23, 0.45);
+
+  /* ---- 1. CORE · border -------------------------------------------------- */
+  --mk-border-subtle: #EAEAEA;          /* dividers, card outlines */
+  --mk-border-strong: #94908C;          /* input outlines (3.17:1, SC 1.4.11) */
+  --mk-border-focus: #B54708;
+
+  /* ---- 1. CORE · text ---------------------------------------------------- */
+  --mk-text-primary: #1C1917;           /* 17.49:1 on white */
+  --mk-text-secondary: #57534E;         /* 7.63:1 */
+  --mk-text-subtle: #78716C;            /* 4.80:1 */
+  --mk-text-on-dark: #FFFFFF;
+  --mk-text-on-dark-secondary: #D6D3D1; /* 11.74:1 on chrome */
+  --mk-text-disabled: #A8A29E;          /* exempt from AA on purpose */
+
+  /* ---- 1. CORE · status (always word + colour, never colour alone) ------- */
+  --mk-status-success: #067647;         /* delivered, open, paid */
+  --mk-status-warning: #B54708;         /* busy, needs attention */
+  --mk-status-danger: #B42318;          /* rejected, cancelled, errors */
+  --mk-status-info: #175CD3;            /* pending, preparing, in progress */
+  --mk-status-neutral: #57534E;
+
+  --mk-wash-success: #ECFDF3;
+  --mk-wash-warning: #FFFAEB;
+  --mk-wash-danger: #FEF3F2;
+  --mk-wash-info: #EFF8FF;
+  --mk-wash-neutral: #F5F5F4;
+
+  /* ---- 2. MOBILE · type scale (mobile reads bigger than console) --------- */
+  --mk-font: "IBM Plex Sans Arabic", "IBM Plex Sans", -apple-system, "Segoe UI", Tahoma, sans-serif;
+  --mk-fs-display-xl: 32px;  --mk-lh-display-xl: 42px;  /* hero numerals, splash  */
+  --mk-fs-display:   28px;  --mk-lh-display:   36px;
+  --mk-fs-title-1:   24px;  --mk-lh-title-1:   32px;    /* page titles */
+  --mk-fs-title-2:   20px;  --mk-lh-title-2:   28px;    /* section titles */
+  --mk-fs-title-3:   17px;  --mk-lh-title-3:   24px;    /* card titles, app bar */
+  --mk-fs-body:      15px;  --mk-lh-body:      22px;
+  --mk-fs-body-sm:   13px;  --mk-lh-body-sm:   18px;    /* secondary rows */
+  --mk-fs-label:     13px;  --mk-lh-label:     18px;    /* field labels, w500 */
+  --mk-fs-caption:   12px;  --mk-lh-caption:   16px;
+  --mk-fs-micro:     11px;  --mk-lh-micro:     14px;    /* badges only */
+
+  /* ---- 2. MOBILE · spacing (4px base, from packages/ui tokens.ts) -------- */
+  --mk-space-1: 4px;  --mk-space-2: 8px;   --mk-space-3: 12px;
+  --mk-space-4: 16px; --mk-space-5: 20px;  --mk-space-6: 24px;
+  --mk-space-7: 28px; --mk-space-8: 32px;  --mk-space-10: 40px;
+  --mk-space-12: 48px; --mk-space-16: 64px;
+  --mk-gutter: 16px;                     /* screen edge padding */
+
+  /* ---- 2. MOBILE · radius (softened one step from console for hand scale) - */
+  --mk-radius-xs: 6px;                   /* chips, tiny badges */
+  --mk-radius-sm: 8px;                   /* inputs, small buttons */
+  --mk-radius-md: 12px;                  /* buttons, list cards */
+  --mk-radius-lg: 16px;                  /* cards */
+  --mk-radius-xl: 20px;                  /* sheets, heroes */
+  --mk-radius-pill: 9999px;
+
+  /* ---- 2. MOBILE · elevation (hand-held: soft and low) ------------------- */
+  --mk-elev-0: none;
+  --mk-elev-1: 0 1px 2px rgba(28, 25, 23, 0.06), 0 1px 3px rgba(28, 25, 23, 0.08);
+  --mk-elev-2: 0 4px 12px rgba(28, 25, 23, 0.10);
+  --mk-elev-3: 0 12px 32px rgba(28, 25, 23, 0.16);
+
+  /* ---- 2. MOBILE · motion (from packages/ui motion) ---------------------- */
+  --mk-motion-fast: 120ms;
+  --mk-motion-base: 200ms;
+  --mk-motion-slow: 320ms;
+  --mk-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- 3. COMPONENT · geometry ------------------------------------------- */
+  --mk-screen-w: 393px;                  /* blueprint frame width (iPhone-class) */
+  --mk-screen-h: 852px;
+  --mk-appbar-h: 56px;
+  --mk-tabbar-h: 64px;
+  --mk-touch: 48px;                      /* MIN_TOUCH_TARGET — never below */
+  --mk-control-h: 52px;                  /* primary buttons, large inputs */
+  --mk-control-h-sm: 40px;               /* chips, compact controls */
+  --mk-icon: 24px;
+  --mk-icon-sm: 20px;
+  --mk-icon-xs: 16px;
+
+  /* ---- 3. COMPONENT · semantic (components read these, never core) ------- */
+  --mk-bg: var(--mk-surface-base);             /* screen background */
+  --mk-bg-sunken: var(--mk-surface-sunken);
+  --mk-card: var(--mk-surface-raised);
+  --mk-card-border: var(--mk-border-subtle);
+  --mk-text-1: var(--mk-text-primary);
+  --mk-text-2: var(--mk-text-secondary);
+  --mk-text-3: var(--mk-text-subtle);
+  --mk-action: var(--mk-brand-primary);
+  --mk-action-hover: var(--mk-brand-primary-hover);
+  --mk-action-text: #FFFFFF;
+  --mk-action-soft: var(--mk-brand-subtle);
+  --mk-field: var(--mk-surface-base);
+  --mk-field-border: var(--mk-border-strong);
+  --mk-divider: var(--mk-border-subtle);
+  --mk-nav-bg: var(--mk-surface-base);
+  --mk-nav-active: var(--mk-brand-primary);
+  --mk-nav-inactive: var(--mk-text-subtle);
+  --mk-shadow-card: var(--mk-elev-1);
+  --mk-shadow-float: var(--mk-elev-2);
+  --mk-shadow-sheet: var(--mk-elev-3);
+
+  /* ---- 4. ILLUSTRATION · flat art palette (generated SVG assets) --------- */
+  --mk-illu-bg: #FFF7EF;                 /* illustration panels */
+  --mk-illu-1: #B54708;                  /* primary art */
+  --mk-illu-2: #E58B54;                  /* mid tint */
+  --mk-illu-3: #F3C9A8;                  /* light tint */
+  --mk-illu-4: #067647;                  /* secondary (success green) */
+  --mk-illu-5: #7FC49E;                  /* light green */
+  --mk-illu-6: #175CD3;                  /* tertiary (info blue) */
+  --mk-illu-7: #1C1917;                  /* ink details */
+  --mk-illu-8: #FFFAEB;                  /* warm highlight */
+
+  /* ---- 4b. STATUS BARS & PLATFORM ---------------------------------------- */
+  --mk-statusbar-fg: var(--mk-text-primary);
+}
+
+/* ============================================================================
+   THEME SKIN A — "Warm Minimal" · brand-faithful light (default)
+   White surfaces, hairline borders, quiet elevation. The console's little
+   sibling: calm, dense, obviously Marketak.
+   ========================================================================== */
+.theme-a {
+  --mk-bg: #FAFAF9;
+  --mk-bg-sunken: #F5F5F4;
+  --mk-card: #FFFFFF;
+  --mk-card-border: var(--mk-border-subtle);
+  --mk-shadow-card: 0 1px 2px rgba(28, 25, 23, 0.05), 0 0 0 1px var(--mk-border-subtle);
+  --mk-shadow-float: 0 8px 24px rgba(28, 25, 23, 0.12);
+  --mk-shadow-sheet: 0 -12px 40px rgba(28, 25, 23, 0.18);
+  --mk-radius-md: 12px;
+  --mk-radius-lg: 14px;
+  --mk-statusbar-fg: var(--mk-text-primary);
+}
+
+/* ============================================================================
+   THEME SKIN B — "Midnight Chrome" · dark premium
+   Extends the console's chrome surface (#1C1917) into a full mobile dark
+   ramp. Orange stays the action colour; on-dark orange text is lightened for
+   contrast (≥4.5:1 on the dark ramp). Radii grow; shadows become depth glows.
+   ========================================================================== */
+.theme-b {
+  --mkb-0: #141210;                      /* deepest bg (behind everything)   */
+  --mkb-1: #1C1917;                      /* chrome surface (= console)       */
+  --mkb-2: #26221F;                      /* raised cards                     */
+  --mkb-3: #322D29;                      /* interactive cards, inputs        */
+  --mkb-4: #3F3934;                      /* borders on dark                  */
+  --mk-bg: var(--mkb-0);
+  --mk-bg-sunken: var(--mkb-1);
+  --mk-card: var(--mkb-2);
+  --mk-card-border: var(--mkb-4);
+  --mk-text-1: #FFFFFF;
+  --mk-text-2: #D6D3D1;
+  --mk-text-3: #A8A29E;
+  --mk-action: var(--mk-brand-primary);  /* fills keep white text (5.43:1)   */
+  --mk-action-hover: #C25A12;
+  --mk-action-text: #FFFFFF;
+  --mk-action-soft: rgba(181, 71, 8, 0.16);
+  --mk-action-on-dark-text: #F2A76C;     /* orange as TEXT on dark ≥4.5:1    */
+  --mk-field: var(--mkb-3);
+  --mk-field-border: var(--mkb-4);
+  --mk-divider: var(--mkb-4);
+  --mk-nav-bg: var(--mkb-1);
+  --mk-nav-active: var(--mk-action-on-dark-text);
+  --mk-nav-inactive: #A8A29E;
+  --mk-scrim: rgba(10, 8, 7, 0.6);
+  --mk-shadow-card: 0 0 0 1px var(--mkb-4);
+  --mk-shadow-float: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --mk-shadow-sheet: 0 -16px 48px rgba(0, 0, 0, 0.6);
+  --mk-illu-bg: var(--mkb-2);
+  --mk-statusbar-fg: #FFFFFF;
+}
+
+/* ============================================================================
+   THEME SKIN C — "Fresh Editorial" · illustrated & friendly
+   Warm cream canvas, oversized radii, chunky illustration, success-green as
+   the secondary accent (reuses the existing token — no new brand colour).
+   ========================================================================== */
+.theme-c {
+  --mk-bg: #FFF9F2;
+  --mk-bg-sunken: #FFF3E6;
+  --mk-card: #FFFFFF;
+  --mk-card-border: #F3E4D3;
+  --mk-text-1: var(--mk-text-primary);
+  --mk-text-2: var(--mk-text-secondary);
+  --mk-text-3: #967E6A;
+  --mk-action: var(--mk-brand-primary);
+  --mk-action-soft: #FFF1E4;
+  --mk-accent-2: var(--mk-status-success);
+  --mk-accent-2-soft: var(--mk-wash-success);
+  --mk-shadow-card: 0 2px 8px rgba(124, 45, 18, 0.07);
+  --mk-shadow-float: 0 10px 28px rgba(124, 45, 18, 0.14);
+  --mk-shadow-sheet: 0 -12px 40px rgba(124, 45, 18, 0.18);
+  --mk-radius-sm: 10px;
+  --mk-radius-md: 14px;
+  --mk-radius-lg: 18px;
+  --mk-radius-xl: 24px;
+  --mk-statusbar-fg: var(--mk-text-primary);
+}
+
+/* ============================================================================
+   BASE STYLES shared by every blueprint page
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+
+.mk-body {
+  margin: 0;
+  font-family: var(--mk-font);
+  color: var(--mk-text-1);
+  background: #EDEBE8;                   /* blueprint canvas (page chrome) */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Icon injector host */
+[data-icon] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--mk-icon);
+  height: var(--mk-icon);
+  flex: none;
+  line-height: 0;
+}
+[data-icon] svg { width: 100%; height: 100%; display: block; }
+[data-icon="star-fill"], [data-icon="logo-mark"] svg { fill: currentColor; }
+
+/* Money never separates from its currency (spec rule) */
+.mk-money { font-variant-numeric: tabular-nums; white-space: nowrap; unicode-bidi: plaintext; }
+/* Latin tokens inside RTL copy (order numbers, phones, references) */
+.mk-ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+
+/* ============================================================================
+   COMPONENT LAYER — the vocabulary every blueprint screen is built from.
+   Screens must compose these classes / tokens; they may not restate values.
+   ========================================================================== */
+
+/* ---- Buttons · heights: lg 52 (primary actions), md 48 (touch minimum) --- */
+.mk-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: inherit; font-size: var(--mk-fs-body); font-weight: 600;
+  min-height: var(--mk-touch); padding: 0 var(--mk-space-5);
+  border-radius: var(--mk-radius-md); border: 1px solid transparent;
+  cursor: pointer; user-select: none; text-decoration: none;
+  transition: background var(--mk-motion-fast) var(--mk-ease),
+              border-color var(--mk-motion-fast) var(--mk-ease),
+              transform var(--mk-motion-fast) var(--mk-ease);
+}
+.mk-btn:active { transform: scale(0.985); }
+.mk-btn-primary { background: var(--mk-action); color: var(--mk-action-text); }
+.mk-btn-primary:hover { background: var(--mk-action-hover); }
+.mk-btn-secondary { background: var(--mk-card); color: var(--mk-text-1); border-color: var(--mk-card-border); box-shadow: var(--mk-shadow-card); }
+.mk-btn-ghost { background: transparent; color: var(--mk-action); }
+.mk-btn-danger { background: var(--mk-wash-danger); color: var(--mk-status-danger); }
+.mk-btn-dark { background: var(--mk-surface-chrome); color: var(--mk-text-on-dark); }
+.mk-btn[disabled] { background: var(--mk-bg-sunken); color: var(--mk-text-disabled); border-color: transparent; cursor: not-allowed; box-shadow: none; }
+.mk-btn-sm { min-height: var(--mk-control-h-sm); padding: 0 var(--mk-space-4); font-size: var(--mk-fs-body-sm); border-radius: var(--mk-radius-sm); }
+
+/* ---- Inputs -------------------------------------------------------------- */
+.mk-field { display: flex; flex-direction: column; gap: 6px; }
+.mk-field > label { font-size: var(--mk-fs-label); font-weight: 500; color: var(--mk-text-2); }
+.mk-input {
+  display: flex; align-items: center; gap: 10px;
+  min-height: var(--mk-touch); padding: 0 var(--mk-space-4);
+  background: var(--mk-field); border: 1px solid var(--mk-field-border);
+  border-radius: var(--mk-radius-sm); font-family: inherit; font-size: var(--mk-fs-body);
+  color: var(--mk-text-1); transition: border-color var(--mk-motion-fast) var(--mk-ease), box-shadow var(--mk-motion-fast) var(--mk-ease);
+}
+.mk-input:focus-within, .mk-input.is-focus { border-color: var(--mk-border-focus); box-shadow: 0 0 0 3px var(--mk-action-soft); outline: none; }
+.mk-input input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; color: inherit; }
+.mk-input input::placeholder { color: var(--mk-text-disabled); }
+.mk-input.is-error { border-color: var(--mk-status-danger); }
+.mk-input.is-error:focus-within { box-shadow: 0 0 0 3px var(--mk-wash-danger); }
+.mk-field-error { display: flex; align-items: center; gap: 6px; font-size: var(--mk-fs-caption); color: var(--mk-status-danger); }
+.mk-field-hint { font-size: var(--mk-fs-caption); color: var(--mk-text-3); }
+
+/* ---- Badges · status pills (word + colour, never colour alone) ----------- */
+.mk-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--mk-radius-pill);
+  font-size: var(--mk-fs-micro); font-weight: 600; line-height: var(--mk-lh-micro);
+}
+.mk-badge .dot { width: 6px; height: 6px; border-radius: var(--mk-radius-pill); }
+.mk-badge-success { background: var(--mk-wash-success); color: var(--mk-status-success); } .mk-badge-success .dot { background: var(--mk-status-success); }
+.mk-badge-info    { background: var(--mk-wash-info);    color: var(--mk-status-info);    } .mk-badge-info .dot    { background: var(--mk-status-info); }
+.mk-badge-warning { background: var(--mk-wash-warning); color: var(--mk-status-warning); } .mk-badge-warning .dot { background: var(--mk-status-warning); }
+.mk-badge-danger  { background: var(--mk-wash-danger);  color: var(--mk-status-danger);  } .mk-badge-danger .dot  { background: var(--mk-status-danger); }
+.mk-badge-neutral { background: var(--mk-wash-neutral); color: var(--mk-status-neutral); } .mk-badge-neutral .dot { background: var(--mk-status-neutral); }
+.mk-badge-brand   { background: var(--mk-action-soft);  color: var(--mk-brand-primary-text); }
+
+/* ---- Chips (filters, verticals) ------------------------------------------ */
+.mk-chip {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  min-height: var(--mk-control-h-sm); padding: 0 14px;
+  border-radius: var(--mk-radius-pill); border: 1px solid var(--mk-card-border);
+  background: var(--mk-card); color: var(--mk-text-2); font-size: var(--mk-fs-body-sm); font-weight: 500;
+}
+.mk-chip.is-active { background: var(--mk-action-soft); border-color: var(--mk-brand-primary); color: var(--mk-brand-primary-text); }
+
+/* ---- Cards --------------------------------------------------------------- */
+.mk-card { background: var(--mk-card); border: 1px solid var(--mk-card-border); border-radius: var(--mk-radius-lg); box-shadow: var(--mk-shadow-card); }
+
+/* ---- App bar ------------------------------------------------------------- */
+.mk-appbar {
+  display: flex; align-items: center; gap: var(--mk-space-3);
+  min-height: var(--mk-appbar-h); padding: 0 var(--mk-gutter);
+}
+.mk-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--mk-touch); height: var(--mk-touch); border-radius: var(--mk-radius-pill);
+  color: var(--mk-text-1); background: transparent; border: none; cursor: pointer;
+}
+.mk-iconbtn:active { background: var(--mk-surface-hover); }
+
+/* ---- Tab bar ------------------------------------------------------------- */
+.mk-tabbar {
+  display: flex; align-items: stretch; background: var(--mk-nav-bg);
+  border-top: 1px solid var(--mk-divider); padding-bottom: var(--mk-space-2);
+}
+.mk-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-height: var(--mk-tabbar-h); font-size: var(--mk-fs-micro); font-weight: 500;
+  color: var(--mk-nav-inactive); text-decoration: none; position: relative;
+}
+.mk-tab.is-active { color: var(--mk-nav-active); }
+.mk-tab .tabdot { width: 4px; height: 4px; border-radius: 50%; background: transparent; }
+.mk-tab.is-active .tabdot { background: currentColor; }
+
+/* ---- Quantity stepper ----------------------------------------------------- */
+.mk-stepper { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--mk-card-border); border-radius: var(--mk-radius-pill); background: var(--mk-card); }
+.mk-stepper button { width: 40px; height: 40px; border: none; background: transparent; color: var(--mk-action); display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; }
+.mk-stepper span { min-width: 24px; text-align: center; font-size: var(--mk-fs-body); font-weight: 600; }
+
+/* ---- Skeleton (loading) ---------------------------------------------------- */
+.mk-skel { position: relative; overflow: hidden; background: var(--mk-bg-sunken); border-radius: var(--mk-radius-sm); }
+.mk-skel::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: mk-shimmer 1.4s infinite; }
+@keyframes mk-shimmer { 100% { transform: translateX(100%); } }
+
+/* ---- Offline banner -------------------------------------------------------- */
+.mk-banner { display: flex; align-items: center; gap: 10px; padding: 10px var(--mk-gutter);
+  font-size: var(--mk-fs-caption); font-weight: 500; }
+.mk-banner-offline { background: var(--mk-wash-neutral); color: var(--mk-text-secondary); }
