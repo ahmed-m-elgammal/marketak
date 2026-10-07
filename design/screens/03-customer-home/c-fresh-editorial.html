@@ -12,42 +12,40 @@
 <script src="../../assets/icons.js"></script>
 <style>
   .hm-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
-  .hm-body { flex:1; min-height:0; overflow-y:auto; padding-bottom:var(--mk-space-4); scrollbar-width:none; }
-  .hm-body::-webkit-scrollbar { display:none; }
-  .hm-head { padding:var(--mk-space-2) var(--mk-gutter) var(--mk-space-3); }
-  .hm-greet { display:flex; align-items:center; gap:12px; min-height:var(--mk-touch); }
-  .hm-greet .av { width:46px; height:46px; border-radius:50%; background:var(--mk-action-soft); display:flex; align-items:center; justify-content:center; color:var(--mk-brand-primary); font-weight:700; flex:none; }
-  .hm-greet .t { flex:1; min-width:0; }
-  .hm-greet .hi { font-size:var(--mk-fs-title-2); font-weight:700; }
-  .hm-greet .ad { display:flex; align-items:center; gap:4px; font-size:var(--mk-fs-caption); color:var(--mk-text-2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .hm-voucher { margin:var(--mk-space-3) 0 0; display:flex; align-items:center; gap:12px; background:var(--mk-accent-2-soft); border:1.5px dashed var(--mk-accent-2); border-radius:var(--mk-radius-lg); padding:12px 14px; }
-  .hm-voucher .code { background:#fff; border:1px solid var(--mk-accent-2); color:var(--mk-accent-2); font-weight:700; font-size:var(--mk-fs-caption);
-                      padding:4px 10px; border-radius:var(--mk-radius-sm); direction:ltr; letter-spacing:0; }
-  .hm-voucher .tx { flex:1; font-size:var(--mk-fs-caption); color:var(--mk-text-1); line-height:var(--mk-lh-caption); }
-  .hm-search { margin-top:var(--mk-space-4); }
-  .hm-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:var(--mk-space-4) var(--mk-gutter) 0; }
-  .tile { border-radius:var(--mk-radius-lg); background:var(--mk-card); border:1px solid var(--mk-card-border); padding:12px 8px 10px;
-          display:flex; flex-direction:column; align-items:center; gap:6px; font-size:var(--mk-fs-caption); font-weight:600; color:var(--mk-text-1); }
-  .tile .art { width:44px; height:44px; }
-  .hm-sec { display:flex; align-items:baseline; justify-content:space-between; padding:var(--mk-space-5) var(--mk-gutter) var(--mk-space-2); }
-  .hm-sec h2 { margin:0; font-size:var(--mk-fs-title-3); font-weight:700; }
-  .hm-sec a { font-size:var(--mk-fs-caption); color:var(--mk-brand-primary-text); font-weight:600; text-decoration:none; }
-  .reorder { margin:0 var(--mk-gutter); background:var(--mk-card); border:1px solid var(--mk-card-border); border-radius:var(--mk-radius-lg); padding:14px; }
-  .reorder .r1 { display:flex; align-items:center; gap:8px; font-size:var(--mk-fs-caption); color:var(--mk-text-2); }
-  .reorder .r2 { display:flex; align-items:center; gap:10px; margin-top:8px; }
-  .reorder .thumb { width:40px; height:40px; border-radius:10px; background:var(--mk-action-soft); display:flex; align-items:center; justify-content:center; flex:none; }
-  .reorder .t { flex:1; font-size:var(--mk-fs-body-sm); font-weight:600; }
-  .reorder .t small { display:block; font-weight:400; color:var(--mk-text-3); font-size:var(--mk-fs-caption); }
-  .vend { margin:0 var(--mk-gutter) 12px; overflow:hidden; }
-  .vend .cover { height:84px; display:flex; align-items:center; justify-content:center; gap:10px; }
-  .vend .bd { padding:12px 14px 14px; display:flex; gap:12px; align-items:center; }
-  .vend .meta { flex:1; min-width:0; }
-  .vend .r1 { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .vend .nm { font-size:var(--mk-fs-title-3); font-weight:700; }
-  .vend .sub { font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin:2px 0 8px; }
-  .vend .stats { display:flex; gap:12px; font-size:var(--mk-fs-body-sm); color:var(--mk-text-2); flex-wrap:wrap; }
-  .vend .stats span { display:inline-flex; align-items:center; gap:4px; }
-  .vend .stats [data-icon] { width:14px; height:14px; color:var(--mk-text-subtle); }
+  .hm-head { padding:var(--mk-space-2) var(--mk-gutter) var(--mk-space-2); }
+  .hm-greet { display:flex; align-items:center; justify-content:space-between; min-height:var(--mk-touch); }
+  .hm-greet .hello { font-size:var(--mk-fs-note); color:var(--mk-ink-3); font-weight:500; }
+  .hm-greet h1 { margin:2px 0 0; font-size:var(--mk-fs-sec); font-weight:700; line-height:var(--mk-lh-sec); }
+  .hm-now { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:var(--mk-radius-pill);
+            background:var(--mk-accent-soft); color:var(--mk-accent-text); font-size:var(--mk-fs-tag); font-weight:600; white-space:nowrap; }
+  .hm-now .dot { width:6px; height:6px; border-radius:50%; background:var(--mk-accent); }
+  /* ---- سؤال اليوم: الشاشة تسأل، مش بتعرض ---- */
+  .qcard { margin:var(--mk-space-2) var(--mk-gutter) 0; padding:var(--mk-space-5); background:var(--mk-card);
+           border:1px solid var(--mk-line); border-radius:var(--mk-radius-xl); box-shadow:var(--mk-shadow-1); }
+  .qcard .qlabel { display:inline-flex; align-items:center; gap:6px; font-size:var(--mk-fs-tag); font-weight:600; color:var(--mk-ink-3); }
+  .qcard .q { margin:8px 0 0; font-size:var(--mk-fs-sec); font-weight:700; line-height:var(--mk-lh-sec); }
+  .qcard .what { margin-top:var(--mk-space-3); padding:var(--mk-space-3) var(--mk-space-4); background:var(--mk-bg-2);
+                 border-radius:var(--mk-radius-md); font-size:var(--mk-fs-body); font-weight:600; }
+  .qcard .meta { margin-top:8px; font-size:var(--mk-fs-note); color:var(--mk-ink-3); display:flex; align-items:center; gap:6px; }
+  .qcard .price { margin-top:var(--mk-space-3); font-size:var(--mk-fs-title); font-weight:700; }
+  .qcard .price small { font-size:var(--mk-fs-body); color:var(--mk-ink-2); font-weight:600; }
+  .q-actions { display:flex; gap:10px; margin-top:var(--mk-space-4); }
+  .q-actions .mk-btn { flex:1; }
+  /* ---- escape hatch: القرار بنفسك، لكن مش هو البداية ---- */
+  .q-or { display:flex; align-items:center; gap:12px; margin:var(--mk-space-5) var(--mk-gutter) var(--mk-space-3); margin-top:auto; padding-top:var(--mk-space-4); }
+  .q-or::before, .q-or::after { content:""; flex:1; border-top:1px dashed var(--mk-line-strong); opacity:.6; }
+  .q-or span { font-size:var(--mk-fs-note); color:var(--mk-ink-3); font-weight:500; }
+  .openlist { padding:0 var(--mk-gutter); display:flex; flex-direction:column; gap:8px; }
+  .orow { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--mk-card);
+          border:1px solid var(--mk-line); border-radius:var(--mk-radius-md); }
+  .orow .logo { width:44px; height:44px; border-radius:var(--mk-radius-sm); display:flex; align-items:center; justify-content:center; flex:none; }
+  .orow .t { flex:1; min-width:0; }
+  .orow .nm { font-size:var(--mk-fs-body); font-weight:700; }
+  .orow .st { font-size:var(--mk-fs-tag); margin-top:2px; display:flex; align-items:center; gap:5px; }
+  .orow .go { color:var(--mk-ink-3); }
+  .esc { margin:var(--mk-space-3) var(--mk-gutter) var(--mk-space-4); display:flex; align-items:center; gap:10px;
+         min-height:var(--mk-touch); padding:0 var(--mk-space-4); border:1.5px dashed var(--mk-line-strong);
+         border-radius:var(--mk-radius-md); color:var(--mk-ink-2); font-size:var(--mk-fs-body); font-weight:500; }
   .hm-tabfix { flex:none; }
 </style>
 </head>
@@ -58,117 +56,72 @@
     <a class="crumb" href="javascript:void(0)">الشاشة 03 — الرئيسية (العميل)</a>
     <span class="tag"><span class="dot"></span>مثال C · Fresh Editorial</span>
   </div>
-  <p class="bp-desc"><b>الفكرة:</b> رئيسية «بتهتم بيك» — تحية باسمك وقسيمة <span dir="ltr">SAVE10</span> فوق، بلاطات أقسام برسوم مولّدة، وشريط «اطلب تاني بضغطة» من سجل طلبك <span dir="ltr">MK-261004-7F3K9</span>. الأقوى في بناء عادة الطلب المتكرر — وهو جوهر نموذج ربع سنوي مقتصد الميزانية.</p>
+  <p class="bp-desc"><b>الفكرة (بعد كسر القواعد):</b> الرئيسية كتالوج؟ لأ. التطبيق يعرف الوقت (١٢:١٥ — نافذة الغداء) ويعرف تاريخك (آخر طلب امبارح) — فيسأل سؤالًا واحدًا جوابه ضغطة: «نفس طلب امبارح؟»، وفوقه «سوّرني» لمن مش عارف. الكتالوج لم يُحذف — لكنه نواة هادئة أسفل الشاشة: ثلاثة محلات مفتوحة + باب هروب متقطّع للبحث. القاعدة المكسورة رقم ٠١ و٠٧ من <a href="../../experience.html" style="color:var(--mk-accent-text);font-weight:600">فلسفة التجربة</a>.</p>
 
   <div class="stage">
     <div class="phone theme-c">
       <div class="island"></div>
       <div class="screen">
-        <div class="statusbar"><span>٩:٤١</span><i data-icon="statusbar" style="width:55px;height:13px"></i></div>
+        <div class="statusbar"><span>١٢:١٥</span><i data-icon="statusbar" style="width:55px;height:13px"></i></div>
 
         <div class="hm-wrap">
-          <div class="hm-body">
-            <div class="hm-head">
-              <div class="hm-greet">
-                <div class="av">س</div>
-                <div class="t">
-                  <div class="hi">أهلاً يا سارة</div>
-                  <div class="ad"><i data-icon="pin" style="width:14px;height:14px;color:var(--mk-brand-primary-text)"></i>المنزل · 12 ش شريف، الزمالك <i data-icon="chevron-down" style="width:14px;height:14px"></i></div>
-                </div>
-                <button class="mk-iconbtn"><i data-icon="bell"></i></button>
+          <div class="hm-head">
+            <div class="hm-greet">
+              <div>
+                <div class="hello">إزيك يا أحمد</div>
+                <h1>هننجدي على إيه النهارده؟</h1>
               </div>
-
-              <div class="hm-voucher">
-                <i data-icon="voucher" style="color:var(--mk-accent-2);width:26px;height:26px"></i>
-                <div class="tx"><b>خصم 10%</b> على طلبك الجاي من أي محل — لحد 14 أكتوبر</div>
-                <span class="code">SAVE10</span>
-              </div>
-
-              <div class="mk-input hm-search"><i data-icon="search" style="color:var(--mk-text-subtle)"></i><input placeholder="نفس الأكل اللي بتتمناه… اكتبه"></div>
-            </div>
-
-            <div class="hm-tiles">
-              <div class="tile">
-                <svg class="art" viewBox="0 0 48 48"><path d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z" fill="var(--mk-illu-1)"/><path d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="var(--mk-illu-3)"/></svg>
-                مطاعم
-              </div>
-              <div class="tile">
-                <svg class="art" viewBox="0 0 48 48"><path d="M10 20h28l-4 18H14z" fill="var(--mk-illu-6)" opacity=".9"/><path d="M17 20v-5a7 7 0 0 1 14 0v5" stroke="var(--mk-illu-6)" stroke-width="3" fill="none"/><circle cx="19" cy="27" r="2" fill="#fff"/><circle cx="26" cy="31" r="2" fill="#fff"/></svg>
-                بقالة
-              </div>
-              <div class="tile">
-                <svg class="art" viewBox="0 0 48 48"><rect x="8" y="10" width="32" height="26" rx="6" fill="var(--mk-illu-2)"/><path d="M14 20h20M14 26h14" stroke="#fff" stroke-width="3" stroke-linecap="round"/><rect x="16" y="6" width="16" height="6" rx="3" fill="var(--mk-illu-1)"/></svg>
-                مخبوزات
-              </div>
-              <div class="tile">
-                <svg class="art" viewBox="0 0 48 48"><rect x="12" y="14" width="24" height="24" rx="5" fill="var(--mk-illu-5)"/><path d="M24 20v12M18 26h12" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>
-                صيدلية
-              </div>
-              <div class="tile">
-                <svg class="art" viewBox="0 0 48 48"><path d="M24 8c3 6 9 8 9 15a9 9 0 1 1-18 0c0-7 6-9 9-15z" fill="var(--mk-illu-1)" opacity=".85"/><path d="M24 38c-2-3-2-6 0-9 2 3 2 6 0 9z" fill="var(--mk-illu-4)"/></svg>
-                ورد
-              </div>
-              <div class="tile">
-                <svg class="art" viewBox="0 0 48 48"><circle cx="24" cy="24" r="15" fill="none" stroke="var(--mk-illu-7)" stroke-width="3"/><path d="M24 15v9l6 4" stroke="var(--mk-illu-7)" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
-                الكل
-              </div>
-            </div>
-
-            <div class="hm-sec"><h2>اطلب تاني بضغطة</h2></div>
-            <div class="reorder">
-              <div class="r1"><i data-icon="receipt" style="width:16px;height:16px;color:var(--mk-brand-primary-text)"></i>طلبك الأخير · <span class="mk-ltr">MK-261004-7F3K9</span> · 12:40 م</div>
-              <div class="r2">
-                <div class="thumb">
-                  <svg viewBox="0 0 32 32" width="26" height="26"><path d="M16 5 26 25H6z" fill="var(--mk-illu-1)"/><circle cx="14" cy="17" r="2" fill="var(--mk-illu-3)"/><circle cx="19" cy="20" r="1.7" fill="var(--mk-illu-8)"/></svg>
-                </div>
-                <div class="t">بيتزا مارجريتا (كبير) ×1 — بيتزا بليس<small>200.00 ج.م · يوصّل في 20–40 د</small></div>
-                <button class="mk-btn mk-btn-primary mk-btn-sm">اطلب تاني</button>
-              </div>
-            </div>
-
-            <div class="hm-sec"><h2>المفتوح الآن حواليك</h2><a href="#">8 محلات</a></div>
-
-            <div class="mk-card vend">
-              <div class="cover" style="background:var(--mk-action-soft)">
-                <svg viewBox="0 0 90 48" height="48"><path d="M45 4 78 42H12z" fill="var(--mk-illu-3)"/><path d="M45 10 70 40H20z" fill="var(--mk-illu-1)"/><circle cx="38" cy="27" r="3.5" fill="var(--mk-illu-3)"/><circle cx="52" cy="33" r="3.5" fill="var(--mk-illu-8)"/><circle cx="40" cy="36" r="2.6" fill="var(--mk-illu-8)"/></svg>
-              </div>
-              <div class="bd">
-                <div class="meta">
-                  <div class="r1"><span class="nm">بيتزا بليس</span><span class="mk-badge mk-badge-brand"><span class="dot"></span>مفتوح</span></div>
-                  <div class="sub">بيتزا ومأكولات إيطالية · الزمالك</div>
-                  <div class="stats">
-                    <span><i data-icon="star-fill" style="color:var(--mk-brand-primary)"></i><b>4.6</b> (320)</span>
-                    <span><i data-icon="clock"></i>20–40 د</span>
-                    <span><i data-icon="scooter"></i>25.00 ج.م</span>
-                  </div>
-                </div>
-                <i data-icon="chevron-left" style="color:var(--mk-text-3)"></i>
-              </div>
-            </div>
-
-            <div class="mk-card vend">
-              <div class="cover" style="background:var(--mk-accent-2-soft)">
-                <svg viewBox="0 0 90 48" height="48"><path d="M15 22h60l-9 20H24z" fill="var(--mk-illu-5)"/><path d="M28 22v-6a17 17 0 0 1 34 0v6" stroke="var(--mk-illu-4)" stroke-width="4" fill="none"/><circle cx="36" cy="30" r="3" fill="#fff"/><circle cx="52" cy="34" r="3" fill="#fff"/><circle cx="60" cy="28" r="3" fill="#fff"/></svg>
-              </div>
-              <div class="bd">
-                <div class="meta">
-                  <div class="r1"><span class="nm">سوق الحديقة</span><span class="mk-badge mk-badge-brand"><span class="dot"></span>مفتوح</span></div>
-                  <div class="sub">بقالة · خضار وفاكهة · أجبان — الزمالك</div>
-                  <div class="stats">
-                    <span><i data-icon="star-fill" style="color:var(--mk-brand-primary)"></i><b>4.7</b> (512)</span>
-                    <span style="color:var(--mk-accent-2);font-weight:600"><i data-icon="scooter" style="color:var(--mk-accent-2)"></i>توصيل مجاني فوق 100</span>
-                  </div>
-                </div>
-                <i data-icon="chevron-left" style="color:var(--mk-text-3)"></i>
-              </div>
+              <span class="hm-now"><span class="dot"></span>وقت الغداء</span>
             </div>
           </div>
+
+          <!-- سؤال اليوم -->
+          <div class="qcard">
+            <span class="qlabel"><i data-icon="sparkle" style="width:14px;height:14px;color:var(--mk-accent-text)"></i>سؤال اليوم</span>
+            <div class="q">نفس طلب امبارح؟</div>
+            <div class="what">بيتزا بليس — مارجريتا ×2 + كولا كبيرة</div>
+            <div class="meta"><i data-icon="clock" style="width:14px;height:14px"></i>طلبك الأخير · امبارح ١٢:٢٠ · ~30 د</div>
+            <div class="price mk-money">240.00 <small>ج.م</small></div>
+            <div class="q-actions">
+              <button class="mk-btn mk-btn-primary">أيوه، اطلبه</button>
+              <button class="mk-btn mk-btn-secondary">لأ، سوّرني</button>
+            </div>
+          </div>
+
+          <!-- القرار بنفسك — نواة هادئة -->
+          <div class="q-or"><span>أو قرّر بنفسك</span></div>
+          <div class="openlist">
+            <div class="orow">
+              <div class="logo" style="background:var(--mk-accent-soft)">
+                <svg viewBox="0 0 48 48" width="28" height="28"><path d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z" fill="var(--mk-art-ember)"/><path d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="var(--mk-art-sand)"/></svg>
+              </div>
+              <div class="t"><div class="nm">بيتزا بليس</div><div class="st" style="color:var(--mk-good)"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--mk-good)"></span>مفتوح — ~30 د</div></div>
+              <i data-icon="chevron-left" class="go"></i>
+            </div>
+            <div class="orow">
+              <div class="logo" style="background:var(--mk-info-soft)">
+                <svg viewBox="0 0 48 48" width="28" height="28"><path d="M10 20h28l-4 18H14z" fill="var(--mk-art-sky)" opacity=".9"/><path d="M17 20v-5a7 7 0 0 1 14 0v5" stroke="var(--mk-art-sky)" stroke-width="3" fill="none"/></svg>
+              </div>
+              <div class="t"><div class="nm">سوق الحديقة</div><div class="st" style="color:var(--mk-good)"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--mk-good)"></span>مفتوح — ~20 د</div></div>
+              <i data-icon="chevron-left" class="go"></i>
+            </div>
+            <div class="orow">
+              <div class="logo" style="background:var(--mk-warn-soft)">
+                <svg viewBox="0 0 48 48" width="28" height="28"><rect x="9" y="12" width="30" height="10" rx="5" fill="var(--mk-art-sand)"/><rect x="6" y="20" width="36" height="8" rx="4" fill="var(--mk-art-ember)"/><rect x="9" y="26" width="30" height="10" rx="5" fill="var(--mk-art-mint)"/></svg>
+              </div>
+              <div class="t"><div class="nm">برجر هاوس</div><div class="st" style="color:var(--mk-warn)"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--mk-warn)"></span>مشغول — +15 د</div></div>
+              <i data-icon="chevron-left" class="go"></i>
+            </div>
+          </div>
+
+          <!-- باب الهروب -->
+          <div class="esc"><i data-icon="search" style="width:18px;height:18px;color:var(--mk-ink-3)"></i>دوّر بنفسك في محلات الزمالك</div>
 
           <div class="hm-tabfix">
             <div class="mk-tabbar">
               <a class="mk-tab is-active"><i data-icon="home-fill"></i>الرئيسية<span class="tabdot"></span></a>
               <a class="mk-tab"><i data-icon="search"></i>البحث<span class="tabdot"></span></a>
-              <a class="mk-tab"><i data-icon="cart"></i>السلة<span class="tabdot"></span></a>
+              <a class="mk-tab"><i data-icon="cart"></i>الصينية<span class="tabdot"></span></a>
               <a class="mk-tab"><i data-icon="receipt"></i>طلباتي<span class="tabdot"></span></a>
               <a class="mk-tab"><i data-icon="user"></i>حسابي<span class="tabdot"></span></a>
             </div>
@@ -180,26 +133,34 @@
 
     <div class="notes">
       <div class="note-card">
-        <h3><i data-icon="gift"></i>القسيمة والسجل — من الجداول نفسها</h3>
+        <h3><i data-icon="sparkle"></i>جاوب قبل السؤال — مبدأ ١</h3>
         <ul>
-          <li>شريط <span dir="ltr">SAVE10</span> يمثل قسيمة البذرة (10% = 1000 نقطة أساس) — تُطبَّق في السلة وتظهرscoped لكل محل إن كانت مخصصة له (<code class="rpc">apply_voucher_v1</code>).</li>
-          <li>«اطلب تاني» من <code class="rpc">reorder_v1</code> — يبني سلة جديدة من <span dir="ltr">MK-261004-7F3K9</span> ويوسم الصنف غير المتاح بدل أن يفشل صامتًا.</li>
-          <li>السعر المعروض 200.00 ج.م = سعر صنف «مارجريتا كبير» المجمّد في عنصر الطلب السابق (لقطة التسعير) — لا سعر اليوم.</li>
+          <li>السؤال يُبنى من آخر <span dir="ltr">orders</span> مكتمل + <span dir="ltr">order_items</span> — والسعر المعروض من آخر quote مسجّل سيرفرًا، لا حساب محلي.</li>
+          <li>«وقت الغداء» شريحة زمنية حقيقية: خارج ١١:٣٠–٣:٠٠ يتبدل الكرت لـ«المحلات بتفتح ١١:٣٠ — صحيّني؟» من <span dir="ltr">vendor_schedules</span>.</li>
+          <li>صفر عنوان، صفر بحث، صفر فلاتر — العنوان الافتراضي هيُسأل عنه في الصينية فقط لو اتغيّر.</li>
         </ul>
       </div>
       <div class="note-card">
-        <h3><i data-icon="sparkle"></i>لماذا يفوز هذا الاتجاه؟</h3>
+        <h3><i data-icon="route"></i>سوّرني — القرار مسموح بتفويضه</h3>
         <ul>
-          <li>أول شاشة تجيب ثلاثة أسئلة العميل قبل أن يسألها: «إيه الجديد لي؟ إيه العرض؟ إيه اللي طلبتو مش اليوم؟»</li>
-          <li>إعادة الطلب بضغطة هي أقوى أداة احتفاظ — مكانها الصحيح أول الشاشة وليس مدفونة في «طلباتي».</li>
-          <li>البلاطات المرسومة تعمل بلا صور محلات نهائيًا — الإطلاق في منطقة واحدة لا يعتمد على اكتمال محتوى المحلات.</li>
+          <li>ترشيح واحد محسوب من <span dir="ltr">ratings</span> + سجلك + <span dir="ltr">vendor_schedules</span> (مفتوح فعلًا الآن) — مفاجأة لا عشوائية.</li>
+          <li>«سوّرني» يكمل الطلب لآخره عبر <code class="rpc">place_order_v1</code> — ضغطة واحدة من الجوع إلى «في الطريق».</li>
         </ul>
       </div>
       <div class="note-card">
-        <h3><i data-icon="alert"></i>ثمن الاتجاه</h3>
+        <h3><i data-icon="info"></i>الكتالوج موجود — بس مش هو البداية</h3>
         <ul>
-          <li>المحتويات الترويجية تحتاج لوحة تشغيل (admin) تتحكم فيها — وإلا صارت شاشة وهمية. القسيمة والبلاطات يجب أن تقرأ من الإعدادات لا أن تُثبّت.</li>
-          <li>شريط القسيمة يأكل ارتفاعًا ثمينًا — على الشاشات الصغيرة يتحول لقابل للسحب (نقطة كسر موثقة في system.html).</li>
+          <li>القائمة الهادئة من <code class="rpc">get_vendor_feed_v1</code> — مفتوح/مشغول بجملة ولا لون صامت (قاعدة ٤).</li>
+          <li>«دوّر بنفسك» نواة قابلة للنقر (<code class="rpc">search_catalog_v1</code>) — لا شريط بحث مهيمن.</li>
+          <li>الكاش المشفر يخلي القائمة تعمل أوف لاين — والأسعار تُوسم «تقديرية».</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="check"></i>بوابة الصفر-تفكير</h3>
+        <ul>
+          <li>من فتح التطبيق إلى طلب مؤكد: <b>لمستان</b> («أيوه، اطلبه» ← «اطلب» في الصينية) — صفر حروف مكتوبة.</li>
+          <li>زر رئيسي واحد («أيوه، اطلبه»)؛ «سوّرني» ثانوي بالوزن واللون.</li>
+          <li>كل حالة بجملة + لون: «مشغول — +15 د»، «مفتوح — ~30 د».</li>
         </ul>
       </div>
     </div>
@@ -207,32 +168,47 @@
 
   <div class="states-strip">
     <h2>الحالات الإلزامية لهذه الشاشة</h2>
-    <p class="sub">مقتطفات بنفس جلد theme-c.</p>
+    <p class="sub">مقتطفات من نفس القالب — كل حالة بجملة بشرية، مش لون صامت.</p>
     <div class="states">
       <div class="state-tile">
-        <h4>1 · مستخدم جديد (بدون سجل)</h4>
-        <div style="border:1px dashed var(--mk-border-strong);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-caption);color:var(--mk-text-2);text-align:center;background:var(--mk-card)">
-          شريط «اطلب تاني» وشريط القسيمة يختفيان كليًا — لا نعرض فراغًا ولا زرًا معطلًا. أول طلب يبني الشريط تلقائيًا.
+        <h4>1 · قبل نافذة الغداء (١١:٠٠ ص)</h4>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:6px 2px">
+          <div>
+            <div class="hello" style="font-size:var(--mk-fs-note);color:var(--mk-ink-3)">إزيك يا أحمد</div>
+            <div style="font-size:var(--mk-fs-sec);font-weight:700;margin-top:2px">محلات الزمالك بتفتح قريب</div>
+          </div>
+          <div class="what" style="padding:10px 12px;background:var(--mk-bg-2);border-radius:10px;font-size:var(--mk-fs-body);font-weight:600">المحلات بتفتح ١١:٣٠ ص — صحيّني لما تفتح؟</div>
+          <button class="mk-btn mk-btn-primary mk-btn-sm" style="align-self:flex-start">فعّل التنبيه — مرة واحدة بس</button>
         </div>
       </div>
       <div class="state-tile">
-        <h4>2 · قسيمة مستهلكة</h4>
-        <div style="display:flex;align-items:center;gap:10px;background:var(--mk-wash-neutral);border-radius:var(--mk-radius-md);padding:10px 12px;font-size:var(--mk-fs-caption);color:var(--mk-text-2)">
-          <i data-icon="voucher" style="color:var(--mk-text-subtle)"></i>استخدمت قسيمة SAVE10 — دبل عليك لما يجي عرض جديد.
+        <h4>2 · محل طلبك الأخير مقفول</h4>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:6px 2px">
+          <div style="font-size:var(--mk-fs-body);font-weight:700">بيتزا بليس مقفولة النهارده</div>
+          <div style="font-size:var(--mk-fs-note);color:var(--mk-ink-2);line-height:1.7">عطلة أسبوعية — بترجع بكره ١١:٣٠ ص. نفس الطلب من <b>برجر هاوس</b>؟</div>
+          <div style="display:flex;gap:8px">
+            <button class="mk-btn mk-btn-primary mk-btn-sm">اطلبه من هناك</button>
+            <button class="mk-btn mk-btn-secondary mk-btn-sm">لأ، شوفلي حاجة تانية</button>
+          </div>
         </div>
       </div>
       <div class="state-tile">
-        <h4>3 · إعادة طلب بصنف ناقص</h4>
-        <div style="display:flex;gap:8px;background:var(--mk-wash-warning);border-radius:var(--mk-radius-md);padding:10px 12px;font-size:var(--mk-fs-caption);color:var(--mk-status-warning);align-items:flex-start">
-          <i data-icon="alert" style="margin-top:1px"></i>
-          <div>«مارجريتا كبير» مش متاحة دلوقتي — ضفنا الصغير بدالها، أو شيلها وكمّل.</div>
+        <h4>3 · السعر اتغير (<span dir="ltr">PRICE_CHANGED</span>)</h4>
+        <div style="display:flex;flex-direction:column;gap:10px;padding:6px 2px">
+          <div style="font-size:var(--mk-fs-body);font-weight:700">السعر اتغير شوية</div>
+          <div style="font-size:var(--mk-fs-note);color:var(--mk-ink-2);line-height:1.7">مارجريتا بقت <span class="mk-money">125.00</span> بدل <span class="mk-money">120.00</span> ج.م — الإجمالي <b class="mk-money">245.00 ج.م</b>. تطلب برضه؟</div>
+          <div style="display:flex;gap:8px">
+            <button class="mk-btn mk-btn-primary mk-btn-sm">أيوه، كمّل</button>
+            <button class="mk-btn mk-btn-secondary mk-btn-sm">لا، شيلها</button>
+          </div>
         </div>
       </div>
       <div class="state-tile">
-        <h4>4 · تحميل أول فتح</h4>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div class="mk-skel" style="height:64px;border-radius:14px"></div>
-          <div class="mk-skel" style="height:64px;border-radius:14px"></div>
+        <h4>4 · أوف لاين (تصفح الكاش)</h4>
+        <div class="mk-banner mk-banner-offline" style="border-radius:10px;border:1px solid var(--mk-line)"><i data-icon="offline"></i>النت وقع — القائمة من الكاش والأسعار تقديرية.</div>
+        <div class="mk-card" style="margin-top:10px;padding:12px;display:flex;gap:12px;align-items:center;opacity:.85">
+          <div style="width:44px;height:44px;border-radius:10px;background:var(--mk-bg-2)"></div>
+          <div style="flex:1"><div style="font-weight:700;font-size:var(--mk-fs-note)">سؤال اليوم جاهز برضه</div><div style="font-size:var(--mk-fs-tag);color:var(--mk-ink-3)">أتأكد من السعر أول ما النت يرجع.</div></div>
         </div>
       </div>
     </div>

@@ -11,50 +11,50 @@
 <link rel="stylesheet" href="assets/blueprint.css">
 <script src="assets/icons.js"></script>
 <style>
-  .bp-top .tag { background:var(--mk-surface-chrome); color:#fff; font-size:var(--mk-fs-micro); font-weight:600;
+  .bp-top .tag { background:var(--mk-chrome); color:#fff; font-size:var(--mk-fs-tag); font-weight:600;
                  padding:5px 12px; border-radius:var(--mk-radius-pill); display:inline-flex; align-items:center; gap:6px; }
   .bp-top .tag .dot { width:7px; height:7px; border-radius:50%; background:#F2A76C; }
-  .bp-desc b { color:var(--mk-text-primary); }
-  h2.demo { max-width:1120px; margin:48px auto 4px; padding:0 24px; font-size:var(--mk-fs-title-1); font-weight:700; }
-  h2.demo .n { color:var(--mk-brand-primary); }
-  p.demo-sub { max-width:1120px; margin:0 auto 0; padding:0 24px; font-size:var(--mk-fs-body-sm); color:var(--mk-text-secondary); }
+  .bp-desc b { color:var(--mk-ink); }
+  h2.demo { max-width:1120px; margin:48px auto 4px; padding:0 24px; font-size:var(--mk-fs-title); font-weight:700; }
+  h2.demo .n { color:var(--mk-accent); }
+  p.demo-sub { max-width:1120px; margin:0 auto 0; padding:0 24px; font-size:var(--mk-fs-note); color:var(--mk-ink-2); }
   .stage + .stage { margin-top:36px; }
 
   /* ---- demo 1 · the question --------------------------------------------- */
   .q-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
   .q-top { padding:var(--mk-space-2) var(--mk-gutter) 0; display:flex; align-items:center; justify-content:space-between; }
-  .q-hi { font-size:var(--mk-fs-caption); color:var(--mk-text-3); }
-  .q-hi b { display:block; font-size:var(--mk-fs-title-2); color:var(--mk-text-1); font-weight:700; margin-top:2px; }
-  .q-time { display:inline-flex; align-items:center; gap:6px; background:var(--mk-action-soft); color:var(--mk-brand-primary-text);
-            font-size:var(--mk-fs-caption); font-weight:700; padding:8px 12px; border-radius:var(--mk-radius-pill); }
-  .q-card { margin:var(--mk-space-4) var(--mk-gutter) 0; background:var(--mk-surface-chrome); border-radius:var(--mk-radius-xl);
-            padding:20px; color:#fff; box-shadow:var(--mk-elev-3); position:relative; overflow:hidden; }
+  .q-hi { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); }
+  .q-hi b { display:block; font-size:var(--mk-fs-sec); color:var(--mk-ink); font-weight:700; margin-top:2px; }
+  .q-time { display:inline-flex; align-items:center; gap:6px; background:var(--mk-accent-soft); color:var(--mk-accent-text);
+            font-size:var(--mk-fs-tag); font-weight:700; padding:8px 12px; border-radius:var(--mk-radius-pill); }
+  .q-card { margin:var(--mk-space-4) var(--mk-gutter) 0; background:var(--mk-chrome); border-radius:var(--mk-radius-xl);
+            padding:20px; color:#fff; box-shadow:var(--mk-shadow-3); position:relative; overflow:hidden; }
   .q-card .glow { position:absolute; top:-46px; inset-inline-start:-46px; width:150px; height:150px; border-radius:50%;
                   background:rgba(181,71,8,.35); filter:blur(2px); }
-  .q-card .cap { font-size:var(--mk-fs-caption); color:#F2A76C; font-weight:700; display:flex; align-items:center; gap:6px; position:relative; }
+  .q-card .cap { font-size:var(--mk-fs-tag); color:#F2A76C; font-weight:700; display:flex; align-items:center; gap:6px; position:relative; }
   .q-card h3 { margin:6px 0 12px; font-size:var(--mk-fs-display); line-height:var(--mk-lh-display); font-weight:700; position:relative; }
   .q-ord { position:relative; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:var(--mk-radius-lg);
            padding:12px 14px; display:flex; gap:12px; align-items:center; }
-  .q-ord .logo { width:44px; height:44px; border-radius:var(--mk-radius-md); background:var(--mk-brand-primary);
+  .q-ord .logo { width:44px; height:44px; border-radius:var(--mk-radius-md); background:var(--mk-accent);
                  display:flex; align-items:center; justify-content:center; flex:none; }
   .q-ord .t { flex:1; min-width:0; }
-  .q-ord .t .nm { font-size:var(--mk-fs-body-sm); font-weight:700; }
-  .q-ord .t .dt { font-size:var(--mk-fs-micro); color:var(--mk-text-on-dark-secondary); margin-top:2px; }
-  .q-ord .pr { font-size:var(--mk-fs-body-sm); font-weight:700; color:#F2A76C; white-space:nowrap; }
+  .q-ord .t .nm { font-size:var(--mk-fs-note); font-weight:700; }
+  .q-ord .t .dt { font-size:var(--mk-fs-tag); color:var(--mk-ink-inv-2); margin-top:2px; }
+  .q-ord .pr { font-size:var(--mk-fs-note); font-weight:700; color:#F2A76C; white-space:nowrap; }
   .q-acts { position:relative; display:flex; gap:10px; margin-top:14px; }
   .q-acts .mk-btn { flex:1; }
-  .q-or { display:flex; align-items:center; gap:12px; margin:var(--mk-space-5) var(--mk-gutter) var(--mk-space-2); margin-top:auto; padding-top:var(--mk-space-4); color:var(--mk-text-subtle); font-size:var(--mk-fs-caption); font-weight:600; }
-  .q-or::before, .q-or::after { content:""; flex:1; height:1px; background:var(--mk-border-subtle); }
+  .q-or { display:flex; align-items:center; gap:12px; margin:var(--mk-space-5) var(--mk-gutter) var(--mk-space-2); margin-top:auto; padding-top:var(--mk-space-4); color:var(--mk-ink-3); font-size:var(--mk-fs-tag); font-weight:600; }
+  .q-or::before, .q-or::after { content:""; flex:1; height:1px; background:var(--mk-line); }
   .q-vends { display:flex; gap:8px; overflow-x:auto; padding:var(--mk-space-2) var(--mk-gutter) 0; scrollbar-width:none; }
   .q-vends::-webkit-scrollbar { display:none; }
-  .qv { flex:none; display:inline-flex; align-items:center; gap:7px; border:1px solid var(--mk-card-border); background:var(--mk-card);
-        border-radius:var(--mk-radius-pill); padding:7px 11px 7px 7px; font-size:var(--mk-fs-body-sm); font-weight:600; }
+  .qv { flex:none; display:inline-flex; align-items:center; gap:7px; border:1px solid var(--mk-line); background:var(--mk-card);
+        border-radius:var(--mk-radius-pill); padding:7px 11px 7px 7px; font-size:var(--mk-fs-note); font-weight:600; }
   .qv .dotl { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:none; }
-  .qv .st { font-size:var(--mk-fs-micro); font-weight:500; }
-  .qv .st.open { color:var(--mk-status-success); } .qv .st.busy { color:var(--mk-status-warning); }
+  .qv .st { font-size:var(--mk-fs-tag); font-weight:500; }
+  .qv .st.open { color:var(--mk-good); } .qv .st.busy { color:var(--mk-warn); }
   .q-search { margin:var(--mk-space-3) var(--mk-gutter) var(--mk-space-4); display:flex; align-items:center; justify-content:center; gap:8px;
-              min-height:var(--mk-touch); border:1.5px dashed var(--mk-border-strong); border-radius:var(--mk-radius-md);
-              color:var(--mk-text-2); font-size:var(--mk-fs-body-sm); font-weight:600; }
+              min-height:var(--mk-touch); border:1.5px dashed var(--mk-line-strong); border-radius:var(--mk-radius-md);
+              color:var(--mk-ink-2); font-size:var(--mk-fs-note); font-weight:600; }
   .q-tabfix { flex:none; margin-top:auto; }
 
   /* ---- demo 2 · the tray ---------------------------------------------------- */
@@ -62,91 +62,91 @@
   .t-body { flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; padding-bottom:var(--mk-space-2); }
   .t-body::-webkit-scrollbar { display:none; }
   .t-slots { padding:var(--mk-space-2) var(--mk-gutter) 0; display:flex; flex-direction:column; gap:10px; }
-  .slot { border:1px solid var(--mk-card-border); background:var(--mk-card); border-radius:var(--mk-radius-lg); padding:12px 14px;
-          display:flex; align-items:center; gap:12px; box-shadow:var(--mk-shadow-card); }
-  .slot .n { width:26px; height:26px; border-radius:50%; background:var(--mk-action-soft); color:var(--mk-brand-primary-text);
-             font-size:var(--mk-fs-micro); font-weight:700; display:flex; align-items:center; justify-content:center; flex:none; }
+  .slot { border:1px solid var(--mk-line); background:var(--mk-card); border-radius:var(--mk-radius-lg); padding:12px 14px;
+          display:flex; align-items:center; gap:12px; box-shadow:var(--mk-shadow-1); }
+  .slot .n { width:26px; height:26px; border-radius:50%; background:var(--mk-accent-soft); color:var(--mk-accent-text);
+             font-size:var(--mk-fs-tag); font-weight:700; display:flex; align-items:center; justify-content:center; flex:none; }
   .slot .logo { width:42px; height:42px; border-radius:var(--mk-radius-md); display:flex; align-items:center; justify-content:center; flex:none; }
   .slot .t { flex:1; min-width:0; }
-  .slot .t .nm { font-size:var(--mk-fs-body-sm); font-weight:700; }
-  .slot .t .dt { font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:2px; }
-  .slot .pr { font-size:var(--mk-fs-body-sm); font-weight:700; white-space:nowrap; }
-  .slot-empty { border:1.5px dashed var(--mk-border-strong); background:transparent; box-shadow:none; color:var(--mk-text-subtle); }
-  .slot-empty .n { background:var(--mk-wash-neutral); color:var(--mk-text-subtle); }
-  .slot-empty .t .nm { color:var(--mk-text-2); font-weight:600; }
+  .slot .t .nm { font-size:var(--mk-fs-note); font-weight:700; }
+  .slot .t .dt { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); margin-top:2px; }
+  .slot .pr { font-size:var(--mk-fs-note); font-weight:700; white-space:nowrap; }
+  .slot-empty { border:1.5px dashed var(--mk-line-strong); background:transparent; box-shadow:none; color:var(--mk-ink-3); }
+  .slot-empty .n { background:var(--mk-bg-2); color:var(--mk-ink-3); }
+  .slot-empty .t .nm { color:var(--mk-ink-2); font-weight:600; }
   .t-presets { margin:var(--mk-space-4) var(--mk-gutter) 0; }
-  .t-presets h4 { margin:0 0 8px; font-size:var(--mk-fs-caption); font-weight:700; color:var(--mk-text-3); display:flex; align-items:center; gap:6px; }
-  .preset { display:flex; align-items:center; gap:12px; padding:11px 14px; border-bottom:1px dashed var(--mk-border-subtle); }
+  .t-presets h4 { margin:0 0 8px; font-size:var(--mk-fs-tag); font-weight:700; color:var(--mk-ink-3); display:flex; align-items:center; gap:6px; }
+  .preset { display:flex; align-items:center; gap:12px; padding:11px 14px; border-bottom:1px dashed var(--mk-line); }
   .preset:last-child { border-bottom:none; }
-  .preset [data-icon] { color:var(--mk-brand-primary); }
-  .preset .k { font-size:var(--mk-fs-caption); color:var(--mk-text-3); width:52px; flex:none; }
-  .preset .v { flex:1; font-size:var(--mk-fs-body-sm); font-weight:600; }
-  .preset .v small { display:block; font-weight:400; font-size:var(--mk-fs-micro); color:var(--mk-text-subtle); margin-top:1px; }
-  .preset .chg { font-size:var(--mk-fs-caption); color:var(--mk-brand-primary-text); font-weight:600; text-decoration:none; flex:none; }
-  .t-sum { margin:var(--mk-space-3) var(--mk-gutter) 0; background:var(--mk-bg-sunken); border-radius:var(--mk-radius-lg); padding:14px 16px; }
-  .t-sum .r { display:flex; justify-content:space-between; font-size:var(--mk-fs-body-sm); color:var(--mk-text-2); padding:3px 0; }
-  .t-sum .r.tot { border-top:1px dashed var(--mk-border-subtle); margin-top:7px; padding-top:10px; font-size:var(--mk-fs-body); font-weight:700; color:var(--mk-text-1); }
-  .t-ttl { margin:10px var(--mk-gutter) 0; display:flex; align-items:center; gap:8px; font-size:var(--mk-fs-caption); color:var(--mk-status-info);
-           background:var(--mk-wash-info); border-radius:var(--mk-radius-sm); padding:9px 12px; font-weight:600; }
-  .t-cta { flex:none; padding:var(--mk-space-3) var(--mk-gutter) 0; border-top:1px solid var(--mk-divider); background:var(--mk-card); }
-  .t-cta .mk-btn { width:100%; font-size:var(--mk-fs-title-3); }
+  .preset [data-icon] { color:var(--mk-accent); }
+  .preset .k { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); width:52px; flex:none; }
+  .preset .v { flex:1; font-size:var(--mk-fs-note); font-weight:600; }
+  .preset .v small { display:block; font-weight:400; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); margin-top:1px; }
+  .preset .chg { font-size:var(--mk-fs-tag); color:var(--mk-accent-text); font-weight:600; text-decoration:none; flex:none; }
+  .t-sum { margin:var(--mk-space-3) var(--mk-gutter) 0; background:var(--mk-bg-2); border-radius:var(--mk-radius-lg); padding:14px 16px; }
+  .t-sum .r { display:flex; justify-content:space-between; font-size:var(--mk-fs-note); color:var(--mk-ink-2); padding:3px 0; }
+  .t-sum .r.tot { border-top:1px dashed var(--mk-line); margin-top:7px; padding-top:10px; font-size:var(--mk-fs-body); font-weight:700; color:var(--mk-ink); }
+  .t-ttl { margin:10px var(--mk-gutter) 0; display:flex; align-items:center; gap:8px; font-size:var(--mk-fs-tag); color:var(--mk-info);
+           background:var(--mk-info-soft); border-radius:var(--mk-radius-sm); padding:9px 12px; font-weight:600; }
+  .t-cta { flex:none; padding:var(--mk-space-3) var(--mk-gutter) 0; border-top:1px solid var(--mk-line); background:var(--mk-card); }
+  .t-cta .mk-btn { width:100%; font-size:var(--mk-fs-head); }
 
   /* ---- demo 3 · the sentence ----------------------------------------------- */
   .k-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
   .k-body { flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
   .k-body::-webkit-scrollbar { display:none; }
-  .k-ordno { padding:var(--mk-space-1) var(--mk-gutter) 0; font-size:var(--mk-fs-micro); color:var(--mk-text-subtle); display:flex; align-items:center; gap:6px; }
+  .k-ordno { padding:var(--mk-space-1) var(--mk-gutter) 0; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); display:flex; align-items:center; gap:6px; }
   .k-hero { padding:var(--mk-space-2) var(--mk-gutter) var(--mk-space-4); }
-  .k-hero .say { font-size:var(--mk-fs-display-xl); line-height:var(--mk-lh-display-xl); font-weight:700; letter-spacing:0; }
-  .k-hero .say em { font-style:normal; color:var(--mk-brand-primary-text); }
-  .k-hero .eta { margin-top:8px; font-size:var(--mk-fs-body); color:var(--mk-text-2); display:flex; align-items:center; gap:8px; }
-  .k-hero .eta b { color:var(--mk-status-success); }
+  .k-hero .say { font-size:var(--mk-fs-hero); line-height:var(--mk-lh-hero); font-weight:700; letter-spacing:0; }
+  .k-hero .say em { font-style:normal; color:var(--mk-accent-text); }
+  .k-hero .eta { margin-top:8px; font-size:var(--mk-fs-body); color:var(--mk-ink-2); display:flex; align-items:center; gap:8px; }
+  .k-hero .eta b { color:var(--mk-good); }
   .k-ribbon { display:flex; align-items:flex-start; margin:0 var(--mk-gutter) var(--mk-space-5); }
   .kr { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; position:relative; }
   .kr .ball { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:2; }
   .kr .ball [data-icon] { width:15px; height:15px; }
-  .kr.done .ball { background:var(--mk-status-success); color:#fff; }
-  .kr.now .ball { background:var(--mk-brand-primary); color:#fff; box-shadow:0 0 0 6px var(--mk-action-soft); }
-  .kr.todo .ball { background:var(--mk-bg-sunken); color:var(--mk-text-disabled); border:1.5px dashed var(--mk-border-strong); }
+  .kr.done .ball { background:var(--mk-good); color:#fff; }
+  .kr.now .ball { background:var(--mk-accent); color:#fff; box-shadow:0 0 0 6px var(--mk-accent-soft); }
+  .kr.todo .ball { background:var(--mk-bg-2); color:var(--mk-ink-3); border:1.5px dashed var(--mk-line-strong); }
   .kr .line { position:absolute; top:15px; height:2px; z-index:1; }
-  .kr .lb { font-size:var(--mk-fs-micro); font-weight:600; color:var(--mk-text-2); text-align:center; }
-  .kr.now .lb { color:var(--mk-brand-primary-text); }
-  .kr.todo .lb { color:var(--mk-text-disabled); }
+  .kr .lb { font-size:var(--mk-fs-tag); font-weight:600; color:var(--mk-ink-2); text-align:center; }
+  .kr.now .lb { color:var(--mk-accent-text); }
+  .kr.todo .lb { color:var(--mk-ink-3); }
   .k-rider { margin:0 var(--mk-gutter) var(--mk-space-3); display:flex; align-items:center; gap:12px; }
-  .k-rider .av { width:46px; height:46px; border-radius:50%; background:var(--mk-wash-info); color:var(--mk-status-info);
+  .k-rider .av { width:46px; height:46px; border-radius:50%; background:var(--mk-info-soft); color:var(--mk-info);
                  display:flex; align-items:center; justify-content:center; flex:none; }
   .k-rider .t { flex:1; }
-  .k-rider .t .nm { font-size:var(--mk-fs-body-sm); font-weight:700; }
-  .k-rider .t .dt { font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:1px; display:flex; align-items:center; gap:5px; }
-  .k-cash { margin:0 var(--mk-gutter) var(--mk-space-3); display:flex; align-items:center; gap:10px; background:var(--mk-wash-success);
-            color:var(--mk-status-success); border-radius:var(--mk-radius-md); padding:11px 14px; font-size:var(--mk-fs-body-sm); font-weight:700; }
-  .k-proof { margin:0 var(--mk-gutter) var(--mk-space-3); border:1.5px dashed var(--mk-border-strong); border-radius:var(--mk-radius-lg);
-             padding:16px; display:flex; flex-direction:column; align-items:center; gap:7px; color:var(--mk-text-subtle); text-align:center; }
-  .k-proof .t1 { font-size:var(--mk-fs-body-sm); font-weight:700; color:var(--mk-text-2); }
-  .k-proof .t2 { font-size:var(--mk-fs-caption); }
+  .k-rider .t .nm { font-size:var(--mk-fs-note); font-weight:700; }
+  .k-rider .t .dt { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); margin-top:1px; display:flex; align-items:center; gap:5px; }
+  .k-cash { margin:0 var(--mk-gutter) var(--mk-space-3); display:flex; align-items:center; gap:10px; background:var(--mk-good-soft);
+            color:var(--mk-good); border-radius:var(--mk-radius-md); padding:11px 14px; font-size:var(--mk-fs-note); font-weight:700; }
+  .k-proof { margin:0 var(--mk-gutter) var(--mk-space-3); border:1.5px dashed var(--mk-line-strong); border-radius:var(--mk-radius-lg);
+             padding:16px; display:flex; flex-direction:column; align-items:center; gap:7px; color:var(--mk-ink-3); text-align:center; }
+  .k-proof .t1 { font-size:var(--mk-fs-note); font-weight:700; color:var(--mk-ink-2); }
+  .k-proof .t2 { font-size:var(--mk-fs-tag); }
   .k-map { margin:0 var(--mk-gutter) var(--mk-space-4); display:flex; align-items:center; justify-content:center; gap:8px;
-           min-height:var(--mk-touch); border-radius:var(--mk-radius-md); background:var(--mk-bg-sunken);
-           color:var(--mk-text-2); font-size:var(--mk-fs-body-sm); font-weight:600; text-decoration:none; }
+           min-height:var(--mk-touch); border-radius:var(--mk-radius-md); background:var(--mk-bg-2);
+           color:var(--mk-ink-2); font-size:var(--mk-fs-note); font-weight:600; text-decoration:none; }
 
   /* ---- before/after strip ---------------------------------------------------- */
   .duel { max-width:1120px; margin:64px auto 80px; padding:0 24px; }
-  .duel h2 { font-size:var(--mk-fs-title-2); font-weight:700; margin:0 0 6px; }
-  .duel .sub { font-size:var(--mk-fs-body-sm); color:var(--mk-text-secondary); margin:0 0 18px; }
-  table.ba { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--mk-border-subtle); border-radius:var(--mk-radius-lg); overflow:hidden; }
-  table.ba th { text-align:right; font-size:var(--mk-fs-caption); color:var(--mk-text-subtle); font-weight:600; padding:12px 16px;
-                background:var(--mk-wash-neutral); border-bottom:1px solid var(--mk-border-subtle); }
-  table.ba td { padding:13px 16px; border-bottom:1px dashed var(--mk-border-subtle); font-size:var(--mk-fs-body-sm); vertical-align:top; }
+  .duel h2 { font-size:var(--mk-fs-sec); font-weight:700; margin:0 0 6px; }
+  .duel .sub { font-size:var(--mk-fs-note); color:var(--mk-ink-2); margin:0 0 18px; }
+  table.ba { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--mk-line); border-radius:var(--mk-radius-lg); overflow:hidden; }
+  table.ba th { text-align:right; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); font-weight:600; padding:12px 16px;
+                background:var(--mk-bg-2); border-bottom:1px solid var(--mk-line); }
+  table.ba td { padding:13px 16px; border-bottom:1px dashed var(--mk-line); font-size:var(--mk-fs-note); vertical-align:top; }
   table.ba tr:last-child td { border-bottom:none; }
   td.scene { font-weight:700; white-space:nowrap; }
-  td.them { color:var(--mk-text-subtle); width:34%; }
+  td.them { color:var(--mk-ink-3); width:34%; }
   td.us { font-weight:600; width:36%; }
-  td.us b { color:var(--mk-brand-primary-text); }
+  td.us b { color:var(--mk-accent-text); }
   .touchline { margin-top:14px; display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
   @media (max-width:860px){ .touchline { grid-template-columns:1fr; } }
-  .touch { background:var(--mk-surface-chrome); color:#fff; border-radius:var(--mk-radius-lg); padding:18px 20px; }
+  .touch { background:var(--mk-chrome); color:#fff; border-radius:var(--mk-radius-lg); padding:18px 20px; }
   .touch .n { font-size:var(--mk-fs-display); font-weight:700; color:#F2A76C; direction:ltr; text-align:end; }
-  .touch .t { font-size:var(--mk-fs-body-sm); font-weight:600; margin-top:2px; }
-  .touch .s { font-size:var(--mk-fs-caption); color:var(--mk-text-on-dark-secondary); margin-top:4px; line-height:var(--mk-lh-caption); }
+  .touch .t { font-size:var(--mk-fs-note); font-weight:600; margin-top:2px; }
+  .touch .s { font-size:var(--mk-fs-tag); color:var(--mk-ink-inv-2); margin-top:4px; line-height:var(--mk-lh-tag); }
 </style>
 </head>
 <body class="bp-body">
@@ -195,9 +195,9 @@
           <div class="q-or">أو قرّر بنفسك</div>
 
           <div class="q-vends">
-            <span class="qv"><span class="dotl" style="background:var(--mk-action-soft);color:var(--mk-brand-primary)"><i data-icon="store" style="width:15px;height:15px"></i></span>بيتزا بليس<span class="st open">مفتوح</span></span>
-            <span class="qv"><span class="dotl" style="background:var(--mk-wash-success);color:var(--mk-status-success)"><i data-icon="leaf" style="width:15px;height:15px"></i></span>سوق الحديقة<span class="st open">مفتوح</span></span>
-            <span class="qv"><span class="dotl" style="background:var(--mk-wash-warning);color:var(--mk-status-warning)"><i data-icon="flame" style="width:15px;height:15px"></i></span>برجر هاوس<span class="st busy">مشغول</span></span>
+            <span class="qv"><span class="dotl" style="background:var(--mk-accent-soft);color:var(--mk-accent)"><i data-icon="store" style="width:15px;height:15px"></i></span>بيتزا بليس<span class="st open">مفتوح</span></span>
+            <span class="qv"><span class="dotl" style="background:var(--mk-good-soft);color:var(--mk-good)"><i data-icon="leaf" style="width:15px;height:15px"></i></span>سوق الحديقة<span class="st open">مفتوح</span></span>
+            <span class="qv"><span class="dotl" style="background:var(--mk-warn-soft);color:var(--mk-warn)"><i data-icon="flame" style="width:15px;height:15px"></i></span>برجر هاوس<span class="st busy">مشغول</span></span>
           </div>
 
           <div class="q-search"><i data-icon="search" style="width:17px;height:17px"></i>دوّر بنفسك في محلات الزمالك</div>
@@ -257,7 +257,7 @@
         <div class="t-wrap">
           <div class="mk-appbar">
             <button class="mk-iconbtn"><i data-icon="arrow-right"></i></button>
-            <span style="font-size:var(--mk-fs-title-3);font-weight:700;flex:1">صينيتك</span>
+            <span style="font-size:var(--mk-fs-head);font-weight:700;flex:1">صينيتك</span>
             <span class="mk-badge mk-badge-brand"><i data-icon="clock" style="width:12px;height:12px"></i>متجمدة 4:59</span>
           </div>
 
@@ -265,8 +265,8 @@
             <div class="t-slots">
               <div class="slot">
                 <span class="n">١</span>
-                <div class="logo" style="background:var(--mk-action-soft)">
-                  <svg viewBox="0 0 48 48" width="26" height="26"><path d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z" fill="var(--mk-illu-1)"/><path d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="var(--mk-illu-3)"/></svg>
+                <div class="logo" style="background:var(--mk-accent-soft)">
+                  <svg viewBox="0 0 48 48" width="26" height="26"><path d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z" fill="var(--mk-art-ember)"/><path d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="var(--mk-art-sand)"/></svg>
                 </div>
                 <div class="t"><div class="nm">بيتزا بليس</div><div class="dt">مارجريتا ×2 + كولا كبيرة</div></div>
                 <div class="pr">215.00 ج.م</div>
@@ -274,8 +274,8 @@
 
               <div class="slot">
                 <span class="n">٢</span>
-                <div class="logo" style="background:var(--mk-wash-success)">
-                  <svg viewBox="0 0 48 48" width="26" height="26"><path d="M10 20h28l-4 18H14z" fill="var(--mk-illu-6)" opacity=".9"/><path d="M17 20v-5a7 7 0 0 1 14 0v5" stroke="var(--mk-illu-6)" stroke-width="3" fill="none"/><circle cx="19" cy="27" r="2" fill="#fff"/><circle cx="26" cy="31" r="2" fill="#fff"/><circle cx="30" cy="25" r="2" fill="#fff"/></svg>
+                <div class="logo" style="background:var(--mk-good-soft)">
+                  <svg viewBox="0 0 48 48" width="26" height="26"><path d="M10 20h28l-4 18H14z" fill="var(--mk-art-sky)" opacity=".9"/><path d="M17 20v-5a7 7 0 0 1 14 0v5" stroke="var(--mk-art-sky)" stroke-width="3" fill="none"/><circle cx="19" cy="27" r="2" fill="#fff"/><circle cx="26" cy="31" r="2" fill="#fff"/><circle cx="30" cy="25" r="2" fill="#fff"/></svg>
                 </div>
                 <div class="t"><div class="nm">سوق الحديقة</div><div class="dt">3 أصناف — خضار وفاكهة</div></div>
                 <div class="pr">95.00 ج.م</div>
@@ -283,13 +283,13 @@
 
               <div class="slot slot-empty">
                 <span class="n">٣</span>
-                <div class="logo" style="border-radius:var(--mk-radius-md);border:1.5px dashed var(--mk-border-strong)"><i data-icon="plus" style="width:18px;height:18px"></i></div>
+                <div class="logo" style="border-radius:var(--mk-radius-md);border:1.5px dashed var(--mk-line-strong)"><i data-icon="plus" style="width:18px;height:18px"></i></div>
                 <div class="t"><div class="nm">خانة فاضية — لو حابب</div><div class="dt">الحد 3 محلات عشان التسليم يفضل سريع ومنطقي</div></div>
               </div>
             </div>
 
             <div class="t-presets">
-              <h4><i data-icon="check-circle" style="width:14px;height:14px;color:var(--mk-status-success)"></i>اتقرر خلاص — مش محتاج تعمل حاجة</h4>
+              <h4><i data-icon="check-circle" style="width:14px;height:14px;color:var(--mk-good)"></i>اتقرر خلاص — مش محتاج تعمل حاجة</h4>
               <div class="mk-card" style="padding:4px 16px">
                 <div class="preset">
                   <i data-icon="pin"></i>
@@ -370,7 +370,7 @@
         <div class="k-wrap">
           <div class="mk-appbar">
             <button class="mk-iconbtn"><i data-icon="arrow-right"></i></button>
-            <span style="font-size:var(--mk-fs-title-3);font-weight:700;flex:1">طلبك</span>
+            <span style="font-size:var(--mk-fs-head);font-weight:700;flex:1">طلبك</span>
             <button class="mk-iconbtn"><i data-icon="headset"></i></button>
           </div>
           <div class="k-ordno"><i data-icon="receipt" style="width:13px;height:13px"></i>رقم الطلب <span class="mk-ltr">MK-261008-4127</span> · بيتزا بليس + سوق الحديقة</div>
@@ -378,14 +378,14 @@
           <div class="k-body">
             <div class="k-hero">
               <div class="say">الصاحب <em>جاي عليك</em></div>
-              <div class="eta"><i data-icon="scooter" style="width:18px;height:18px;color:var(--mk-status-success)"></i>خرج من سوق الحديقة — <b>باقي ~7 دقايق</b></div>
+              <div class="eta"><i data-icon="scooter" style="width:18px;height:18px;color:var(--mk-good)"></i>خرج من سوق الحديقة — <b>باقي ~7 دقايق</b></div>
             </div>
 
             <div class="k-ribbon">
-              <div class="kr done"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-status-success)"></span><span class="ball"><i data-icon="check"></i></span><span class="lb">اتأكد</span></div>
-              <div class="kr done"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-status-success)"></span><span class="ball"><i data-icon="check"></i></span><span class="lb">اتحضر</span></div>
-              <div class="kr done"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-status-success)"></span><span class="ball"><i data-icon="check"></i></span><span class="lb">خرج</span></div>
-              <div class="kr now"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-border-subtle)"></span><span class="ball"><i data-icon="scooter"></i></span><span class="lb">جاي عليك</span></div>
+              <div class="kr done"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-good)"></span><span class="ball"><i data-icon="check"></i></span><span class="lb">اتأكد</span></div>
+              <div class="kr done"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-good)"></span><span class="ball"><i data-icon="check"></i></span><span class="lb">اتحضر</span></div>
+              <div class="kr done"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-good)"></span><span class="ball"><i data-icon="check"></i></span><span class="lb">خرج</span></div>
+              <div class="kr now"><span class="line" style="inset-inline-start:50%;width:100%;background:var(--mk-line)"></span><span class="ball"><i data-icon="scooter"></i></span><span class="lb">جاي عليك</span></div>
               <div class="kr todo"><span class="ball"><i data-icon="bag"></i></span><span class="lb">اتسلم</span></div>
             </div>
 
@@ -395,7 +395,7 @@
                 <div class="nm">أحمد صالح</div>
                 <div class="dt"><i data-icon="scooter" style="width:13px;height:13px"></i>صاحب طلباتك النهارده — تقييمه 4.9</div>
               </div>
-              <button class="mk-iconbtn" style="background:var(--mk-action-soft);color:var(--mk-brand-primary)"><i data-icon="phone"></i></button>
+              <button class="mk-iconbtn" style="background:var(--mk-accent-soft);color:var(--mk-accent)"><i data-icon="phone"></i></button>
             </div>
 
             <div class="k-cash"><i data-icon="cash" style="width:18px;height:18px"></i>جهّز كاش: 335.00 ج.م — أو فودافون كاش / إنستاباي عند الباب</div>

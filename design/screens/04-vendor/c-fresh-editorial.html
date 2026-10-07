@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>المحل — مثال C · Fresh Editorial — Marketak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../tokens/tokens.css">
+<link rel="stylesheet" href="../../assets/blueprint.css">
+<script src="../../assets/icons.js"></script>
+<style>
+  .vd-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
+  .vd-body { flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
+  .vd-body::-webkit-scrollbar { display:none; }
+  /* ---- identity ---- */
+  .vd-hero { display:flex; align-items:center; gap:14px; padding:var(--mk-space-2) var(--mk-gutter) var(--mk-space-4); }
+  .vd-logo { width:72px; height:72px; border-radius:var(--mk-radius-lg); background:var(--mk-accent-soft);
+             display:flex; align-items:center; justify-content:center; flex:none; }
+  .vd-id { flex:1; min-width:0; }
+  .vd-id h1 { margin:0; font-size:var(--mk-fs-title); font-weight:700; line-height:var(--mk-lh-title); }
+  .vd-id .sub { font-size:var(--mk-fs-note); color:var(--mk-ink-3); margin-top:2px; }
+  .vd-stats { display:flex; gap:12px; margin-top:8px; font-size:var(--mk-fs-note); color:var(--mk-ink-2); flex-wrap:wrap; }
+  .vd-stats span { display:inline-flex; align-items:center; gap:4px; }
+  .vd-stats [data-icon] { width:14px; height:14px; color:var(--mk-ink-3); }
+  /* ---- الأخدوه: القائمة تبدأ بالقرار ---- */
+  .vd-sec { display:flex; align-items:baseline; justify-content:space-between; padding:var(--mk-space-4) var(--mk-gutter) var(--mk-space-2); }
+  .vd-sec h2 { margin:0; font-size:var(--mk-fs-sec); font-weight:700; }
+  .vd-sec .hint { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); }
+  .picks { display:flex; gap:12px; overflow-x:auto; padding:0 var(--mk-gutter) var(--mk-space-2); scrollbar-width:none; }
+  .picks::-webkit-scrollbar { display:none; }
+  .pick { flex:none; width:168px; background:var(--mk-card); border:1px solid var(--mk-line); border-radius:var(--mk-radius-lg);
+          box-shadow:var(--mk-shadow-1); overflow:hidden; }
+  .pick .art { height:88px; display:flex; align-items:center; justify-content:center; background:var(--mk-bg-2); }
+  .pick .bd { padding:10px 12px 12px; }
+  .pick .nm { font-size:var(--mk-fs-body); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pick .row { display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
+  .pick .pr { font-size:var(--mk-fs-body); font-weight:700; }
+  .addbtn { width:32px; height:32px; border-radius:var(--mk-radius-pill); border:none; background:var(--mk-accent);
+            color:var(--mk-ink-inv); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex:none; }
+  /* ---- categories + list ---- */
+  .vd-chips { display:flex; gap:8px; overflow-x:auto; padding:var(--mk-space-2) var(--mk-gutter); scrollbar-width:none; }
+  .vd-chips::-webkit-scrollbar { display:none; }
+  .mrow { display:flex; align-items:center; gap:12px; padding:12px var(--mk-gutter); border-bottom:1px solid var(--mk-line); }
+  .mrow .t { flex:1; min-width:0; }
+  .mrow .nm { font-size:var(--mk-fs-body); font-weight:700; }
+  .mrow .ds { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mrow .pr { font-size:var(--mk-fs-body); font-weight:700; margin-top:4px; }
+  .soldout { font-size:var(--mk-fs-tag); font-weight:700; color:var(--mk-ink-3); border:1.5px dashed var(--mk-line-strong);
+             border-radius:var(--mk-radius-sm); padding:8px 12px; flex:none; }
+  /* ---- sticky: الصينية موجزة ---- */
+  .vd-sticky { flex:none; border-top:1px solid var(--mk-line); background:var(--mk-card); padding:var(--mk-space-3) var(--mk-gutter) var(--mk-space-2); }
+  .vd-trayline { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .vd-trayline .l { font-size:var(--mk-fs-note); color:var(--mk-ink-2); font-weight:500; display:flex; align-items:center; gap:6px; }
+  .vd-trayline .l b { color:var(--mk-ink); }
+  .vd-trayline .slots { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); display:inline-flex; gap:4px; align-items:center; }
+  .vd-trayline .slots i { width:10px; height:10px; border-radius:4px; background:var(--mk-accent-soft); border:1px solid var(--mk-accent); display:inline-block; }
+  .vd-trayline .slots i.off { background:var(--mk-bg-2); border-color:var(--mk-line-strong); }
+</style>
+</head>
+<body class="bp-body">
+
+  <div class="bp-top">
+    <a class="crumb" href="../index.html"><i data-icon="chevron-right" style="width:16px;height:16px"></i> معرض التصميم</a>
+    <a class="crumb" href="javascript:void(0)">الشاشة 04 — صفحة المحل والقائمة</a>
+    <span class="tag"><span class="dot"></span>مثال C · Fresh Editorial</span>
+  </div>
+  <p class="bp-desc"><b>الفكرة (بعد كسر القواعد):</b> قائمة ٢٠٠ صنف كتالوج؟ لأ. الشاشة دي «قرار الغداء» مش صفحة تصفح: تبدأ بـ<b>«الأخدوه»</b> — أصناف المحل المشهورة اللي جاية على بالك أصلًا — وبعدها القائمة كاملة لمن يريد. الحد الأدنى والحالة مكتوبين بجملة من أول ثانية (مفيش مفاجأة في الصينية)، والإضافة بتطير للصينية مش بتفتح شاشة وسيطة. القاعدة المكسورة رقم ٠٢ و٠٦ من <a href="../../experience.html" style="color:var(--mk-accent-text);font-weight:600">فلسفة التجربة</a>.</p>
+
+  <div class="stage">
+    <div class="phone theme-c">
+      <div class="island"></div>
+      <div class="screen">
+        <div class="statusbar"><span>١٢:١٦</span><i data-icon="statusbar" style="width:55px;height:13px"></i></div>
+
+        <div class="vd-wrap">
+          <div class="mk-appbar">
+            <button class="mk-iconbtn"><i data-icon="chevron-right"></i></button>
+            <div style="flex:1;font-weight:700;font-size:var(--mk-fs-head)">بيتزا بليس</div>
+            <span class="mk-badge mk-badge-success"><span class="dot"></span>مفتوح — ~30 د</span>
+          </div>
+
+          <div class="vd-body">
+            <!-- الهوية: أرقام قليلة وجميلة — كلها من المخطط -->
+            <div class="vd-hero">
+              <div class="vd-logo">
+                <svg viewBox="0 0 48 48" width="44" height="44"><path d="M24 6 40 14v6a4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0 4 4 0 0 1-8 0v-6z" fill="var(--mk-art-ember)"/><path d="M10 22h28v16a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3z" fill="var(--mk-art-sand)"/><circle cx="20" cy="30" r="2.2" fill="var(--mk-art-ember)"/><circle cx="28" cy="34" r="2.2" fill="var(--mk-art-ember)"/></svg>
+              </div>
+              <div class="vd-id">
+                <h1>بيتزا بليس</h1>
+                <div class="sub">بيتزا ومأكولات إيطالية · الزمالك</div>
+                <div class="vd-stats">
+                  <span><i data-icon="star-fill" style="color:var(--mk-accent-text)"></i><b>4.6</b> (320)</span>
+                  <span><i data-icon="clock"></i>20–40 د</span>
+                  <span><i data-icon="scooter"></i>25.00 ج.م</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- الأخدوه -->
+            <div class="vd-sec"><h2>الأخدوه هنا</h2><span class="hint">اللي الناس بتجي عليه</span></div>
+            <div class="picks">
+              <div class="pick">
+                <div class="art"><svg viewBox="0 0 72 44" width="72" height="44"><path d="M36 4 68 40H4z" fill="var(--mk-art-sand)"/><path d="M36 10 62 40H10z" fill="var(--mk-art-ember)"/><circle cx="30" cy="26" r="3" fill="var(--mk-art-cream)"/><circle cx="41" cy="32" r="3" fill="var(--mk-art-cream)"/><circle cx="33" cy="35" r="2.2" fill="var(--mk-art-cream)"/></svg></div>
+                <div class="bd">
+                  <div class="nm">مارجريتا</div>
+                  <div class="row"><span class="pr mk-money">120.00 ج.م</span><button class="addbtn"><i data-icon="plus" style="width:16px;height:16px"></i></button></div>
+                </div>
+              </div>
+              <div class="pick">
+                <div class="art"><svg viewBox="0 0 72 44" width="72" height="44"><rect x="8" y="12" width="56" height="24" rx="8" fill="var(--mk-art-apricot)"/><rect x="14" y="18" width="44" height="5" rx="2.5" fill="var(--mk-art-cream)"/><rect x="14" y="26" width="30" height="4" rx="2" fill="var(--mk-art-sand)"/></svg></div>
+                <div class="bd">
+                  <div class="nm">فطيرة جبنة</div>
+                  <div class="row"><span class="pr mk-money">85.00 ج.م</span><button class="addbtn"><i data-icon="plus" style="width:16px;height:16px"></i></button></div>
+                </div>
+              </div>
+              <div class="pick">
+                <div class="art"><svg viewBox="0 0 72 44" width="72" height="44"><rect x="18" y="6" width="36" height="34" rx="6" fill="var(--mk-art-sky)" opacity=".85"/><rect x="24" y="2" width="24" height="8" rx="4" fill="var(--mk-art-sky)"/><rect x="23" y="14" width="26" height="18" rx="3" fill="var(--mk-art-cream)" opacity=".9"/></svg></div>
+                <div class="bd">
+                  <div class="nm">كولا كبيرة</div>
+                  <div class="row"><span class="pr mk-money">45.00 ج.م</span><button class="addbtn"><i data-icon="plus" style="width:16px;height:16px"></i></button></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- القائمة كاملة لمن يريد -->
+            <div class="vd-chips">
+              <span class="mk-chip is-active">البيتزا</span>
+              <span class="mk-chip">الفطائر</span>
+              <span class="mk-chip">المقبلات</span>
+              <span class="mk-chip">المشروبات</span>
+            </div>
+
+            <div class="mrow">
+              <div class="t">
+                <div class="nm">بيبروني</div>
+                <div class="ds">صوص طماطم، موتزاريلا، بيبروني</div>
+                <div class="pr mk-money">145.00 ج.م</div>
+              </div>
+              <button class="addbtn"><i data-icon="plus" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="mrow">
+              <div class="t">
+                <div class="nm">خضار موسم</div>
+                <div class="ds">فلفل، زيتون، ذرة — بالصوص اللي تحبه</div>
+                <div class="pr mk-money">130.00 ج.م</div>
+              </div>
+              <button class="addbtn"><i data-icon="plus" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="mrow">
+              <div class="t">
+                <div class="nm">كالزوني جبنة</div>
+                <div class="ds">عجينة طرية ومشوية — <b>خلص النهارده</b></div>
+                <div class="pr mk-money" style="color:var(--mk-ink-3);text-decoration:line-through">110.00 ج.م</div>
+              </div>
+              <span class="soldout">خلص</span>
+            </div>
+            <div class="mrow" style="border-bottom:none">
+              <div class="t">
+                <div class="nm">بطاطس فرن</div>
+                <div class="ds">بالبهاريات — حجم وسط</div>
+                <div class="pr mk-money">55.00 ج.م</div>
+              </div>
+              <button class="addbtn"><i data-icon="plus" style="width:16px;height:16px"></i></button>
+            </div>
+          </div>
+
+          <!-- الصينية الموجزة — الإضافة تطير هنا -->
+          <div class="vd-sticky">
+            <div class="vd-trayline">
+              <span class="l"><i data-icon="cart" style="width:16px;height:16px;color:var(--mk-accent-text)"></i>الصينية — <b>بيتزا بليس</b> · صنفان <b class="mk-money">215.00 ج.م</b></span>
+              <span class="slots"><i></i><i></i><i class="off"></i>١ من ٣</span>
+            </div>
+            <button class="mk-btn mk-btn-primary" style="width:100%">كمّل للصينية</button>
+          </div>
+
+          <div class="home-ind" style="position:static;transform:none;margin:2px auto 6px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3><i data-icon="bag"></i>«الأخدوه» — القائمة تبدأ بالقرار</h3>
+        <ul>
+          <li>أول ما تفتح: أصناف المحل المشهورة — مبني على <span dir="ltr">menu_items.tags</span> + <span dir="ltr">rating_avg</span>. قرارك الغالب معروض قبل ما تلفّح.</li>
+          <li>القائمة كاملة تحت لمن يريد — من <b>R2 snapshot</b> (<span dir="ltr">menu_cdn_url</span>)، و<span dir="ltr">get_menu_v1</span> احتياطي فقط. <span dir="ltr">menu_version</span> يكشف القديم.</li>
+          <li>الإضافة ضغطة واحدة تطير للصينية — <b>لا شاشة وسيطة</b> للصنف إلا لو فيه خيارات إجبارية (<code class="err rpc">INVALID_OPTIONS</code>).</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="alert"></i>الصدق قبل البيع</h3>
+        <ul>
+          <li>«مشغول» يظهر <b>قبل</b> الطلب بجملة: «زحمة دلوقتي — +15 د. تطلب برضه؟» — من <span dir="ltr">is_busy</span> + <span dir="ltr">estimated_delivery_time_min/max</span>.</li>
+          <li>«خلص» كلمة واضحة (<span dir="ltr">stock_count = 0</span>) — والبديل يُقترح. <span dir="ltr">null</span> = غير محدود، لا يظهر أي وسم.</li>
+          <li>الحد الأدنى (١٠٠ ج.م هنا) معلن في رأس الشاشة — <code class="err rpc">BELOW_MINIMUM</code> نصبح استثناء نادر لا مفاجأة.</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="route"></i>الإضافة والسلة — مربوط بالإنجين</h3>
+        <ul>
+          <li><code class="rpc">upsert_cart_item_v1</code> (الصنف، المحل، الكمية، الخيارات) — آخر كتابة تفوز على <span dir="ltr">updated_at</span>.</li>
+          <li><code class="err rpc">TOO_MANY_VENDORS</code> يترجم بشرية: «٣ محلات ده الحد — شيل محل تكمل» مع تسمية المحلات.</li>
+          <li>شريط الخانات (١ من ٣) يعلن القيد الحقيقي في <span dir="ltr">place_order_v1</span> كدعوة لا كفجوة.</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3><i data-icon="check"></i>بوابة الصفر-تفكير</h3>
+        <ul>
+          <li>سؤال الشاشة: «هتاخد إيه من هنا؟» — والإجابة الغالبة معروضة الأول.</li>
+          <li>من الصنف إلى الصينية: <b>لمسة واحدة</b> — والصينية موجزة دايمًا تحت.</li>
+          <li>كل حالة بجملة + لون: «مفتوح — ~30 د»، «خلص»، «مشغول — +15 د».</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="states-strip">
+    <h2>الحالات الإلزامية لهذه الشاشة</h2>
+    <p class="sub">مقتطفات من نفس القالب — كل حالة بجملة بشرية قبل أو بعد القرار.</p>
+    <div class="states">
+      <div class="state-tile">
+        <h4>1 · المحل مشغول (<span dir="ltr">is_busy</span>)</h4>
+        <div style="display:flex;gap:10px;background:var(--mk-warn-soft);border:1px solid color-mix(in srgb, var(--mk-warn) 30%, transparent);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-note);color:var(--mk-warn);align-items:flex-start">
+          <i data-icon="clock" style="margin-top:1px"></i>
+          <div><b>زحمة دلوقتي — هياخد 15 دقيقة زيادة.</b><br>تطلب برضه؟ المواعيد هتتحدث في الصينية.</div>
+        </div>
+        <div class="mk-field-hint" style="margin-top:8px">التحذير قبل القرار لا بعده — والـ ETA على البطاقة اتحدث معه.</div>
+      </div>
+      <div class="state-tile">
+        <h4>2 · المحل مقفول (<span dir="ltr">VENDOR_CLOSED</span>)</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center;padding:10px;text-align:center">
+          <div style="width:48px;height:48px;border-radius:50%;background:var(--mk-bg-2);display:flex;align-items:center;justify-content:center;color:var(--mk-ink-3)"><i data-icon="clock" style="width:22px;height:22px"></i></div>
+          <div style="font-weight:700;font-size:var(--mk-fs-body)">مقفول دلوقتي — يفتح ١١:٣٠ ص</div>
+          <div style="font-size:var(--mk-fs-tag);color:var(--mk-ink-2)">تصفح القائمة مسموح — ضيف أوّل ما يفتح.</div>
+          <button class="mk-btn mk-btn-secondary mk-btn-sm">صحّيني لما يفتح</button>
+        </div>
+      </div>
+      <div class="state-tile">
+        <h4>3 · خيارات إجبارية (<span dir="ltr">INVALID_OPTIONS</span>)</h4>
+        <div style="border:1px solid var(--mk-line);border-radius:var(--mk-radius-md);overflow:hidden">
+          <div style="padding:12px;background:var(--mk-card)">
+            <div style="font-weight:700;font-size:var(--mk-fs-body)">اختار الحجم</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;border:1.5px solid var(--mk-accent);background:var(--mk-accent-soft);border-radius:8px;padding:9px 12px;font-size:var(--mk-fs-note);font-weight:600"><span>وسط</span><span class="mk-money">120.00 ج.م</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--mk-line);border-radius:8px;padding:9px 12px;font-size:var(--mk-fs-note)"><span>كبير</span><span class="mk-money">160.00 ج.م</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="mk-field-hint" style="margin-top:8px">الشيت يفتح فقط للخيارات الإجبارية — الاختيارات الحرة تفضل مكانها في الصينية.</div>
+      </div>
+      <div class="state-tile">
+        <h4>4 · أوف لاين (قائمة الكاش)</h4>
+        <div class="mk-banner mk-banner-offline" style="border-radius:10px;border:1px solid var(--mk-line)"><i data-icon="offline"></i>النت وقع — القائمة من الكاش والأسعار تقديرية.</div>
+        <div class="mk-field-hint" style="margin-top:8px">الإضافة تتخزن محليًا وتترفع أول ما يرجع — <span dir="ltr">sync_changes_v1</span>.</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

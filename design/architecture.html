@@ -10,59 +10,59 @@
 <link rel="stylesheet" href="tokens/tokens.css">
 <script src="assets/icons.js"></script>
 <style>
-  body { margin:0; font-family:var(--mk-font); background:#EFEDEA; color:var(--mk-text-primary); -webkit-font-smoothing:antialiased; }
+  body { margin:0; font-family:var(--mk-font); background:#EFEDEA; color:var(--mk-ink); -webkit-font-smoothing:antialiased; }
   .page { max-width:1200px; margin:0 auto; padding:32px 24px 96px; }
-  .bp-hero { background:var(--mk-surface-chrome); color:var(--mk-text-on-dark); border-radius:var(--mk-radius-xl); padding:40px; margin-bottom:32px; }
+  .bp-hero { background:var(--mk-chrome); color:var(--mk-ink-inv); border-radius:var(--mk-radius-xl); padding:40px; margin-bottom:32px; }
   .bp-hero h1 { font-size:var(--mk-fs-display); margin:0 0 8px; font-weight:700; }
-  .bp-hero p { margin:0; color:var(--mk-text-on-dark-secondary); font-size:var(--mk-fs-body); max-width:720px; line-height:var(--mk-lh-body); }
+  .bp-hero p { margin:0; color:var(--mk-ink-inv-2); font-size:var(--mk-fs-body); max-width:720px; line-height:var(--mk-lh-body); }
   section { margin-bottom:40px; }
-  h2.sec { font-size:var(--mk-fs-title-1); margin:0 0 4px; font-weight:700; }
-  p.sec-note { margin:0 0 20px; color:var(--mk-text-secondary); font-size:var(--mk-fs-body); max-width:780px; line-height:var(--mk-lh-body); }
-  .card { background:#fff; border:1px solid var(--mk-border-subtle); border-radius:var(--mk-radius-lg); padding:24px; margin-bottom:16px; }
-  .card h3 { margin:0 0 4px; font-size:var(--mk-fs-title-3); font-weight:600; }
-  .card .why { color:var(--mk-text-secondary); font-size:var(--mk-fs-body-sm); margin:0 0 16px; line-height:var(--mk-lh-body-sm); }
-  code.tok { direction:ltr; display:inline-block; font-family:ui-monospace,monospace; font-size:12px; background:var(--mk-wash-neutral); padding:2px 6px; border-radius:6px; color:var(--mk-status-info); }
+  h2.sec { font-size:var(--mk-fs-title); margin:0 0 4px; font-weight:700; }
+  p.sec-note { margin:0 0 20px; color:var(--mk-ink-2); font-size:var(--mk-fs-body); max-width:780px; line-height:var(--mk-lh-body); }
+  .card { background:#fff; border:1px solid var(--mk-line); border-radius:var(--mk-radius-lg); padding:24px; margin-bottom:16px; }
+  .card h3 { margin:0 0 4px; font-size:var(--mk-fs-head); font-weight:600; }
+  .card .why { color:var(--mk-ink-2); font-size:var(--mk-fs-note); margin:0 0 16px; line-height:var(--mk-lh-note); }
+  code.tok { direction:ltr; display:inline-block; font-family:ui-monospace,monospace; font-size:12px; background:var(--mk-bg-2); padding:2px 6px; border-radius:6px; color:var(--mk-info); }
   /* flow diagrams */
   .flow { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; }
-  .fnode { border-radius:var(--mk-radius-md); padding:12px 14px; font-size:var(--mk-fs-body-sm); font-weight:600; text-align:center;
+  .fnode { border-radius:var(--mk-radius-md); padding:12px 14px; font-size:var(--mk-fs-note); font-weight:600; text-align:center;
            display:flex; flex-direction:column; gap:3px; justify-content:center; min-width:120px; }
-  .fnode small { font-weight:400; font-size:var(--mk-fs-micro); opacity:.85; }
-  .fnode-start { background:var(--mk-surface-chrome); color:#fff; }
-  .fnode-rpc { background:var(--mk-wash-info); color:var(--mk-status-info); border:1px dashed var(--mk-status-info); font-family:ui-monospace,monospace; font-weight:500; direction:ltr; }
-  .fnode-screen { background:var(--mk-action-soft); color:var(--mk-brand-primary-text); border:1px solid var(--mk-brand-primary); }
-  .fnode-ok { background:var(--mk-wash-success); color:var(--mk-status-success); }
-  .fnode-warn { background:var(--mk-wash-warning); color:var(--mk-status-warning); }
-  .farrow { display:flex; align-items:center; padding:0 6px; color:var(--mk-text-subtle); }
+  .fnode small { font-weight:400; font-size:var(--mk-fs-tag); opacity:.85; }
+  .fnode-start { background:var(--mk-chrome); color:#fff; }
+  .fnode-rpc { background:var(--mk-info-soft); color:var(--mk-info); border:1px dashed var(--mk-info); font-family:ui-monospace,monospace; font-weight:500; direction:ltr; }
+  .fnode-screen { background:var(--mk-accent-soft); color:var(--mk-accent-text); border:1px solid var(--mk-accent); }
+  .fnode-ok { background:var(--mk-good-soft); color:var(--mk-good); }
+  .fnode-warn { background:var(--mk-warn-soft); color:var(--mk-warn); }
+  .farrow { display:flex; align-items:center; padding:0 6px; color:var(--mk-ink-3); }
   .farrow svg { width:18px; height:18px; }
   /* nav tree */
   .tabs-map { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:900px){ .tabs-map { grid-template-columns:1fr; } }
   .tree { border-radius:var(--mk-radius-lg); padding:20px; }
-  .tree h4 { margin:0 0 2px; font-size:var(--mk-fs-title-3); font-weight:700; display:flex; align-items:center; gap:8px; }
-  .tree .sub { font-size:var(--mk-fs-caption); margin-bottom:14px; }
+  .tree h4 { margin:0 0 2px; font-size:var(--mk-fs-head); font-weight:700; display:flex; align-items:center; gap:8px; }
+  .tree .sub { font-size:var(--mk-fs-tag); margin-bottom:14px; }
   .tabrow { display:flex; flex-direction:column; gap:8px; }
-  .tabitem { display:flex; align-items:center; gap:10px; background:var(--mk-card); border:1px solid var(--mk-card-border);
-             border-radius:var(--mk-radius-md); padding:10px 14px; font-size:var(--mk-fs-body-sm); font-weight:600; }
-  .tabitem [data-icon] { color:var(--mk-brand-primary); }
-  .tabitem .screens { margin-inline-start:auto; font-weight:400; font-size:var(--mk-fs-micro); color:var(--mk-text-3); text-align:left; max-width:55%; }
+  .tabitem { display:flex; align-items:center; gap:10px; background:var(--mk-card); border:1px solid var(--mk-line);
+             border-radius:var(--mk-radius-md); padding:10px 14px; font-size:var(--mk-fs-note); font-weight:600; }
+  .tabitem [data-icon] { color:var(--mk-accent); }
+  .tabitem .screens { margin-inline-start:auto; font-weight:400; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); text-align:left; max-width:55%; }
   /* status machine */
   .machine { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
   .st { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:var(--mk-radius-pill);
-        font-size:var(--mk-fs-body-sm); font-weight:600; }
+        font-size:var(--mk-fs-note); font-weight:600; }
   .st .n { font-family:ui-monospace,monospace; font-size:10px; font-weight:500; opacity:.7; direction:ltr; }
-  .st-arrow { color:var(--mk-text-subtle); }
+  .st-arrow { color:var(--mk-ink-3); }
   /* inventory table */
-  table.spec { width:100%; border-collapse:collapse; font-size:var(--mk-fs-body-sm); }
-  table.spec th { text-align:right; font-size:var(--mk-fs-caption); color:var(--mk-text-subtle); font-weight:500; padding:8px 12px; border-bottom:1px solid var(--mk-border-subtle); }
-  table.spec td { padding:9px 12px; border-bottom:1px dashed var(--mk-border-subtle); vertical-align:top; }
-  tr.done td { background:var(--mk-action-soft); }
-  .pill-now { display:inline-block; background:var(--mk-brand-primary); color:#fff; font-size:10px; font-weight:600; border-radius:999px; padding:2px 8px; }
-  .pill-next { display:inline-block; background:var(--mk-wash-neutral); color:var(--mk-text-secondary); font-size:10px; font-weight:600; border-radius:999px; padding:2px 8px; }
+  table.spec { width:100%; border-collapse:collapse; font-size:var(--mk-fs-note); }
+  table.spec th { text-align:right; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); font-weight:500; padding:8px 12px; border-bottom:1px solid var(--mk-line); }
+  table.spec td { padding:9px 12px; border-bottom:1px dashed var(--mk-line); vertical-align:top; }
+  tr.done td { background:var(--mk-accent-soft); }
+  .pill-now { display:inline-block; background:var(--mk-accent); color:#fff; font-size:10px; font-weight:600; border-radius:999px; padding:2px 8px; }
+  .pill-next { display:inline-block; background:var(--mk-bg-2); color:var(--mk-ink-2); font-size:10px; font-weight:600; border-radius:999px; padding:2px 8px; }
   .arch { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   @media (max-width:900px){ .arch { grid-template-columns:1fr; } }
-  .archbox { border-radius:var(--mk-radius-md); padding:16px; border:1px solid var(--mk-card-border); }
+  .archbox { border-radius:var(--mk-radius-md); padding:16px; border:1px solid var(--mk-line); }
   .archbox h5 { margin:0 0 6px; font-size:var(--mk-fs-body); font-weight:700; display:flex; gap:8px; align-items:center; }
-  .archbox ul { margin:0; padding-inline-start:18px; font-size:var(--mk-fs-caption); color:var(--mk-text-secondary); line-height:1.9; }
+  .archbox ul { margin:0; padding-inline-start:18px; font-size:var(--mk-fs-tag); color:var(--mk-ink-2); line-height:1.9; }
 </style>
 </head>
 <body>
@@ -79,8 +79,8 @@
     <p class="sec-note">الموبايل طبقة عرض فقط: لا يحسب سعرًا، ولا ينشئ طلبًا على الجهاز، ولا يحتفظ بأي مال. كل قرار مالي أو حالة داخل معاملة Postgres.</p>
     <div class="card">
       <div class="arch">
-        <div class="archbox" style="background:var(--mk-action-soft);border-color:var(--mk-brand-primary)">
-          <h5><i data-icon="phone" style="color:var(--mk-brand-primary)"></i> تطبيق الموبايل (العميل + المندوب)</h5>
+        <div class="archbox" style="background:var(--mk-accent-soft);border-color:var(--mk-accent)">
+          <h5><i data-icon="phone" style="color:var(--mk-accent)"></i> تطبيق الموبايل (العميل + المندوب)</h5>
           <ul>
             <li>عرض وتنقّل وحالة واجهة فقط</li>
             <li>كاش عرض مشفّر (كتالوج/سلة) — يوسّم الأسعار «تقديرية»</li>
@@ -88,8 +88,8 @@
             <li>تبديل الدور محفوظ لكل جهاز — المندوب يظهر بشرط دور <span class="mk-ltr">rider</span> + علم ميزة</li>
           </ul>
         </div>
-        <div class="archbox" style="background:var(--mk-wash-info);border-color:var(--mk-status-info)">
-          <h5><i data-icon="shield" style="color:var(--mk-status-info)"></i> Supabase — العقل</h5>
+        <div class="archbox" style="background:var(--mk-info-soft);border-color:var(--mk-info)">
+          <h5><i data-icon="shield" style="color:var(--mk-info)"></i> Supabase — العقل</h5>
           <ul>
             <li>Auth بمعرّف Google/Apple فقط (<span class="mk-ltr">signInWithIdToken</span>)</li>
             <li>كل عمليات القراءة والكتابة RPCs <span class="mk-ltr">*_v1</span> مع RLS</li>
@@ -97,7 +97,7 @@
             <li>بوابة الملف: <span class="mk-ltr">get_profile_status_v1</span> يحدد ما يمكن تصفّحه وما يمكن طلبه</li>
           </ul>
         </div>
-        <div class="archbox" style="background:var(--mk-wash-neutral);border-color:var(--mk-border-strong)">
+        <div class="archbox" style="background:var(--mk-bg-2);border-color:var(--mk-line-strong)">
           <h5><i data-icon="store"></i> Cloudflare + FCM — التوصيل والوسائط</h5>
           <ul>
             <li>R2 للصور ولقطات الكتالوج (عرض فقط)</li>
@@ -147,9 +147,9 @@
     <h2 class="sec">٣ · خريطة التنقّل — تجربتان، تبويبان</h2>
     <p class="sec-note">التبديل بين الدورين من «حسابي» بمفتاح واحد ظاهر فقط لمن يملك دور المندوب. كل تبويب مع شاشاته — الشاشات المصمّمة في الدفعة الأولى معلّمة.</p>
     <div class="tabs-map">
-      <div class="tree" style="background:var(--mk-wash-info)">
-        <h4><i data-icon="bag" style="color:var(--mk-status-info)"></i> تبويبات العميل</h4>
-        <div class="sub" style="color:var(--mk-status-info)">5 تبويبات · تدفق الطلب من التصفح للتقييم</div>
+      <div class="tree" style="background:var(--mk-info-soft)">
+        <h4><i data-icon="bag" style="color:var(--mk-info)"></i> تبويبات العميل</h4>
+        <div class="sub" style="color:var(--mk-info)">5 تبويبات · تدفق الطلب من التصفح للتقييم</div>
         <div class="tabrow">
           <div class="tabitem"><i data-icon="home-fill"></i>الرئيسية<span class="screens">العنوان النشط، الفيد، الأقسام، «اطلب تاني»</span></div>
           <div class="tabitem"><i data-icon="search"></i>البحث<span class="screens">بحث عربي مطبَّع + فلاتر (منطقة/نوع/مفتوح)</span></div>
@@ -157,20 +157,20 @@
           <div class="tabitem"><i data-icon="receipt"></i>طلباتي<span class="screens">جارية/سابقة · تتبع · إعادة طلب · إلغاء</span></div>
           <div class="tabitem"><i data-icon="user"></i>حسابي<span class="screens">الملف، العناوين، اللغة، تبديل الدور، دعم</span></div>
         </div>
-        <div style="margin-top:14px;font-size:var(--mk-fs-caption);color:var(--mk-status-info);display:flex;gap:6px;align-items:center">
+        <div style="margin-top:14px;font-size:var(--mk-fs-tag);color:var(--mk-info);display:flex;gap:6px;align-items:center">
           <i data-icon="route" style="width:16px;height:16px"></i> مسارات مفتوحة: محل، صنف + خيارات، الدفع (كتلة/محفظة)، تتبع، تقييم منفصل للمحل والمندوب
         </div>
       </div>
-      <div class="tree" style="background:var(--mk-wash-warning)">
-        <h4><i data-icon="helmet" style="color:var(--mk-status-warning)"></i> تبويبات المندوب</h4>
-        <div class="sub" style="color:var(--mk-status-warning)">4 تبويبات · تظهر بعد التحقق (is_verified)</div>
+      <div class="tree" style="background:var(--mk-warn-soft)">
+        <h4><i data-icon="helmet" style="color:var(--mk-warn)"></i> تبويبات المندوب</h4>
+        <div class="sub" style="color:var(--mk-warn)">4 تبويبات · تظهر بعد التحقق (is_verified)</div>
         <div class="tabrow">
           <div class="tabitem"><i data-icon="scooter"></i>المتاح الآن<span class="screens">مفتاح أونلاين · عروض قريبة (≤10) · الأجر قبل القبول</span></div>
           <div class="tabitem"><i data-icon="route"></i>الرحلة الحالية<span class="screens">تسلسل الاستلام → التسليم · تجميع نقد · إثبات تسليم</span></div>
           <div class="tabitem"><i data-icon="cash"></i>أرباحي<span class="screens">اليوم: رحلات/أرجل/إكراميات · النقد المحتجز ومحدوده</span></div>
           <div class="tabitem"><i data-icon="user"></i>حسابي<span class="screens">نفس حساب العميل + مستندات وحالة التحقق</span></div>
         </div>
-        <div style="margin-top:14px;font-size:var(--mk-fs-caption);color:var(--mk-status-warning);display:flex;gap:6px;align-items:center">
+        <div style="margin-top:14px;font-size:var(--mk-fs-tag);color:var(--mk-warn);display:flex;gap:6px;align-items:center">
           <i data-icon="alert" style="width:16px;height:16px"></i> تحذير النقد عند 80% من الحد (افتراضي 2,500.00 ج.م) — تجميع المحفظة (فودافون كاش/إنستاباي) بديل مقترح تلقائيًا
         </div>
       </div>
@@ -186,26 +186,26 @@
       <h3>حالة الطلب كما يراها العميل — <span class="mk-ltr" style="font-weight:500">orders.status</span></h3>
       <div class="why" dir="ltr">Derived cache over sub_orders — never set directly. Vocabulary shown top-to-bottom of the customer journey.</div>
       <div class="machine">
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">بانتظار تأكيد المحلات<span class="n">pending</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">بانتظار تأكيد المحلات<span class="n">pending</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-warning);color:var(--mk-status-warning)">تأكيد جزئي<span class="n">partially_confirmed</span></span>
+        <span class="st" style="background:var(--mk-warn-soft);color:var(--mk-warn)">تأكيد جزئي<span class="n">partially_confirmed</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">قيد التحضير<span class="n">preparing</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">قيد التحضير<span class="n">preparing</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">جاهز للاستلام<span class="n">ready</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">جاهز للاستلام<span class="n">ready</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">مع المندوب<span class="n">picked_up</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">مع المندوب<span class="n">picked_up</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">في الطريق إليك<span class="n">delivering</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">في الطريق إليك<span class="n">delivering</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-success);color:var(--mk-status-success)">تم التوصيل<span class="n">delivered</span></span>
+        <span class="st" style="background:var(--mk-good-soft);color:var(--mk-good)">تم التوصيل<span class="n">delivered</span></span>
       </div>
       <div style="height:10px"></div>
       <div class="machine">
-        <span class="st" style="background:var(--mk-wash-danger);color:var(--mk-status-danger)">ملغي<span class="n">cancelled</span></span>
-        <span style="font-size:var(--mk-fs-caption);color:var(--mk-text-subtle)">أو</span>
-        <span class="st" style="background:var(--mk-wash-danger);color:var(--mk-status-danger)">ملغي جزئيًا<span class="n">partially_cancelled</span></span>
-        <span style="font-size:var(--mk-fs-caption);color:var(--mk-text-subtle)">— يفتح شاشة الحل: إزالة المحل المرفوض أو المتابعة مع استرداد قيمته</span>
+        <span class="st" style="background:var(--mk-bad-soft);color:var(--mk-bad)">ملغي<span class="n">cancelled</span></span>
+        <span style="font-size:var(--mk-fs-tag);color:var(--mk-ink-3)">أو</span>
+        <span class="st" style="background:var(--mk-bad-soft);color:var(--mk-bad)">ملغي جزئيًا<span class="n">partially_cancelled</span></span>
+        <span style="font-size:var(--mk-fs-tag);color:var(--mk-ink-3)">— يفتح شاشة الحل: إزالة المحل المرفوض أو المتابعة مع استرداد قيمته</span>
       </div>
       <div class="why" style="margin-top:12px">
         <b>نافذة الإلغاء:</b> العميل يلغي بنفسه حتى «قبول المحل قبل بدء التحضير» — بعدها تُرفض بـ <code class="tok">CANCEL_WINDOW_CLOSED</code> مع بديل الدعم. وأي صنف <code class="tok">out_of_stock / price_updated</code> يجمّد التقدم حتى موافقة صريحة عبر <code class="tok">confirm_modification_v1</code> بورقة تُظهر الفرق بالجنيه.
@@ -216,23 +216,23 @@
       <h3>رحلة المندوب — <span class="mk-ltr" style="font-weight:500">delivery_assignments.status</span></h3>
       <div class="why" dir="ltr">Claim is atomic — exactly one rider wins (ORDER_ALREADY_CLAIMED → refresh list). Stops are frozen at claim into stop_sequence.</div>
       <div class="machine">
-        <span class="st" style="background:var(--mk-wash-neutral);color:var(--mk-status-neutral)">غير متصل<span class="n">offline</span></span>
+        <span class="st" style="background:var(--mk-bg-2);color:var(--mk-ink-2)">غير متصل<span class="n">offline</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-success);color:var(--mk-status-success)">متاح<span class="n">available</span></span>
+        <span class="st" style="background:var(--mk-good-soft);color:var(--mk-good)">متاح<span class="n">available</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">استلمت الطلب<span class="n">assigned</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">استلمت الطلب<span class="n">assigned</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">عند المحل الأول<span class="n">at_first_vendor</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">عند المحل الأول<span class="n">at_first_vendor</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">جاري الاستلام<span class="n">picking_up</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">جاري الاستلام<span class="n">picking_up</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">استلمت كل شيء<span class="n">picked_up</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">استلمت كل شيء<span class="n">picked_up</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">في الطريق<span class="n">delivering</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">في الطريق<span class="n">delivering</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-info);color:var(--mk-status-info)">وصلت<span class="n">arrived</span></span>
+        <span class="st" style="background:var(--mk-info-soft);color:var(--mk-info)">وصلت<span class="n">arrived</span></span>
         <span class="st-arrow"><i data-icon="chevron-left"></i></span>
-        <span class="st" style="background:var(--mk-wash-success);color:var(--mk-status-success)">تم التسليم<span class="n">delivered</span></span>
+        <span class="st" style="background:var(--mk-good-soft);color:var(--mk-good)">تم التسليم<span class="n">delivered</span></span>
       </div>
       <div class="why" style="margin-top:12px">
         <b>جمع النقد عند التسليم:</b> المبلغ المطلوب يساوي إجمالي الطلب حرفيًا (<code class="tok">AMOUNT_MISMATCH</code> يمنع أي فرق). إثبات التسليم = <b>صورة</b> (<code class="tok">proof_path</code>) — لا يوجد OTP في المخطط، فلن نصمّم واحدًا. البديل «محفظة»: يكتب المندوب رقم عملية التحويل فقط.

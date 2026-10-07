@@ -11,7 +11,7 @@ from imagination.
 
 | Path | What it holds |
 |---|---|
-| `tokens/tokens.css` | **Single source of truth.** Mirrors `packages/ui/src/theme/` verbatim (brand `#B54708`, chrome `#1C1917`, IBM Plex Sans Arabic, 4px spacing, 48px touch) + mobile type scale + component layer + 3 theme skins. Screens hardcode nothing. |
+| `tokens/tokens.css` | **Single source of truth.** Three clean layers: named primitives (brand `#B54708`, night ramp, art palette) → a **26-name semantic contract** every screen reads (`--mk-bg`, `--mk-ink`, `--mk-accent`…) → skins `.theme-a/b/c` that re-point values, never names. Mirrors `packages/ui` (IBM Plex Sans Arabic, 4px spacing, 48px touch) + 8-role type scale + component layer. Screens hardcode nothing. |
 | `assets/icons.js` | The 56-glyph SVG icon sprite (single source, file://-safe injector) incl. the generated Marketak mark, official Google/Apple plates, Vodafone Cash/Instapay glyphs. |
 | `assets/blueprint.css` | Documentation chrome only: phone frame (393×852), status bar, annotation panels. |
 | `system.html` | Design system: colour tokens + contrast, type scale (bilingual rules), spacing/radius/elevation/motion, icons, components with all states, interaction patterns derived from the constitution. |
@@ -21,20 +21,22 @@ from imagination.
 | `screens/…` | Screen blueprints. Each page = live phone mockup + spec annotations + mandatory edge states. |
 | `index.html` | Gallery with live previews of everything. |
 
-## Batch 1 (this commit) — 3 screens × 3 design directions
+## Batches 1–2 — 5 screens × 3 design directions (all Zero-Think gated)
 
 | Screen | A · Warm Minimal | B · Midnight Chrome | C · Fresh Editorial |
 |---|---|---|---|
 | 01 Sign In (Google/Apple only) | `screens/01-sign-in/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
 | 02 Profile Completion gate | `screens/02-profile-completion/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
-| 03 Customer Home | `screens/03-customer-home/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
+| 03 Customer Home — **the Question** («نفس طلب امبارح؟» + سوّرني; catalog demoted) — rebuilt in batch 2 | `screens/03-customer-home/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
+| 04 Vendor page — **«الأخدوه» first** (lunch decision, not a catalogue) | `screens/04-vendor/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
+| 05 The Tray الصينية — **confirmation, not a form** (0 keyboards, 1 CTA) | `screens/05-tray/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
 
-The three directions share one token core — picking one means picking a *skin*
-(`.theme-a/.theme-b/.theme-c`), not a rebuild. **The skin decides how it looks; the doctrine
-(`experience.html`) decides how it behaves** — the skins stay valid and every batch-2+ screen is
-designed through the doctrine (batch-1 home A is kept as the “industry baseline” we measure against).
-Next batches (see `architecture.html` §5): vendor/menu → cart/quote → payment & tracking →
-orders & settings → rider surfaces → earnings — vendor detail becomes a “lunch decision”, not a catalogue.
+The three directions share one token contract — picking one means picking a *skin*
+(`.theme-a/.theme-b/.theme-c`), not a rebuild: screens 03–05 are **identical DOM** re-pointed by
+the skins, which is the token system proving itself. **The skin decides how it looks; the doctrine
+(`experience.html`) decides how it behaves** — every screen above passes the §6 checklist and each
+screen page carries its own Zero-Think gate note.
+Next batches (see `architecture.html` §5): tracking sentence → orders → rider surfaces → earnings.
 
 ## Non-negotiables carried from the repo
 
@@ -44,12 +46,12 @@ orders & settings → rider surfaces → earnings — vendor detail becomes a �
 - **No customer wallet** (ADR 2) — cash / Vodafone Cash / Instapay **at delivery**.
 - **Status is word + colour, never colour alone; no uppercase; no letter-spacing on Arabic** (Arabic-first, RTL default, logical properties throughout).
 - **Every screen designed with loading / empty / error / offline states** before being called done.
-- **Zero-Think gate (new):** every screen from batch 2 on must pass the 8-question checklist in `experience.html` §6 — one decision per screen, smart defaults, zero typed characters in the main ordering path, human Egyptian copy via the voice table (§5).
+- **Zero-Think gate:** every screen must pass the 8-question checklist in `experience.html` §6 — one decision per screen, smart defaults, zero typed characters in the main ordering path, human Egyptian copy via the voice table (§5). Batch-2 screens (03–05) are the first fully gated; batch-1 sign-in/profile carry the doctrine framing.
 
 ## Assets
 
 All imagery (logo, illustrations, map, food art) is **generated SVG** in the project's own
-illustration palette (`--mk-illu-*`) — no external/stock dependencies, appropriate for the
+illustration palette (`--mk-art-*`) — no external/stock dependencies, appropriate for the
 Egypt-first launch.
 
 ## How to review

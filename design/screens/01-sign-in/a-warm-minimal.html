@@ -16,19 +16,19 @@
   .si-hero { flex:none; position:relative; padding-top:var(--mk-space-10); padding-bottom:var(--mk-space-6); text-align:center; }
   .si-blob { position:absolute; inset-inline:0; top:-40px; height:300px; z-index:0; pointer-events:none; }
   .si-brand { position:relative; z-index:1; display:inline-flex; flex-direction:column; align-items:center; gap:12px; }
-  .si-brand .mark { width:76px; height:76px; color:var(--mk-brand-primary); filter:drop-shadow(0 10px 22px rgba(181,71,8,.28)); }
-  .si-wordmark { font-size:var(--mk-fs-display); font-weight:700; letter-spacing:0; color:var(--mk-text-primary); }
-  .si-wordmark small { display:block; font-size:var(--mk-fs-caption); font-weight:500; color:var(--mk-text-subtle); direction:ltr; margin-top:2px; }
-  .si-tagline { position:relative; z-index:1; margin-top:var(--mk-space-6); font-size:var(--mk-fs-title-2); font-weight:700; color:var(--mk-text-primary); line-height:var(--mk-lh-title-2); }
-  .si-tagline-sub { position:relative; z-index:1; margin-top:var(--mk-space-2); font-size:var(--mk-fs-body); color:var(--mk-text-secondary); line-height:var(--mk-lh-body); max-width:290px; margin-inline:auto; }
+  .si-brand .mark { width:76px; height:76px; color:var(--mk-accent); filter:drop-shadow(0 10px 22px rgba(181,71,8,.28)); }
+  .si-wordmark { font-size:var(--mk-fs-display); font-weight:700; letter-spacing:0; color:var(--mk-ink); }
+  .si-wordmark small { display:block; font-size:var(--mk-fs-tag); font-weight:500; color:var(--mk-ink-3); direction:ltr; margin-top:2px; }
+  .si-tagline { position:relative; z-index:1; margin-top:var(--mk-space-6); font-size:var(--mk-fs-sec); font-weight:700; color:var(--mk-ink); line-height:var(--mk-lh-sec); }
+  .si-tagline-sub { position:relative; z-index:1; margin-top:var(--mk-space-2); font-size:var(--mk-fs-body); color:var(--mk-ink-2); line-height:var(--mk-lh-body); max-width:290px; margin-inline:auto; }
   .si-actions { margin-top:auto; display:flex; flex-direction:column; gap:var(--mk-space-3); }
-  .si-or { display:flex; align-items:center; gap:12px; color:var(--mk-text-subtle); font-size:var(--mk-fs-caption); }
-  .si-or::before, .si-or::after { content:""; flex:1; height:1px; background:var(--mk-divider); }
-  .btn-apple { background:var(--mk-surface-chrome); color:var(--mk-text-on-dark); }
+  .si-or { display:flex; align-items:center; gap:12px; color:var(--mk-ink-3); font-size:var(--mk-fs-tag); }
+  .si-or::before, .si-or::after { content:""; flex:1; height:1px; background:var(--mk-line); }
+  .btn-apple { background:var(--mk-chrome); color:var(--mk-ink-inv); }
   .btn-apple:hover { background:#000; }
   .si-lang { display:flex; justify-content:center; margin-top:var(--mk-space-5); }
-  .si-legal { text-align:center; font-size:var(--mk-fs-caption); color:var(--mk-text-subtle); line-height:var(--mk-lh-caption); margin-top:var(--mk-space-4); }
-  .si-legal a { color:var(--mk-brand-primary-text); font-weight:500; text-decoration:none; }
+  .si-legal { text-align:center; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); line-height:var(--mk-lh-tag); margin-top:var(--mk-space-4); }
+  .si-legal a { color:var(--mk-accent-text); font-weight:500; text-decoration:none; }
 </style>
 </head>
 <body class="bp-body">
@@ -38,7 +38,7 @@
     <a class="crumb" href="javascript:void(0)">الشاشة 01 — تسجيل الدخول</a>
     <span class="tag"><span class="dot"></span>مثال A · Warm Minimal</span>
   </div>
-  <p class="bp-desc"><b>الفكرة:</b> أبيض هادئ وبرتقالي ماركتك فقط — ثقة فورية وواضح مطلق: زرّان اثنان ولا شيء غيرهما. البطل هو الشعار وحملة «كل أسواق منطقتك في رحلة واحدة». أفضل مثال لواجهة «تُقرأ بالعربية أولًا».</p>
+  <p class="bp-desc"><b>الفكرة:</b> أبيض هادئ وبرتقالي ماركتك فقط — ثقة فورية وواضح مطلق: زرّان اثنان ولا شيء غيرهما. البطل هو الشعار وحملة «كل أسواق منطقتك في رحلة واحدة». أفضل مثال لواجهة «تُقرأ بالعربية أولًا». <b>فلسفة الصفر-تفكير:</b> الدخول مش فورم — قرار واحد بضغطة، وصفر حقول نصية. لا شيء هنا يُطلب من المستخدم غير ما المواصفات تشترطه فعلًا (جوجل/آبل فقط).</p>
 
   <div class="stage">
     <!-- ================= PHONE ================= -->
@@ -50,11 +50,11 @@
         <div class="si-wrap">
           <!-- decorative brand wash (SVG, generated asset) -->
           <svg class="si-blob" viewBox="0 0 393 300" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="196" cy="120" r="150" fill="var(--mk-action-soft)"/>
-            <circle cx="70" cy="60" r="34" fill="var(--mk-illu-3)" opacity=".55"/>
-            <circle cx="330" cy="86" r="26" fill="var(--mk-illu-5)" opacity=".5"/>
-            <circle cx="352" cy="210" r="16" fill="var(--mk-illu-2)" opacity=".35"/>
-            <circle cx="38" cy="196" r="20" fill="var(--mk-illu-8)"/>
+            <circle cx="196" cy="120" r="150" fill="var(--mk-accent-soft)"/>
+            <circle cx="70" cy="60" r="34" fill="var(--mk-art-sand)" opacity=".55"/>
+            <circle cx="330" cy="86" r="26" fill="var(--mk-art-mint)" opacity=".5"/>
+            <circle cx="352" cy="210" r="16" fill="var(--mk-art-apricot)" opacity=".35"/>
+            <circle cx="38" cy="196" r="20" fill="var(--mk-art-cream)"/>
           </svg>
 
           <div class="si-hero">
@@ -71,7 +71,7 @@
             <button class="mk-btn mk-btn-secondary"><i data-icon="google" style="width:22px;height:22px"></i>المتابعة بحساب جوجل</button>
             <div class="si-or">أو</div>
             <!-- Apple: offered first on iOS builds (spec note) -->
-            <button class="mk-btn btn-apple"><i data-icon="apple" style="width:22px;height:22px;color:#fff"></i>المتابعة مع آبل</button>
+            <button class="mk-btn btn-apple"><i data-icon="apple" style="width:22px;height:22px;color:var(--mk-ink-inv)"></i>المتابعة مع آبل</button>
 
             <div class="si-lang">
               <div class="mk-chip is-active" style="min-height:36px">العربية</div>
@@ -122,15 +122,15 @@
     <div class="states">
       <div class="state-tile">
         <h4>1 · أثناء تسجيل الدخول — تحميل</h4>
-        <button class="mk-btn mk-btn-secondary" style="width:100%;position:relative;color:var(--mk-text-disabled)">
-          <svg viewBox="0 0 24 24" width="20" height="20" style="animation:spin 1.2s linear infinite"><style>@keyframes spin{to{transform:rotate(360deg)}}</style><circle cx="12" cy="12" r="8.5" stroke="var(--mk-border-strong)" stroke-width="2.4" fill="none"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5" stroke="var(--mk-brand-primary)" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
+        <button class="mk-btn mk-btn-secondary" style="width:100%;position:relative;color:var(--mk-ink-3)">
+          <svg viewBox="0 0 24 24" width="20" height="20" style="animation:spin 1.2s linear infinite"><style>@keyframes spin{to{transform:rotate(360deg)}}</style><circle cx="12" cy="12" r="8.5" stroke="var(--mk-line-strong)" stroke-width="2.4" fill="none"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5" stroke="var(--mk-accent)" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
           جاري فتح حسابك…
         </button>
         <div class="mk-field-hint" style="margin-top:8px">الأزرار تتجمد والباقي يخفت 60% — لا يُسمح بالنقر المزدوج.</div>
       </div>
       <div class="state-tile">
         <h4>2 · فشل الدخول — خطأ صريح</h4>
-        <div style="display:flex;gap:10px;background:var(--mk-wash-danger);border:1px solid #F3C6C1;border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-body-sm);color:var(--mk-status-danger);align-items:flex-start">
+        <div style="display:flex;gap:10px;background:var(--mk-bad-soft);border:1px solid color-mix(in srgb, var(--mk-bad) 26%, transparent);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-note);color:var(--mk-bad);align-items:flex-start">
           <i data-icon="alert" style="margin-top:1px"></i>
           <div><b>تعذر تسجيل الدخول بحساب جوجل.</b><br>تأكد إنك اخترت الحساب الصحيح وحاول تاني — أو كلّمنا والدعم يفتحه معك.</div>
         </div>
@@ -138,15 +138,15 @@
       </div>
       <div class="state-tile">
         <h4>3 · تبديل اللغة → English (LTR)</h4>
-        <div dir="ltr" style="border:1px solid var(--mk-border-subtle);border-radius:var(--mk-radius-md);padding:14px;background:var(--mk-action-soft)">
-          <div style="font-size:var(--mk-fs-title-3);font-weight:700;color:var(--mk-text-primary)">Your market,<br>one delivery run</div>
+        <div dir="ltr" style="border:1px solid var(--mk-line);border-radius:var(--mk-radius-md);padding:14px;background:var(--mk-accent-soft)">
+          <div style="font-size:var(--mk-fs-head);font-weight:700;color:var(--mk-ink)">Your market,<br>one delivery run</div>
           <button class="mk-btn mk-btn-secondary" style="width:100%;margin-top:12px"><i data-icon="google" style="width:20px;height:20px"></i>Continue with Google</button>
         </div>
         <div class="mk-field-hint" style="margin-top:8px">المرآة كاملة بلا CSS منفصل — الخصائص المنطقية (inline-start) تتكفل.</div>
       </div>
       <div class="state-tile">
         <h4>4 · أول إقلاع بعد القبول — بوابة الملف</h4>
-        <div style="display:flex;gap:10px;background:var(--mk-wash-warning);border:1px solid #F0E2BD;border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-body-sm);color:var(--mk-status-warning);align-items:flex-start">
+        <div style="display:flex;gap:10px;background:var(--mk-warn-soft);border:1px solid color-mix(in srgb, var(--mk-warn) 30%, transparent);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-note);color:var(--mk-warn);align-items:flex-start">
           <i data-icon="info" style="margin-top:1px"></i>
           <div>يمكنك تصفّح المحلات فورًا — زر الشراء سيطلب إكمال البيانات عند أول طلب.</div>
         </div>

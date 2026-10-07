@@ -13,27 +13,27 @@
 <style>
   .pc-wrap { flex:1; min-height:0; display:flex; flex-direction:column; }
   .pc-head { padding:var(--mk-space-5) var(--mk-gutter) 0; display:flex; align-items:center; gap:12px; }
-  .pc-head .avatar { width:52px; height:52px; border-radius:50%; background:var(--mk-action-soft); display:flex; align-items:center; justify-content:center; color:var(--mk-brand-primary); flex:none; }
+  .pc-head .avatar { width:52px; height:52px; border-radius:50%; background:var(--mk-accent-soft); display:flex; align-items:center; justify-content:center; color:var(--mk-accent); flex:none; }
   .pc-head .avatar [data-icon] { width:26px; height:26px; }
-  .pc-head h1 { margin:0; font-size:var(--mk-fs-title-2); font-weight:700; }
-  .pc-head p { margin:2px 0 0; font-size:var(--mk-fs-body-sm); color:var(--mk-text-2); line-height:var(--mk-lh-body-sm); }
+  .pc-head h1 { margin:0; font-size:var(--mk-fs-sec); font-weight:700; }
+  .pc-head p { margin:2px 0 0; font-size:var(--mk-fs-note); color:var(--mk-ink-2); line-height:var(--mk-lh-note); }
   .pc-dots { display:flex; gap:6px; padding:var(--mk-space-4) var(--mk-gutter) 0; }
-  .pc-dots i { height:6px; flex:1; border-radius:3px; background:var(--mk-bg-sunken); }
-  .pc-dots i.on { background:var(--mk-brand-primary); }
-  .pc-dots i.half { background:linear-gradient(to left, var(--mk-brand-primary) 50%, var(--mk-bg-sunken) 50%); }
+  .pc-dots i { height:6px; flex:1; border-radius:3px; background:var(--mk-bg-2); }
+  .pc-dots i.on { background:var(--mk-accent); }
+  .pc-dots i.half { background:linear-gradient(to left, var(--mk-accent) 50%, var(--mk-bg-2) 50%); }
   .pc-scroll { flex:1; min-height:0; overflow-y:auto; padding:var(--mk-space-4) var(--mk-gutter) 120px; scrollbar-width:none; }
   .pc-scroll::-webkit-scrollbar { display:none; }
-  .q-card { background:var(--mk-card); border:1px solid var(--mk-card-border); border-radius:var(--mk-radius-xl); padding:var(--mk-space-5);
-            box-shadow:var(--mk-shadow-card); display:flex; flex-direction:column; gap:var(--mk-space-4); margin-bottom:var(--mk-space-4); }
-  .q-card .q { font-size:var(--mk-fs-title-3); font-weight:700; display:flex; align-items:center; gap:10px; }
-  .q-card .q .qn { width:28px; height:28px; border-radius:50%; background:var(--mk-action-soft); color:var(--mk-brand-primary-text);
-                   display:inline-flex; align-items:center; justify-content:center; font-size:var(--mk-fs-caption); font-weight:700; flex:none; }
-  .q-card .hint { font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:-8px; }
-  .pc-done { display:flex; gap:10px; background:var(--mk-accent-2-soft); border-radius:var(--mk-radius-lg); padding:12px 14px;
-             font-size:var(--mk-fs-body-sm); color:var(--mk-accent-2); align-items:center; margin-bottom:var(--mk-space-4); }
+  .q-card { background:var(--mk-card); border:1px solid var(--mk-line); border-radius:var(--mk-radius-xl); padding:var(--mk-space-5);
+            box-shadow:var(--mk-shadow-1); display:flex; flex-direction:column; gap:var(--mk-space-4); margin-bottom:var(--mk-space-4); }
+  .q-card .q { font-size:var(--mk-fs-head); font-weight:700; display:flex; align-items:center; gap:10px; }
+  .q-card .q .qn { width:28px; height:28px; border-radius:50%; background:var(--mk-accent-soft); color:var(--mk-accent-text);
+                   display:inline-flex; align-items:center; justify-content:center; font-size:var(--mk-fs-tag); font-weight:700; flex:none; }
+  .q-card .hint { font-size:var(--mk-fs-tag); color:var(--mk-ink-3); margin-top:-8px; }
+  .pc-done { display:flex; gap:10px; background:var(--mk-good-soft); border-radius:var(--mk-radius-lg); padding:12px 14px;
+             font-size:var(--mk-fs-note); color:var(--mk-good); align-items:center; margin-bottom:var(--mk-space-4); }
   .pc-sticky { position:absolute; bottom:0; inset-inline:0; padding:var(--mk-space-3) var(--mk-gutter) var(--mk-space-6);
                background:linear-gradient(to top, var(--mk-bg) 72%, transparent); z-index:10; }
-  .pc-sticky .note { text-align:center; font-size:var(--mk-fs-caption); color:var(--mk-text-3); margin-top:var(--mk-space-2); }
+  .pc-sticky .note { text-align:center; font-size:var(--mk-fs-tag); color:var(--mk-ink-3); margin-top:var(--mk-space-2); }
 </style>
 </head>
 <body class="bp-body">
@@ -43,7 +43,7 @@
     <a class="crumb" href="javascript:void(0)">الشاشة 02 — أكمل ملفك (البوابة)</a>
     <span class="tag"><span class="dot"></span>مثال C · Fresh Editorial</span>
   </div>
-  <p class="bp-desc"><b>الفكرة:</b> محادثة ودّية بدل نموذج — سؤال واحد في بطاقة كبيرة (رقم ١، ٢، ٣) وما اكتمل يتحول لشارة خضراء «تم». الأقل إرهاقًا نفسيًا، والأقرب لجمهور «أول مرة أطلب أونلاين». النقود تظهر صفر هنا بوضوح: «مش هنطلب منك أي دفع».</p>
+  <p class="bp-desc"><b>الفكرة:</b> محادثة ودّية بدل نموذج — سؤال واحد في بطاقة كبيرة (رقم ١، ٢، ٣) وما اكتمل يتحول لشارة خضراء «تم». الأقل إرهاقًا نفسيًا، والأقرب لجمهور «أول مرة أطلب أونلاين». النقود تظهر صفر هنا بوضوح: «مش هنطلب منك أي دفع». <b>فلسفة الصفر-تفكير:</b> أقل عدد حقول تسمح به المواصفات — كل ما يُعرف من السياق يُملأ مسبقًا (+20 للمصرية، كاش عند الاستلام بلا سؤال)، والكتابة استثناء لا قاعدة.</p>
 
   <div class="stage">
     <div class="phone theme-c">
@@ -74,7 +74,7 @@
               </div>
               <div class="mk-field">
                 <label>المنطقة</label>
-                <div class="mk-input"><i data-icon="pin" style="width:18px;height:18px;color:var(--mk-text-subtle)"></i><input value="الزمالك — القاهرة"><i data-icon="chevron-down" style="width:18px;height:18px;color:var(--mk-text-subtle)"></i></div>
+                <div class="mk-input"><i data-icon="pin" style="width:18px;height:18px;color:var(--mk-ink-3)"></i><input value="الزمالك — القاهرة"><i data-icon="chevron-down" style="width:18px;height:18px;color:var(--mk-ink-3)"></i></div>
               </div>
               <div class="mk-field">
                 <label>العمارة / الشارع</label>
@@ -87,10 +87,10 @@
               <div class="mk-field">
                 <label>علامة مميزة</label>
                 <div class="mk-input is-focus"><input placeholder="جنب إيه؟ مثال: مسجد النور، الكشك الأبيض" value="جنب مسجد النور"></div>
-                <div class="mk-field-hint" style="display:flex;gap:6px"><i data-icon="sparkle" style="width:14px;height:14px;color:var(--mk-brand-primary-text)"></i>العلامة المميزة بتفرق كتير — المندوب بيوصل أسرع بيها</div>
+                <div class="mk-field-hint" style="display:flex;gap:6px"><i data-icon="sparkle" style="width:14px;height:14px;color:var(--mk-accent-text)"></i>العلامة المميزة بتفرق كتير — المندوب بيوصل أسرع بيها</div>
               </div>
               <div class="mk-field">
-                <label>ملاحظة للمندوب <span style="color:var(--mk-text-3);font-weight:400">(اختياري)</span></label>
+                <label>ملاحظة للمندوب <span style="color:var(--mk-ink-3);font-weight:400">(اختياري)</span></label>
                 <div class="mk-input"><input placeholder="مثال: اتصل أول ما توصل"></div>
               </div>
             </div>
@@ -140,22 +140,22 @@
       <div class="state-tile">
         <h4>1 · خطأ موبايل تحت السؤال</h4>
         <div class="q-card" style="padding:14px;margin:0">
-          <div class="q" style="font-size:var(--mk-fs-body-sm)"><span class="qn">٢</span>رقم موبايلك؟</div>
+          <div class="q" style="font-size:var(--mk-fs-note)"><span class="qn">٢</span>رقم موبايلك؟</div>
           <div class="mk-input is-error"><span style="font-weight:600" dir="ltr">+20</span><input value="0101234567" dir="ltr"></div>
           <div class="mk-field-error"><i data-icon="alert" style="width:14px;height:14px"></i>اكتب 11 رقمًا تبدأ بـ 01</div>
         </div>
       </div>
       <div class="state-tile">
         <h4>2 · أول عنوان بيتحفظ</h4>
-        <div class="q-card" style="padding:14px;margin:0;background:var(--mk-accent-2-soft);border-color:transparent">
-          <div style="display:flex;align-items:center;gap:8px;color:var(--mk-accent-2);font-weight:700;font-size:var(--mk-fs-body-sm)"><i data-icon="check-circle"></i>بنحفظ عنوانك…</div>
+        <div class="q-card" style="padding:14px;margin:0;background:var(--mk-good-soft);border-color:transparent">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--mk-good);font-weight:700;font-size:var(--mk-fs-note)"><i data-icon="check-circle"></i>بنحفظ عنوانك…</div>
           <div class="mk-skel" style="height:12px;width:70%;background:#fff"></div>
           <div class="mk-skel" style="height:12px;width:45%;background:#fff"></div>
         </div>
       </div>
       <div class="state-tile">
         <h4>3 · العنوان خارج مناطق التوصيل</h4>
-        <div style="display:flex;gap:10px;background:var(--mk-wash-warning);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-body-sm);color:var(--mk-status-warning);align-items:flex-start">
+        <div style="display:flex;gap:10px;background:var(--mk-warn-soft);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-note);color:var(--mk-warn);align-items:flex-start">
           <i data-icon="alert" style="margin-top:1px"></i>
           <div>لسه بنغطي الزمالك بس — احفظ العنوان براحتك وهنبعتلك أول ما نوصّل لمنطقتك.</div>
         </div>
@@ -163,9 +163,9 @@
       <div class="state-tile">
         <h4>4 · اكتمل الملف (النهاية السعيدة)</h4>
         <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;text-align:center">
-          <div style="width:56px;height:56px;border-radius:50%;background:var(--mk-accent-2-soft);display:flex;align-items:center;justify-content:center;color:var(--mk-accent-2)"><i data-icon="check-circle" style="width:28px;height:28px"></i></div>
-          <div style="font-weight:700;font-size:var(--mk-fs-title-3)">أنت جاهز!</div>
-          <div style="font-size:var(--mk-fs-caption);color:var(--mk-text-2)">خلاص بقت تقدر تطلب — يلا نبدأ بأقرب محل مفتوح.</div>
+          <div style="width:56px;height:56px;border-radius:50%;background:var(--mk-good-soft);display:flex;align-items:center;justify-content:center;color:var(--mk-good)"><i data-icon="check-circle" style="width:28px;height:28px"></i></div>
+          <div style="font-weight:700;font-size:var(--mk-fs-head)">أنت جاهز!</div>
+          <div style="font-size:var(--mk-fs-tag);color:var(--mk-ink-2)">خلاص بقت تقدر تطلب — يلا نبدأ بأقرب محل مفتوح.</div>
         </div>
       </div>
     </div>
