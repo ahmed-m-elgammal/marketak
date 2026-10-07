@@ -1,0 +1,230 @@
+-- =============================================================================
+-- 19_functions_public_index.sql
+-- The complete public RPC surface: 105 functions in `public`, 34 in `private`.
+--
+-- The full source of the two that matter most — private.compute_quote(),
+-- public.quote_order_v1() and public.place_order_v1() — is in
+-- 16_functions_checkout.sql. The remainder are catalogued below with their
+-- exact signatures and return shapes, taken from pg_proc.
+--
+-- NAMING. Every callable business function ends `_v1`. Trigger and helper
+-- functions do not. The version suffix is not decoration: it is what lets a
+-- deployed client keep calling v1 while a v2 is built beside it.
+--
+-- AUTHORISATION. Almost everything is SECURITY DEFINER. That is required, not
+-- dangerous, because no client has any write grant at all — the function body
+-- IS the authorisation boundary, and it re-checks identity itself. Every one
+-- of them pins `search_path TO ''`, so no object can be resolved through a
+-- caller-controlled path.
+--
+-- ERROR CONTRACT. Business errors are raised by private.err(code, message),
+-- which produces one P0001 whose message begins `CODE: prose`. The client
+-- parses the code off the front. It never matches on prose, which is Arabic
+-- and will change.
+-- =============================================================================
+
+-- =============================================================================
+-- A. CHECKOUT — the pricing authority. Source in 16_functions_checkout.sql.
+-- =============================================================================
+-- quote_order_v1(cart, address, voucher, tip, delivery_type, grouping)
+--   -> quote_id, expires_at, fingerprint, fee_breakdown, totals, per_vendor,
+--      limits, rejections, warnings. 5-minute TTL. Charges nothing.
+-- place_order_v1(quote_id, payment_method, idempotency_key, payment_channel)
+--   -> order_id, order_number, sub_orders, totals. Re-prices, then writes.
+
+-- =============================================================================
+-- B. IDENTITY AND PROFILE
+-- =============================================================================
+-- get_profile_status_v1()
+--   -> profile_completed_at, has_phone, has_address, can_browse, can_order,
+--      missing text[].  The browse/order split lives here.
+-- complete_profile_v1(first_name, last_name, phone)
+--   -> same shape. Sets profile_completed_at, which is the gate in
+--      place_order_v1. Cannot complete without a phone: the CHECK
+--      profile_phone_required enforces it too.
+-- update_profile_v1(patch jsonb)
+--   -> same shape. Partial update of the caller's own row only.
+-- register_device_token_v1(token, platform, app_role, app_version)
+--   -> SETOF device_tokens. Upsert on token: a reinstall moves the row.
+-- effective_cash_limit_v1(rider_id) -> integer
+
+-- =============================================================================
+-- C. ORDER LIFECYCLE
+-- =============================================================================
+-- transition_order_v1(order, sub_order, to_status, reason)
+--   -> sub_order_id, from_status, to_status, order_status.  Validates the
+--      transition, writes order_status_history, lets the trigger fold the
+--      order status. The order status is never set directly by a client.
+-- cancel_order_v1(order, sub_order, reason)
+--   -> outcome, cancelled_count, refund_amount, refund_currency.
+
+-- =============================================================================
+-- D. DELIVERY AND DISPATCH
+-- =============================================================================
+-- get_available_orders_v1(lat, lng, radius_km)
+--   -> assignment_id, order_id, order_number, vendor_count, area_id,
+--      pickup_km, dropoff_km, est_pickup_minutes, total, currency, placed_at.
+--      Radius search over the unassigned offer pool.
+-- claim_order_v1(assignment_id, rider_id)
+--   -> order_id, assignment_id, rider_id, rider_pay_base/distance/bonus/total,
+--      platform_revenue, distance_km, eta_minutes, has_pay_rule. Pay is
+--      RESOLVED HERE by private.resolve_pay and frozen onto the assignment.
+-- complete_delivery_v1(order, proof_path, lat, lng)
+--   -> order_id, delivered_at, rider_pay_total, platform_revenue, tips,
+--      rider_gross_total, vendor_payable, currency. Settles everything.
+
+-- =============================================================================
+-- E. PAYMENT COLLECTION — the reason there is no customer wallet.
+--    The customer pays the rider directly. These functions RECORD it.
+-- =============================================================================
+-- begin_collection_v1(order, payment_method, channel)
+--   -> amount_due, can_collect_cash, can_collect_wallet, cash_held,
+--      effective_cash_limit, currency, already_collected.
+--      can_collect_cash is false once the rider is at their limit.
+-- collect_cash_v1(order, amount, reference, proof_path)
+--   -> order_id, collected_amount, cash_held, ledger_entry_id, reference,
+--      currency.  Increments riders.cash_held and posts a ledger entry.
+-- collect_wallet_v1(order, channel, reference)
+--   -> order_id, collected_amount, cash_held, channel, reference, currency,
+--      platform_cash_moved.  Money moved to a wallet does NOT touch rider cash.
+
+-- =============================================================================
+-- F. MONEY
+-- =============================================================================
+-- get_wallet_balance_v1(owner_type, owner_id)
+--   -> owner_id, balance, ledger_balance, drift, currency, status,
+--      status_reason, version, recent_entries.  `drift` is the difference
+--      between the wallet row and the sum of its ledger entries. It should
+--      always be zero; a non-zero value means the two disagree and is the
+--      single most valuable number in this function.
+-- adjust_wallet_v1(owner_type, owner_id, amount, reason, reference, idempotency_key)
+--   -> wallet_balance, wallet_version, ledger_entry_id, applied.
+-- freeze_wallet_v1(owner_type, owner_id, reason, idempotency_key)
+--   -> wallet_id, owner_type, owner_id, status, status_reason, version, frozen.
+-- list_frozen_v1() -> frozen wallet rows, admin only.
+-- run_payout_v1(payout_type, account_id, period_start, period_end,
+--                action, payout_id, method, reference)
+--   -> payout_id, payout_status, line_count, gross/fee/net, cash_amount,
+--      already_applied.  One function, several actions (draft/approve/pay/
+--      fail/cancel). Re-running is safe via the idempotency key.
+-- get_platform_float_v1(from, to) -> per-day cash reconciliation.
+-- reconcile_day_v1(date, explanation)
+--   -> the float row plus balanced boolean and in_flight_payouts.  Explains a
+--      variance; never silently closes one.
+
+-- =============================================================================
+-- G. REPORTS — all windowed by private.earnings_window(), which clamps to 365
+--    days and reports `range_clamped` rather than refusing.
+-- =============================================================================
+-- get_rider_earnings_v1(from, to) -> payload jsonb
+-- get_vendor_earnings_v1(from, to) -> payload jsonb
+-- get_vendor_dashboard_v1(vendor_id) -> payload jsonb
+-- get_admin_metrics_v1(date) -> payload jsonb
+
+-- =============================================================================
+-- H. CATALOGUE, SEARCH AND FLAGS
+-- =============================================================================
+-- search_catalog_v1(query, area_id, filters, limit)
+--   -> kind, vendor_*, item_*, score, is_open, distance_km, rating_*,
+--      minimum_order_value, prep_time_minutes.
+--      Mixed vendor and item results with a score. Hits the trigram indexes.
+-- get_vendor_feed_v1(area_id, vertical, open_only, query, offset, limit, sort)
+--   -> payload jsonb. Paginated storefront feed.
+-- get_flags_v1(app_role, app_version) -> flag_key, value. Evaluates
+--      targeting_rules and semver_gte server-side.
+-- get_fee_rules_v1(zone_id) -> the zone row plus its tiers and service fee.
+
+-- =============================================================================
+-- I. CONFIGURATION (admin-gated inside the body)
+-- =============================================================================
+-- set_fee_tier_v1(zone, vendor_count, multiplier_bps)
+--   -> zone_id, vendor_count, multiplier_bps, created. Trigger-checked monotonic.
+-- set_commission_rule_v1(scope, applies_to, value_bps, effective_from,
+--                         target_id, commission_type)
+--   -> rule_id, scope, applies_to, value, effective_from, superseded_id.
+--      Returns the id it SUPERSEDED. Rules are never updated in place; a change
+--      closes the old window and opens a new one, so history is reconstructable.
+-- get_commission_v1(scope, target_id) -> rules with is_effective_now.
+
+-- =============================================================================
+-- J. THE OUTBOX — service_role only. A client must not be able to claim or
+--    mark events, or it could suppress a notification or replay history.
+-- =============================================================================
+-- claim_events_v1(limit)
+--   -> event_ids, template_key, recipient, recipient_id, order_id,
+--      order_number, variables, language, oldest_event.
+--      SKIP LOCKED claim. Joins private.push_routing() to the template and
+--      resolves the recipient's language and push token. SERVICE ROLE ONLY.
+-- mark_events_delivered_v1(ids, result)
+--   -> marked, still_open.  Increments attempts, records last_error.
+--      SERVICE ROLE ONLY.
+
+-- =============================================================================
+-- K. ADMIN CRUD — 44 functions, uniform shape.
+--
+--     admin_upsert_<entity>_v1(patch jsonb, p_id uuid)  -> uuid   (create/update)
+--     admin_delete_<entity>_v1(p_id uuid, reason text)  -> void   (soft delete)
+--     admin_restore_<entity>_v1(p_id uuid, reason text) -> void   (undelete)
+--
+-- Entities: city, area, brand, cuisine, vendor, vendor_cuisine, vendor_area,
+-- vendor_schedule, vendor_holiday, vendor_staff, menu_category, menu_item,
+-- menu_item_size, item_option, option_choice, voucher.
+--
+-- Every one is SECURITY DEFINER and every one checks private.is_admin() FIRST,
+-- before doing anything. `delete` sets deleted_at and never removes a row; the
+-- reason is mandatory and lands in audit_log. This is why a deleted menu item
+-- still has its name and price on historical order_items.
+-- =============================================================================
+
+-- =============================================================================
+-- L. PURE HELPERS — IMMUTABLE or STABLE, no table access, safe to grant widely.
+-- =============================================================================
+-- haversine_km(lat1, lng1, lat2, lng2) -> numeric
+-- normalize_text_v1(text)  -> text   unaccent + lowercase + collapse
+-- normalize_text_v1(jsonb) -> text   flattens an ingredients/array jsonb
+-- semver_gte(have, need)   -> boolean  version comparison for flag targeting
+
+-- =============================================================================
+-- M. TRIGGER FUNCTIONS — not callable by a client. Listed because the trigger
+--    definitions in 13_triggers.sql reference them by name.
+-- =============================================================================
+-- set_updated_at()                          BEFORE UPDATE, 45 tables
+-- bump_version_for_direct_vendor()          menu_items, menu_categories
+-- bump_version_for_items_of()               menu_item_sizes, item_options
+-- bump_version_for_choices()                option_choices (two hops up)
+-- assert_fee_tiers_monotonic()              delivery_fee_tiers
+-- assert_cart_item_orderable()              cart_items
+-- assert_item_has_sizes()                   menu_items
+-- assert_item_still_sized()                 menu_item_sizes
+-- assert_history_scope()                    order_status_history
+-- sync_menu_item_vendor()                   menu_items.vendor_id
+-- sync_cart_item_vendor()                   cart_items.vendor_id
+-- sync_order_item_parent()                  order_items.order_id
+-- sync_order_item_aggregates_ins()        orders.item_count
+-- sync_order_item_aggregates_upd()        orders.item_count
+-- sync_order_item_aggregates_del()        orders.item_count
+-- sync_order_status()                       orders.status
+-- touch_cart_from_new_rows()                carts.last_seen_at
+-- handle_new_user()                         auth.users -> public.users
+
+-- =============================================================================
+-- N. private schema — 34 functions. Full source in 15_functions_private.sql,
+--    except private.compute_quote(), which is in 16_functions_checkout.sql.
+-- =============================================================================
+-- Identity, used by RLS:      is_admin, vendor_ids_for, rider_ids_for,
+--                             account_ids_for, visible_order_ids,
+--                             owned_or_assigned_order_ids, rider_order_ids
+-- Settings:                   setting_bool, setting_int, setting_str
+-- Integrity triggers:         assert_wallet_owner, assert_ledger_account,
+--                             assert_payout_account, assert_commission_target,
+--                             sync_rider_contact_from_user,
+--                             push_user_contact_to_rider
+-- Business:                   compute_quote, recompute_order_aggregates,
+--                             pay_rule_for, resolve_pay, trip_distance_km,
+--                             effective_cash_limit, earnings_window,
+--                             new_order_number, notification_type_exists
+-- Ops:                        ensure_partitions, ensure_month_partition,
+--                             prune_events, prune_notifications,
+--                             prune_rider_location_pings,
+--                             prune_order_eta_snapshots, push_routing
+-- Utility:                    err, try_uuid
