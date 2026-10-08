@@ -49,7 +49,7 @@
   .mrow .pr { font-size:var(--mk-fs-body); font-weight:700; margin-top:4px; }
   .soldout { font-size:var(--mk-fs-tag); font-weight:700; color:var(--mk-ink-3); border:1.5px dashed var(--mk-line-strong);
              border-radius:var(--mk-radius-sm); padding:8px 12px; flex:none; }
-  /* ---- sticky: الصينية موجزة ---- */
+  /* ---- sticky: طلبك موجز ---- */
   .vd-sticky { flex:none; border-top:1px solid var(--mk-line); background:var(--mk-card); padding:var(--mk-space-3) var(--mk-gutter) var(--mk-space-2); }
   .vd-trayline { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
   .vd-trayline .l { font-size:var(--mk-fs-note); color:var(--mk-ink-2); font-weight:500; display:flex; align-items:center; gap:6px; }
@@ -66,7 +66,7 @@
     <a class="crumb" href="javascript:void(0)">الشاشة 04 — صفحة المحل والقائمة</a>
     <span class="tag"><span class="dot"></span>مثال B · Midnight Chrome</span>
   </div>
-  <p class="bp-desc"><b>الفكرة (بعد كسر القواعد):</b> قائمة ٢٠٠ صنف كتالوج؟ لأ. الشاشة دي «قرار الغداء» مش صفحة تصفح: تبدأ بـ<b>«الأخدوه»</b> — أصناف المحل المشهورة اللي جاية على بالك أصلًا — وبعدها القائمة كاملة لمن يريد. الحد الأدنى والحالة مكتوبين بجملة من أول ثانية (مفيش مفاجأة في الصينية)، والإضافة بتطير للصينية مش بتفتح شاشة وسيطة. القاعدة المكسورة رقم ٠٢ و٠٦ من <a href="../../experience.html" style="color:var(--mk-accent-text);font-weight:600">فلسفة التجربة</a>.</p>
+  <p class="bp-desc"><b>الفكرة (بعد كسر القواعد):</b> قائمة ٢٠٠ صنف كتالوج؟ لأ. الشاشة دي «قرار الغداء» مش صفحة تصفح: تبدأ بـ<b>«الأخدوه»</b> — أصناف المحل المشهورة اللي جاية على بالك أصلًا — وبعدها القائمة كاملة لمن يريد. الحد الأدنى والحالة مكتوبين بجملة من أول ثانية (مفيش مفاجأة في طلبك)، والإضافة بتطير على طلبك مش بتفتح شاشة وسيطة. القاعدة المكسورة رقم ٠٢ و٠٦ من <a href="../../experience.html" style="color:var(--mk-accent-text);font-weight:600">فلسفة التجربة</a>.</p>
 
   <div class="stage">
     <div class="phone theme-b">
@@ -166,13 +166,13 @@
             </div>
           </div>
 
-          <!-- الصينية الموجزة — الإضافة تطير هنا -->
+          <!-- طلبك الموجز — الإضافة تطير هنا -->
           <div class="vd-sticky">
             <div class="vd-trayline">
-              <span class="l"><i data-icon="cart" style="width:16px;height:16px;color:var(--mk-accent-text)"></i>الصينية — <b>بيتزا بليس</b> · صنفان <b class="mk-money">215.00 ج.م</b></span>
+              <span class="l"><i data-icon="cart" style="width:16px;height:16px;color:var(--mk-accent-text)"></i>طلبك — <b>بيتزا بليس</b> · صنفان <b class="mk-money">215.00 ج.م</b></span>
               <span class="slots"><i></i><i></i><i class="off"></i>١ من ٣</span>
             </div>
-            <button class="mk-btn mk-btn-primary" style="width:100%">كمّل للصينية</button>
+            <button class="mk-btn mk-btn-primary" style="width:100%">كمّل طلبك</button>
           </div>
 
           <div class="home-ind" style="position:static;transform:none;margin:2px auto 6px"></div>
@@ -185,8 +185,9 @@
         <h3><i data-icon="bag"></i>«الأخدوه» — القائمة تبدأ بالقرار</h3>
         <ul>
           <li>أول ما تفتح: أصناف المحل المشهورة — مبني على <span dir="ltr">menu_items.tags</span> + <span dir="ltr">rating_avg</span>. قرارك الغالب معروض قبل ما تلفّح.</li>
+          <li>و«الأخدوه» مش بتاعة الأكل بس: في الصيدلية هي الأصناف اللي بيتشترى كل شهر، وفي البقالة اللي بيخلص دايمًا — نفس الشاشة بتصفّر تفكيرك لأي نوع محل.</li>
           <li>القائمة كاملة تحت لمن يريد — من <b>R2 snapshot</b> (<span dir="ltr">menu_cdn_url</span>)، و<span dir="ltr">get_menu_v1</span> احتياطي فقط. <span dir="ltr">menu_version</span> يكشف القديم.</li>
-          <li>الإضافة ضغطة واحدة تطير للصينية — <b>لا شاشة وسيطة</b> للصنف إلا لو فيه خيارات إجبارية (<code class="err rpc">INVALID_OPTIONS</code>).</li>
+          <li>الإضافة ضغطة واحدة تطير على طلبك — <b>لا شاشة وسيطة</b> للصنف إلا لو فيه خيارات إجبارية (<code class="err rpc">INVALID_OPTIONS</code>).</li>
         </ul>
       </div>
       <div class="note-card">
@@ -198,7 +199,7 @@
         </ul>
       </div>
       <div class="note-card">
-        <h3><i data-icon="route"></i>الإضافة والسلة — مربوط بالإنجين</h3>
+        <h3><i data-icon="route"></i>الإضافة وطلبك — مربوط بالإنجين</h3>
         <ul>
           <li><code class="rpc">upsert_cart_item_v1</code> (الصنف، المحل، الكمية، الخيارات) — آخر كتابة تفوز على <span dir="ltr">updated_at</span>.</li>
           <li><code class="err rpc">TOO_MANY_VENDORS</code> يترجم بشرية: «٣ محلات ده الحد — شيل محل تكمل» مع تسمية المحلات.</li>
@@ -209,7 +210,7 @@
         <h3><i data-icon="check"></i>بوابة الصفر-تفكير</h3>
         <ul>
           <li>سؤال الشاشة: «هتاخد إيه من هنا؟» — والإجابة الغالبة معروضة الأول.</li>
-          <li>من الصنف إلى الصينية: <b>لمسة واحدة</b> — والصينية موجزة دايمًا تحت.</li>
+          <li>من الصنف إلى طلبك: <b>لمسة واحدة</b> — وطلبك موجزة دايمًا تحت.</li>
           <li>كل حالة بجملة + لون: «مفتوح — ~30 د»، «خلص»، «مشغول — +15 د».</li>
         </ul>
       </div>
@@ -224,7 +225,7 @@
         <h4>1 · المحل مشغول (<span dir="ltr">is_busy</span>)</h4>
         <div style="display:flex;gap:10px;background:var(--mk-warn-soft);border:1px solid color-mix(in srgb, var(--mk-warn) 30%, transparent);border-radius:var(--mk-radius-md);padding:12px;font-size:var(--mk-fs-note);color:var(--mk-warn);align-items:flex-start">
           <i data-icon="clock" style="margin-top:1px"></i>
-          <div><b>زحمة دلوقتي — هياخد 15 دقيقة زيادة.</b><br>تطلب برضه؟ المواعيد هتتحدث في الصينية.</div>
+          <div><b>زحمة دلوقتي — هياخد 15 دقيقة زيادة.</b><br>تطلب برضه؟ المواعيد هتتحدث في طلبك.</div>
         </div>
         <div class="mk-field-hint" style="margin-top:8px">التحذير قبل القرار لا بعده — والـ ETA على البطاقة اتحدث معه.</div>
       </div>
@@ -248,7 +249,7 @@
             </div>
           </div>
         </div>
-        <div class="mk-field-hint" style="margin-top:8px">الشيت يفتح فقط للخيارات الإجبارية — الاختيارات الحرة تفضل مكانها في الصينية.</div>
+        <div class="mk-field-hint" style="margin-top:8px">الشيت يفتح فقط للخيارات الإجبارية — الاختيارات الحرة تفضل مكانها في طلبك.</div>
       </div>
       <div class="state-tile">
         <h4>4 · أوف لاين (قائمة الكاش)</h4>

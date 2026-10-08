@@ -237,7 +237,7 @@
           <div style="background:var(--mk-card);border:1px solid var(--mk-line);border-radius:var(--mk-radius-lg);box-shadow:var(--mk-shadow-1);padding:14px">
             <div style="font-size:var(--mk-fs-head);font-weight:600">بيتزا بليس</div>
             <div style="font-size:var(--mk-fs-tag);color:var(--mk-ink-3);margin:2px 0 12px">بيتزا · 20–40 دقيقة</div>
-            <button class="mk-btn mk-btn-primary" style="width:100%"><i data-icon="bag"></i>أضف للصينية</button>
+            <button class="mk-btn mk-btn-primary" style="width:100%"><i data-icon="bag"></i>ضيف على طلبك</button>
           </div>
         </div>
         <div class="skin theme-b" style="background:var(--mk-bg)">
@@ -245,7 +245,7 @@
           <div style="background:var(--mk-card);border:1px solid var(--mk-line);border-radius:var(--mk-radius-lg);box-shadow:var(--mk-shadow-1);padding:14px">
             <div style="font-size:var(--mk-fs-head);font-weight:600;color:var(--mk-ink)">بيتزا بليس</div>
             <div style="font-size:var(--mk-fs-tag);color:var(--mk-ink-3);margin:2px 0 12px">بيتزا · 20–40 دقيقة</div>
-            <button class="mk-btn mk-btn-primary" style="width:100%"><i data-icon="bag"></i>أضف للصينية</button>
+            <button class="mk-btn mk-btn-primary" style="width:100%"><i data-icon="bag"></i>ضيف على طلبك</button>
           </div>
         </div>
         <div class="skin theme-c" style="background:var(--mk-bg)">
@@ -253,7 +253,7 @@
           <div style="background:var(--mk-card);border:1px solid var(--mk-line);border-radius:var(--mk-radius-xl);box-shadow:var(--mk-shadow-1);padding:14px">
             <div style="font-size:var(--mk-fs-head);font-weight:600">بيتزا بليس</div>
             <div style="font-size:var(--mk-fs-tag);color:var(--mk-ink-3);margin:2px 0 12px">بيتزا · 20–40 دقيقة</div>
-            <button class="mk-btn mk-btn-primary" style="width:100%;border-radius:var(--mk-radius-md)"><i data-icon="bag"></i>أضف للصينية</button>
+            <button class="mk-btn mk-btn-primary" style="width:100%;border-radius:var(--mk-radius-md)"><i data-icon="bag"></i>ضيف على طلبك</button>
           </div>
         </div>
       </div>
@@ -423,7 +423,7 @@
           <div class="mk-tabbar" style="border-radius:0">
             <a class="mk-tab is-active"><i data-icon="home-fill"></i>الرئيسية<span class="tabdot"></span></a>
             <a class="mk-tab"><i data-icon="search"></i>البحث<span class="tabdot"></span></a>
-            <a class="mk-tab"><i data-icon="cart"></i><span style="position:relative">السلة<span style="position:absolute;top:-4px;inset-inline-start:-10px;background:var(--mk-accent);color:#fff;font-size:10px;font-weight:600;min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px">3</span></span><span class="tabdot"></span></a>
+            <a class="mk-tab"><i data-icon="cart"></i><span style="position:relative">طلبك<span style="position:absolute;top:-4px;inset-inline-start:-10px;background:var(--mk-accent);color:#fff;font-size:10px;font-weight:600;min-width:16px;height:16px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 4px">3</span></span><span class="tabdot"></span></a>
             <a class="mk-tab"><i data-icon="receipt"></i>طلباتي<span class="tabdot"></span></a>
             <a class="mk-tab"><i data-icon="user"></i>حسابي<span class="tabdot"></span></a>
           </div>
@@ -475,9 +475,9 @@
         <tr><td><b>النقود</b></td><td>المبلغ لا يظهر أبدًا بدون عملته («25.00 ج.م»)؛ الأرقام جدولية (<span class="mk-ltr">tabular-nums</span>)؛ التطبيق لا يحسب — يعرض تسعير السيرفر فقط.</td><td>نقود بياسمات صحيحة؛ <span class="mk-ltr">place_order_v1</span> يعيد التسعير ويرفض بـ <span class="mk-ltr">PRICE_CHANGED</span>.</td></tr>
         <tr><td><b>عرض السعر المؤقت</b></td><td>عد تنازلي مرئي 5:00 دقائق؛ عند الانتهاء إعادة تسعير تلقائية مع شرح الفرق بدل فشل صامت.</td><td><span class="mk-ltr">QUOTE_EXPIRED</span> / TTL خمس دقائق في <span class="mk-ltr">quote_order_v1</span>.</td></tr>
         <tr><td><b>طريقة الدفع عند التوصيل</b></td><td>كاش أو محفظة (فودافون كاش/إنستاباي) — تُختار وتُغيّر حتى لحظة التسليم، لا عند الدفع.</td><td>FR-C-09: الدفع يُختار «at delivery»؛ لا محفظة عميل (ADR 2).</td></tr>
-        <tr><td><b>السلة متعددة المحلات</b></td><td>مقياس مرئي 3/3 محلات؛ منع الدفع بالتسمية: «شيل محل X للمتابعة».</td><td>حد 3 محلات/طلب؛ <span class="mk-ltr">TOO_MANY_VENDORS</span>.</td></tr>
+        <tr><td><b>طلبك متعدد المحلات</b></td><td>مقياس مرئي 3/3 محلات؛ منع الدفع بالتسمية: «شيل محل X للمتابعة».</td><td>حد 3 محلات/طلب؛ <span class="mk-ltr">TOO_MANY_VENDORS</span>.</td></tr>
         <tr><td><b>التحديث أثناء الطلب</b></td><td>سحب للتحديث + تحديث عند العودة للتطبيق؛ لا استطلاع أسرع من 45 ثانية؛ الجديد يصل إشعارًا.</td><td>الدستور V (الكوست محسوب)؛ P-07: التحديثات بدفعات.</td></tr>
-        <tr><td><b>العمل بلا إنترنت</b></td><td>الكتالوج والسلة من كاش مشفر (عرض فقط) — أي سعر من الكاش يوسم «تقديري». الطلب نفسه لا يُنشأ على الجهاز أبدًا.</td><td>§6.2 — SQLite cache display-only؛ الطلب عبر RPC فقط.</td></tr>
+        <tr><td><b>العمل بلا إنترنت</b></td><td>الكتالوج وطلبك من كاش مشفر (عرض فقط) — أي سعر من الكاش يوسم «تقديري». الطلب نفسه لا يُنشأ على الجهاز أبدًا.</td><td>§6.2 — SQLite cache display-only؛ الطلب عبر RPC فقط.</td></tr>
         <tr><td><b>الإشعارات والروابط العميقة</b></td><td>كل إشعار له مقابله داخل التطبيق؛ «تغيّر طلبك» يفتح شاشة الحل (إزالة المحل أو المتابعة) مباشرة.</td><td><span class="mk-ltr">vendor_rejected</span> = الإشعار الذي يقرر عودة العميل.</td></tr>
         <tr><td><b>الحالات الإلزامية</b></td><td>كل شاشة تُصمم بحالاتها الخمس: تحميل، فراغ، نجاح، خطأ، غير متصل — قبل اعتبارها جاهزة.</td><td>Checklist A4: «empty, loading and failure states all designed».</td></tr>
         <tr><td><b>الوصولية</b></td><td>تباين AA في كل الأزواج (المقاسة في packages/ui)؛ الحالة بالكلمة واللون؛ دعم تكبير خط النظام حتى 130%؛ حلقة تركيز برتقالية موحدة.</td><td>جدول التباين في <span class="mk-ltr">colors.ts</span>؛ SC 1.4.11/2.4.11.</td></tr>

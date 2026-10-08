@@ -16,7 +16,7 @@ from imagination.
 | `assets/blueprint.css` | Documentation chrome only: phone frame (393×852), status bar, annotation panels. |
 | `system.html` | Design system: colour tokens + contrast, type scale (bilingual rules), spacing/radius/elevation/motion, icons, components with all states, interaction patterns derived from the constitution. |
 | `experience.html` | **The Zero-Think experience doctrine** — the 8 industry rules we break, 8 counter-moves each grounded in a real engine constraint, 6 zero-think principles with acceptance tests, 4 signature rituals, the Egyptian voice table (robot vs Marketak copy), and the 8-question checklist that gates every future screen. Behaviour layer that sits **above** any skin. |
-| `experience-demos.html` | The doctrine applied: three live phone mockups from one real day (12:15 “نفس طلب امبارح؟” zero home → 12:16 the Tray confirm with everything pre-decided → 1:02 “الصاحب جاي عليك” sentence tracking) + before/after table + touch-count metrics (2 taps, 0 payment screens, 1 sentence). |
+| `experience-demos.html` | The doctrine applied: three live phone mockups from one real day (12:15 “نفس طلب امبارح؟” zero home → 12:16 the “طلبك” confirm with everything pre-decided → 1:02 “الصاحب جاي عليك” sentence tracking) + before/after table + touch-count metrics (2 taps, 0 payment screens, 1 sentence). |
 | `architecture.html` | Launch/auth flow (`get_profile_status_v1` branches), customer & rider tab maps, order + trip state machines, full screen inventory in 6 batches, push-notification → screen routing. |
 | `screens/…` | Screen blueprints. Each page = live phone mockup + spec annotations + mandatory edge states. |
 | `index.html` | Gallery with live previews of everything. |
@@ -29,7 +29,7 @@ from imagination.
 | 02 Profile Completion gate | `screens/02-profile-completion/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
 | 03 Customer Home — **the Question** («نفس طلب امبارح؟» + سوّرني; catalog demoted) — rebuilt in batch 2 | `screens/03-customer-home/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
 | 04 Vendor page — **«الأخدوه» first** (lunch decision, not a catalogue) | `screens/04-vendor/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
-| 05 The Tray الصينية — **confirmation, not a form** (0 keyboards, 1 CTA) | `screens/05-tray/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
+| 05 طلبك Your Order — **confirmation, not a form** (0 keyboards, 1 CTA) | `screens/05-tray/a-warm-minimal.html` | `…/b-midnight-chrome.html` | `…/c-fresh-editorial.html` |
 
 The three directions share one token contract — picking one means picking a *skin*
 (`.theme-a/.theme-b/.theme-c`), not a rebuild: screens 03–05 are **identical DOM** re-pointed by
