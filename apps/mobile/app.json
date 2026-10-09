@@ -1,15 +1,18 @@
 {
   "expo": {
     "name": "Marketak",
-    "slug": "marketak-mobile",
-    "scheme": "marketak",
+    "slug": "marketak",
     "version": "0.1.0",
+    "scheme": "marketak",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
+    "newArchEnabled": true,
+    "backgroundColor": "#F6F1E7",
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "bundleIdentifier": "com.jaylak.mobile",
-      "supportsTablet": false,
+      "supportsTablet": true,
+      "requireFullScreen": false,
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
         "CFBundleDevelopmentRegion": "ar"
@@ -17,29 +20,35 @@
     },
     "android": {
       "package": "com.jaylak.mobile",
+      "versionCode": 1,
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#123F35"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F6F1E7"
       }
-    },
-    "locales": {
-      "ar": "./assets/ar.json",
-      "en": "./assets/en.json"
     },
     "plugins": [
       "expo-router",
-      "expo-system-ui",
+      "expo-font",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash.png",
-          "imageWidth": 240,
-          "resizeMode": "cover",
-          "backgroundColor": "#F8F5EE"
+          "backgroundColor": "#F6F1E7"
         }
       ],
-      "expo-localization"
-    ]
+      [
+        "expo-localization",
+        {
+          "locales": ["ar", "en"]
+        }
+      ]
+    ],
+    "locales": {
+      "ar": "./assets/locales/ar.json",
+      "en": "./assets/locales/en.json"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

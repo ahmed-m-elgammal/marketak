@@ -218,8 +218,20 @@ function toDeviceRow(value: unknown): DeviceTokenRow | null {
     id: typeof row["id"] === "string" ? row["id"] : "",
     token: row["token"],
     platform,
-    app_role: typeof row["app_role"] === "string" ? row["app_role"] : "",
-    language: typeof row["language"] === "string" ? row["language"] : "en",
+    // `app_role` is a `text` column with a CHECK on customer|rider|admin, but it is
+    // read here as free text, so an unexpected value has to land somewhere honest.
+    // "unknown" rather than a coercion to "customer": guessing a role is how a
+    // notification ends up sent to the wrong party, and the caller filters on this
+    // field to decide who to notify at all.
+    app_role:
+      row["app_role"] === "customer" || row["app_role"] === "rider" || row["app_role"] === "admin"
+        ? row["app_role"]
+        : "unknown",
+    // Normalised, not passed through: `language` is a free-text column with a
+    // default, and the other two parsers in this file normalise the same way. A
+    // device that somehow holds a third value gets English rather than a literal
+    // placeholder the template renderer cannot resolve.
+    language: row["language"] === "ar" ? "ar" : "en",
   };
 }
 

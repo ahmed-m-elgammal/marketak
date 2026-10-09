@@ -1,12 +1,28 @@
 {
-  "extends": "../../tsconfig.json",
+  "//": [
+    "Extends the root base, NOT ../../tsconfig.json. That file is the solution file:",
+    "`files: []` plus `references`. Extending a solution file means this project",
+    "does not inherit `skipLibCheck`, and without it `@cloudflare/workers-types`",
+    "ships a partial DOM lib that collides with TypeScript's own `lib.dom.d.ts`,",
+    "producing hundreds of errors inside TypeScript's own lib files.",
+    "",
+    "`types` is set to only the Workers types, and deliberately NOT `node`: the",
+    "Worker runs in a workerd isolate with no Node globals, so a Node type here is",
+    "a type that compiles and then fails at runtime."
+  ],
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
     "noEmit": false,
     "outDir": "./dist",
     "rootDir": "./src",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"],
   "references": [{ "path": "../../packages/shared" }]
 }

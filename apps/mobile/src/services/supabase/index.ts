@@ -1,1 +1,0 @@
-export { supabase } from "@/services/supabase/client";

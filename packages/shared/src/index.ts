@@ -1,62 +1,204 @@
 /**
- * `@marketak/shared` - the public surface.
+ * `@marketak/shared` - the one place a money value, a status literal, an error
+ * code, an RPC response or an RPC command is defined.
  *
- * ## Import direction, one-way
+ * The mobile app and the outbox Worker both import from here, and nothing else
+ * defines any of them. That is AGENTS.md rule 11: a second money formatter
+ * produces `29.50` on one screen and `٢٩٫٥٠` on another, and the difference is
+ * invisible until a customer complains.
  *
- * ```
- * adapters/      -> HTTP, PostgREST, anything outside the process
- * application/   -> use cases that coordinate the domain
- * domain/        -> facts about the business. No imports upward.
- * tests/         -> imports everything, asserts nothing is exported twice
- * ```
+ * Import from the package root (`@marketak/shared`). A deep path bypasses this
+ * public surface, and a lint rule forbids it.
  *
- * Nothing in `domain/` may import from `application/` or `adapters/`. That is what keeps the money and
- * notification contracts reusable by the mobile app and the admin console, which will not want a
- * Cloudflare dependency.
- *
- * ## What lives where
- *
- * | Path | Holds |
- * |---|---|
- * | `domain/money/format-money.ts` | piastre formatting, currency validation |
- * | `domain/notifications/claim-contract.ts` | what `claim_events_v1` returns, and the Worker-owned strings |
- * | `application/render-notification.ts` | variables + template -> a sendable message |
- * | `adapters/` | reserved for future non-database I/O |
- * | `tests/` | **every test in this package, in one directory** |
- *
- * ## Tests are in `src/tests/`, not beside the source
- *
- * So that "where are the tests for the renderer" is answered by one path rather than a search. Filenames
- * match the module they cover: `tests/format-money.test.ts` covers `domain/money/format-money.ts`.
+ *   import { formatMoney, ORDER_STATUS, type Order } from "@marketak/shared";
  */
 
-export { formatCount, formatMoney, isCurrencyCode, PIASBRES } from "./domain/money/format-money.js";
-export type { CurrencyCode, Piastres } from "./domain/money/format-money.js";
-
 export {
-  formatDateTimeInZone,
-  formatMultiplierBps,
+  PIASTRES_PER_UNIT,
+  FALLBACK_CURRENCY,
+  BPS_DENOMINATOR,
+  PRIMARY_LANGUAGE,
+  toPiastres,
+  fromPiastres,
+  addPiastres,
+  sumPiastres,
+  multiplyByCount,
+  multiplyByRateBps,
+  bpsToPercent,
+  percentToBps,
+  formatMoney,
+  formatMoneyWithCurrency,
+  formatCount,
+  formatRate,
   formatRateBps,
-  formatRelativeInZone,
   formatWhen,
+  formatDate,
+  formatRelativeInZone,
   multiplierFromBps,
-} from "./domain/measure/format-measure.js";
+} from "./money.js";
+export type { Piastres, Language } from "./money.js";
 
 export {
-  isSendable,
-  placeholdersIn,
-  renderTemplate,
-} from "./application/render-notification.js";
+  ORDER_STATUS,
+  SUB_ORDER_STATUS,
+  ASSIGNMENT_STATUS,
+  PAYMENT_STATUS,
+  SETTLEMENT_STATUS,
+  PAYMENT_METHOD,
+  PAYMENT_CHANNEL,
+  COLLECTION_METHOD,
+  DELIVERY_TYPE,
+  DELIVERY_GROUPING,
+  ITEM_STATUS,
+  ACTOR_ROLE,
+  CANCELLATION_ACTOR,
+  RIDER_STATUS,
+  VEHICLE_TYPE,
+  ASSIGNED_BY,
+  USER_ROLE,
+  APP_ROLE,
+  PLATFORM,
+  AUTH_PROVIDER,
+  VERTICAL_TYPE,
+  PRICING_MODE,
+  ADDRESS_LABEL,
+  VENDOR_AVAILABILITY,
+  WALLET_OWNER_TYPE,
+  WALLET_STATUS,
+  LEDGER_ACCOUNT_TYPE,
+  LEDGER_ENTRY_TYPE,
+  PAYOUT_TYPE,
+  PAYOUT_STATUS,
+  PAYOUT_LINE_TYPE,
+  PAYOUT_LINE_SOURCE,
+  COMMISSION_TYPE,
+  COMMISSION_SCOPE,
+  COMMISSION_APPLIES_TO,
+  VOUCHER_DISCOUNT_TYPE,
+  STAFF_ROLE,
+  QUOTE_REJECTION,
+  STATUS_VOCABULARIES,
+} from "./status.js";
 
-export { WORKER_STATIC_VARIABLES } from "./domain/notifications/claim-contract.js";
 export type {
-  ClaimedNotification,
-  DeviceTokenRow,
-  Language,
-  MarkResult,
-  NotificationVariables,
-  Recipient,
-  RenderedNotification,
-  SendOutcome,
+  OrderStatus,
+  SubOrderStatus,
+  AssignmentStatus,
+  PaymentStatus,
+  SettlementStatus,
+  PaymentMethod,
+  PaymentChannel,
+  CollectionMethod,
+  DeliveryType,
+  DeliveryGrouping,
+  ItemStatus,
+  ActorRole,
+  CancellationActor,
+  RiderStatus,
+  VehicleType,
+  AssignedBy,
+  UserRole,
+  AppRole,
+  Platform,
+  AuthProvider,
+  VerticalType,
+  PricingMode,
+  AddressLabel,
+  VendorAvailability,
+  WalletOwnerType,
+  WalletStatus,
+  LedgerAccountType,
+  LedgerEntryType,
+  PayoutType,
+  PayoutStatus,
+  PayoutLineType,
+  PayoutLineSource,
+  CommissionType,
+  CommissionScope,
+  CommissionAppliesTo,
+  VoucherDiscountType,
+  StaffRole,
+  QuoteRejectionCode,
+  StatusVocabularyName,
+} from "./status.js";
+
+export {
+  APP_ERROR_CODES,
+  RETIRED_ERROR_CODES,
+  BEHAVIOUR_CODES,
+  ERROR_MESSAGE_PATTERN,
+  AppError,
+  isAppError,
+  isAppErrorCode,
+  kindOfErrorCode,
+  parseServerMessage,
+  parseAppError,
+} from "./errors.js";
+export type { AppErrorCode, AppErrorKind, ParsedError } from "./errors.js";
+
+export type {
+  SelectedOption,
+  Uuid,
+  ProfileStatus,
+  Address,
+  CartItem,
+  UpsertCartItemResult,
+  RemoveCartItemResult,
+  QuoteTotals,
+  QuoteFeeBreakdown,
+  QuoteVendorSplit,
+  QuoteLimits,
+  QuoteRejection,
+  QuoteResult,
+  PlaceOrderResult,
+  Order,
+  OrderStatusHistoryEntry,
+  OrderItem,
+  CancelOrderResult,
+  RiderProfile,
+  AvailableOrder,
+  ClaimOrderResult,
+  BeginCollectionResult,
+  CollectCashResult,
+  CompleteDeliveryResult,
+  VendorFeedItem,
+  VendorFeed,
+  CatalogSearchHit,
+  DeviceToken,
+} from "./dto.js";
+
+export type {
+  CompleteProfileArgs,
+  UpdateProfilePatch,
+  AddressPatch,
+  UpsertAddressArgs,
+  SetDefaultAddressArgs,
+  DeleteAddressArgs,
+  UpsertCartItemArgs,
+  RemoveCartItemArgs,
+  QuoteOrderArgs,
+  PlaceOrderArgs,
+  CancelOrderArgs,
+  VendorFeedArgs,
+  SearchCatalogArgs,
+  AvailableOrdersArgs,
+  ClaimOrderArgs,
+  TransitionOrderArgs,
+  BeginCollectionArgs,
+  CollectCashArgs,
+  CollectWalletArgs,
+  CompleteDeliveryArgs,
+  EffectiveCashLimitArgs,
+  RegisterDeviceTokenArgs,
+  DateWindowArgs,
+} from "./commands.js";
+
+export { renderTemplate, isSendable } from "./worker.js";
+export type {
   TemplateRow,
-} from "./domain/notifications/claim-contract.js";
+  RenderedNotification,
+  ClaimedNotification,
+  MarkResult,
+  SendOutcome,
+  DeviceTokenRow,
+} from "./worker.js";

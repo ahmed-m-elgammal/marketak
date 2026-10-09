@@ -1,0 +1,28 @@
+{
+  "//": [
+    "The single compiler contract for every workspace. Nothing here is app-specific; a workspace tsconfig extends this and overrides only what it must.",
+    "",
+    "Two settings carry the weight:",
+    "  exactOptionalPropertyTypes - `{ a?: string }` cannot be assigned `undefined` explicitly.",
+    "    The RPC wrappers distinguish 'not sent' from 'sent as null', and Postgres treats the two",
+    "    differently, so the distinction has to survive the type system rather than being flattened away.",
+    "  noUncheckedIndexedAccess - indexing an array yields `T | undefined`. Money comes back in arrays",
+    "    from every RPC, and a silent `undefined` in a total is a wrong receipt."
+  ],
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true
+  }
+}

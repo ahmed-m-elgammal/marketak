@@ -1,38 +1,9 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": ["@cloudflare/workers-types", "node"],
-
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "useUnknownInCatchVariables": true,
-    "verbatimModuleSyntax": true,
-
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "composite": true,
-    "noEmit": true
-  },  "include": ["scripts/**/*.ts"],
+  "//": "Root solution file. It owns no source of its own; it exists so `tsc --build` walks every workspace project reference in dependency order. Adding a workspace means adding a reference here, NOT adding its source to this file.",
+  "files": [],
   "references": [
-    { "path": "packages/shared" },
-    { "path": "packages/ui" },
-    { "path": "functions/outbox-dispatcher" }
-  ],
-  "exclude": ["**/node_modules", "**/dist", "**/.wrangler"]
+    { "path": "./packages/shared" },
+    { "path": "./apps/mobile" },
+    { "path": "./functions/outbox-dispatcher" }
+  ]
 }

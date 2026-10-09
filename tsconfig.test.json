@@ -1,0 +1,42 @@
+{
+  "//": [
+    "The project every test file resolves against for linting.",
+    "",
+    "Test files are excluded from each package's build tsconfig so `tsc -b` never",
+    "emits them into `dist` - a test in a published bundle is dead weight, and for the",
+    "Cloudflare Worker it would be dead weight that gets deployed. The cost of that",
+    "exclusion is that the project service cannot find them, so ESLint routes them to",
+    "a default project, and a default project pointing at the root solution file",
+    "resolves against NO libs at all: `Request`, `Response` and `fetch` become",
+    "unresolved types and every call reports 'could not be resolved'.",
+    "",
+    "So there is one file that includes them all. It is wide on purpose - it holds no",
+    "source, only test files, and its libs are the union of what the three runtimes",
+    "need (Node for scripts, workerd for the Worker, DOM for the app)."
+  ],
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node", "@cloudflare/workers-types", "vitest/globals"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@marketak/shared": ["../packages/shared/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.test.ts",
+    "packages/*/src/**/*.test.tsx",
+    "apps/*/src/**/*.test.ts",
+    "apps/*/src/**/*.test.tsx",
+    "apps/*/app/**/*.test.tsx",
+    "functions/*/src/tests/**/*.test.ts",
+    "functions/*/src/**/*.test.ts"
+  ]
+}

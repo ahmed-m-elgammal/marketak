@@ -1,193 +1,140 @@
-/**
- * Boundary enforcement for apps/mobile.
- *
- * The rules below are the architecture in apps/mobile/README.md, made executable.
- * A violation is a build failure, not a review comment — that is what keeps the
- * feature slices from collapsing back into god files.
- *
- * Run: npx depcruise src app --config .dependency-cruiser.cjs
- */
-
-/* ── path patterns ─────────────────────────────────────────────────────────
- *
- * These are plain regex strings rather than predicate functions. dependency-cruiser's config is
- * cloned before rules are evaluated, and a closure cannot be cloned, so a `path: (p) => ...`
- * fails with "could not be cloned".
- *
- * The consequence is that "feature A may reach into feature A, but never into feature B" cannot be
- * written as one rule, because regex has no backreference here. It is instead enforced by rules 2
- * and 3 together: rule 2 fails any import that lands on a feature-internal path from inside a
- * feature unless the importer is that same feature, and rule 3 fails the same import from outside
- * the features entirely. A self-import passes both; a cross-slice import fails both.
- */
-
-/** Anywhere inside src/features/. */
-const FEATURE_PATH = '^src\\/features\\/';
-
-/** Inside a feature but NOT its index.ts, which is the slice's public surface. */
-const FEATURE_INTERNAL_PATH = '^src\\/features\\/[^/]+\\/(?!index\\.ts$).*';
-
-/** A feature barrel: the only thing importable from outside the slice. */
-const PUBLIC_SURFACE_PATH = '^src\\/features\\/[^/]+\\/index\\.ts$';
+/// <reference types="node" />
 
 /**
- * A route file or a colocated test.
+ * `.dependency-cruiser.cjs` - architecture rules 2 and 3, mechanically.
  *
- * The `.*` after `app\/` is load-bearing: without it the `$` anchor makes the alternative match
- * only the literal string "app/", so no route file was ever exempt and every route-to-screen
- * re-export reported as a violation.
- */
-const ROUTE_OR_TEST_PATH = '^(app\\/.*|.*\\/(screens|widgets|__tests__)\\/.*)$';
-
-/**
- * A feature screen. Public by address: naming a screen is what a route file is for, and routing it
- * through the barrel instead would close a cycle between the barrel and the thing it re-exports.
- */
-const SCREEN_PATH = '^src\\/features\\/[^/]+\\/screens\\/';
-
-const fs = require('node:fs');
-const path = require('node:path');
-
-/**
- * One cross-slice rule per feature slice.
+ * Architecture rule 2: customer and rider code never import each other. Code used
+ * by both lives in a shared zone that imports from neither.
  *
- * This is how "feature A may reach into feature A but never into feature B" is enforced without
- * a regex backreference, which dependency-cruiser does not support. The slice list is read from
- * disk so a newly created slice is covered by the next run with no edit here. Each rule is plain
- * regex strings, never a closure, because the whole config must survive structured cloning.
+ * Architecture rule 3: exactly one module calls Supabase. No screen or component
+ * calls `supabase.rpc` directly.
+ *
+ * Both are import statements, so both are lintable. `eslint.config.js` covers
+ * them with `no-restricted-imports` on the happy path; this file covers them on
+ * the path ESLint does not reach - a re-export that launders a forbidden import
+ * through an `index.ts`, which is exactly the trick a feature-folder boundary is
+ * supposed to prevent.
+ *
+ * Run: `npm run deps:check` from `apps/mobile`.
+ *
+ * This file is a Node module that belongs to no tsconfig, which is why it is in
+ * the `disableTypeChecked` block of the root eslint config.
  */
-function crossSliceRules() {
-  const featuresDir = path.join(__dirname, 'src', 'features');
-  if (!fs.existsSync(featuresDir)) return [];
 
-  return fs
-    .readdirSync(featuresDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({
-      name: `no-cross-slice-${entry.name}`,
-      severity: 'error',
-      comment:
-        `"${entry.name}" must not reach into another feature's internals. Import that feature's ` +
-        'barrel ("@/features/<name>") instead, or move the shared part to src/.',
-      from: { path: `^src\\/features\\/${entry.name}\\/` },
-      to: { path: `^src\\/features\\/(?!${entry.name}\\/)[^/]+\\/(?!index\\.ts$).*` },
-    }));
-}
+const path = require("node:path");
 
-/** @type {import('dependency-cruiser').IConfiguration} */
+/** The two role zones. */
+const CUSTOMER = path.join("src", "features", "customer");
+const RIDER = path.join("src", "features", "rider");
+const SHARED = path.join("src", "features", "shared");
+
+/** The one data layer. */
+const RPC = path.join("src", "services", "rpc");
+const SUPABASE = path.join("src", "services", "supabase");
+
 module.exports = {
   forbidden: [
-    /* ── 1. no circular dependencies anywhere ─────────────────────── */
+    /* ── rule 2: role zones never cross ─────────────────────────────────── */
     {
-      name: 'no-circular',
-      severity: 'error',
-      comment: 'A cycle means a slice has no owner. Break it with a barrel or a shared module.',
+      name: "no-customer-to-rider",
+      comment:
+        "Customer code may not import rider code. Shared code lives in features/shared and imports from neither zone.",
+      severity: "error",
+      from: { path: CUSTOMER },
+      to: { path: RIDER, reachable: true },
+    },
+    {
+      name: "no-rider-to-customer",
+      comment:
+        "Rider code may not import customer code. Shared code lives in features/shared and imports from neither zone.",
+      severity: "error",
+      from: { path: RIDER },
+      to: { path: CUSTOMER, reachable: true },
+    },
+    {
+      name: "shared-imports-neither-zone",
+      comment:
+        "The shared feature zone must import from neither role zone. If both roles need it, it is shared; if one does, it belongs to that role.",
+      severity: "error",
+      from: { path: SHARED },
+      to: { path: [CUSTOMER, RIDER], reachable: true },
+    },
+
+    /* ── rule 3: one data layer ─────────────────────────────────────────── */
+    {
+      name: "no-supabase-outside-the-client",
+      comment:
+        "The Supabase client is created once, in services/supabase/client.ts. Nothing else may import it.",
+      severity: "error",
+      from: {
+        path: "^src",
+        pathNot: [SUPABASE, RPC],
+      },
+      to: { path: SUPABASE, reachable: true },
+    },
+    {
+      name: "no-rpc-call-outside-the-wrapper",
+      comment:
+        "`supabase.rpc` is called only in services/rpc/call.ts. A feature calls the typed wrapper in services/rpc/api.ts.",
+      severity: "error",
+      from: {
+        path: "^src",
+        pathNot: [RPC, SUPABASE],
+      },
+      to: { path: RPC, reachable: true },
+    },
+
+    /* ── rule 11: no second implementation of a shared concern ──────────── */
+    {
+      name: "no-second-money-module",
+      comment:
+        "Money formatting lives in @marketak/shared. A lib/money.ts in the app is how one screen shows 29.50 and another shows ٢٩٫٥٠.",
+      severity: "error",
       from: {},
-      to: { circular: true },
+      to: { path: "^(src|app)/(lib|utils)/(money|currency|price)" },
     },
-
-    /* ── 2. one rule per feature slice, generated by crossSliceRules() above ── */
-    ...crossSliceRules(),
-
-    /* ── 3. only a route file may reach into a feature's internals ──
-     *
-     * `screens/` is the exception. A route's whole job is to name a screen, so
-     * `app/(auth)/welcome.tsx` importing `@/features/auth/screens/WelcomeScreen` is the intended
-     * shape, not a violation. Routing a screen through the barrel instead would make the barrel
-     * depend on the screen it re-exports, which is a cycle.
-     */
     {
-      name: 'no-deep-feature-import-from-outside',
-      severity: 'error',
+      name: "no-second-error-parser",
       comment:
-        'Import from the feature barrel: "@/features/<name>". Deep paths are private. The one ' +
-        'exception is a route naming a screen, which is its entire job.',
+        "One error parser, in services/errors. A second one is how the same failure is retried in one flow and shown in another.",
+      severity: "error",
       from: {
-        pathNot: [
-          FEATURE_PATH,
-          FEATURE_INTERNAL_PATH,
-          PUBLIC_SURFACE_PATH,
-          ROUTE_OR_TEST_PATH,
-          SCREEN_PATH,
-        ],
+        path: "^src",
+        pathNot: [path.join("src", "services", "errors")],
       },
-      to: { path: FEATURE_INTERNAL_PATH },
+      to: { path: "^(src|app)/.*(app-error|parse-error|errors/index)" },
     },
 
-    /* ── 4. lib/ is pure ──────────────────────────────────────────── */
+    /* ── rule 1: no orphan modules ──────────────────────────────────────── */
     {
-      name: 'lib-is-pure',
-      severity: 'error',
+      name: "no-orphans",
       comment:
-        'src/lib/ must stay free of react and react-native so geo, bidi and schedule maths ' +
-        'stay unit-testable without a renderer. Money and formatting live in @marketak/shared, ' +
-        'so they are never duplicated here.',
-      from: { path: '^src/lib/' },
-      to: { path: '^(react|react-native|expo-[a-z0-9-]+)(/|$)' },
-    },
-
-    /* ── 5. theme is a leaf ───────────────────────────────────────── */
-    {
-      name: 'theme-is-a-leaf',
-      severity: 'error',
-      comment: 'src/theme/ is a leaf. Anything it imports is a dependency of everything.',
-      from: { path: '^src/theme/' },
-      to: { path: '^src/' },
-    },
-
-    /* ── 6. services is the only network boundary ─────────────────── */
-    {
-      name: 'no-supabase-outside-network',
-      severity: 'error',
-      comment:
-        'No feature or component touches supabase, R2 or a device API directly. core/network/ ' +
-        'is the only place that may, which is what guarantees one auth subscription.',
-      from: { pathNot: ['^src/services/', '^src/core/network/'] },
-      to: {
-        path:
-          '^(@supabase/supabase-js|expo-file-system|expo-notifications|expo-location|expo-camera)' +
-          '(/|$)',
-      },
-    },
-
-    /* ── 7. shared layers never reach back into features ──────────── */
-    {
-      name: 'shared-never-imports-features',
-      severity: 'error',
-      comment: 'components/, lib/, theme/ and stores/ are shared. Depending on a feature inverts the graph.',
-      from: { path: '^src/(components|lib|stores|theme)/' },
-      to: { path: '^src/features/' },
-    },
-
-    /* ── 8. no orphan files ───────────────────────────────────────── */
-    {
-      name: 'no-orphans',
-      severity: 'warn',
-      comment: 'An orphan is dead code by definition (repo rule 10). Delete it or wire it in.',
-      from: {
-        orphan: true,
-        pathNot: [
-          '\\.d\\.ts$',
-          // A planned slot holds a .gitkeep until the file that needs it is written. It is a
-          // placeholder, not code, so it must not be reported as an unused module.
-          '\\.gitkeep$',
-          '(^|/)index\\.(ts|tsx)$',
-          '\\.config\\.(js|cjs|mjs|ts)$',
-        ],
-      },
+        "Nothing in src/ is unreachable. A folder with no importer is a placeholder slot, and a placeholder slot misleads the next reader. `.gitkeep` is exempt because a scheduled slot is allowed to exist empty.",
+      severity: "error",
+      from: { orphan: true, pathNot: ["\\.gitkeep$", "\\.d\\.ts$", "^(app)/"] },
       to: {},
+    },
+
+    /* ── rule 5: server data never enters a local store ─────────────────── */
+    {
+      name: "no-server-tables-in-a-store",
+      comment:
+        "The server owns carts, orders, addresses and menus. A zustand/redux store holding them is a second source of truth that drifts. Local state holds UI concerns only.",
+      severity: "warn",
+      from: {},
+      to: { path: "^(src/state|src/store)" },
     },
   ],
 
   options: {
-    doNotFollow: { path: 'node_modules' },
-    includeOnly: '^(app|src)',
+    doNotFollow: { path: "node_modules" },
+    includeOnly: ["^(src|app)"],
+    tsConfig: { fileName: "tsconfig.json" },
     tsPreCompilationDeps: true,
-    tsConfig: { fileName: 'tsconfig.json' },
     enhancedResolveOptions: {
-      exportsFields: ['exports'],
-      conditionNames: ['import', 'require', 'default', 'react-native'],
-      extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+      exports: true,
+      conditionNames: ["import", "require", "default", "react-native"],
+      extensions: [".ts", ".tsx", ".js", ".jsx", ".json", ".svg"],
     },
     reporterOptions: {
       text: { highlightFocused: true },

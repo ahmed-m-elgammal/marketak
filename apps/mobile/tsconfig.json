@@ -1,34 +1,21 @@
 {
-  "extends": "expo/tsconfig.base",
+  "//": "The mobile app is its own TS project. It extends the root base so `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are identical everywhere - a setting that differs per workspace is how one package starts sending `undefined` where another does not.",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "useUnknownInCatchVariables": true,
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
+    "composite": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "types": ["react", "react-native"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@marketak/shared": ["../../packages/shared/src/index.ts"]
     }
   },
-  "include": [
-    "app/**/*.ts",
-    "app/**/*.tsx",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "*.ts",
-    "*.d.ts"
-  ],
+  "include": ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx", "expo-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".expo"],
   "references": [{ "path": "../../packages/shared" }]
 }
