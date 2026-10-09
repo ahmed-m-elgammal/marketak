@@ -35,6 +35,15 @@ export default tseslint.config(
       "vitest.config.ts",
       "scripts/**/*.mjs",
       "**/*.config.js",
+      // `**/*.cjs` is not `**/*.config.js`. `apps/mobile/.dependency-cruiser.cjs` is a Node
+      // module that belongs to no tsconfig, so the typed preset above cannot parse it — it
+      // fails with "getParserServices ... was not found by the project service". It carries a
+      // JSDoc `@type` annotation, which is what makes the TS parser pick it up in the first
+      // place; without it ESLint would treat it as plain JS and skip the project service.
+      "**/*.cjs",
+      // Declaration files. `apps/mobile/types.d.ts` belongs to no tsconfig's source, so the typed
+      // preset cannot attach parser services to it - same failure mode as the config files above.
+      "**/*.d.ts",
       "apps/*/vite.config.ts",
     ],
     extends: [tseslint.configs.disableTypeChecked],
@@ -50,14 +59,39 @@ export default tseslint.config(
         process: "readonly",
         atob: "readonly",
         btoa: "readonly",
+        // CommonJS module scope. `**/*.cjs` above pulls in `.cjs` files, which are CommonJS by
+        // definition and cannot use `export` — so `module`, `require` and `__dirname` are real
+        // bindings there, not undeclared globals. `eslint.config.js` does not need them (it is
+        // ESM, `export default`), which is why declaring them here is harmless to it.
+        module: "writable",
+        require: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        exports: "writable",
       },
+    },
+    rules: {
+      // `metro.config.js` and `babel.config.js` are Node CJS by convention — Expo generates and
+      // reads them as `require()` modules. The rule is right for source and wrong here; turning
+      // it off only in this block keeps it on everywhere it matters.
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
 
   {
     // The rules that matter, scoped to source. Scoping matters: without `files`, these would apply to
     // `eslint.config.js` too, and the type-aware ones would re-attach the parser this block exists to avoid.
-    files: ["packages/*/src/**/*.ts", "functions/*/src/**/*.ts", "apps/*/src/**/*.ts", "apps/*/src/**/*.tsx"],
+    files: [
+      "packages/*/src/**/*.ts",
+      "functions/*/src/**/*.ts",
+      // Expo Router routes live in `app/`, NOT `src/` - the app's own code is in `src/`. Both are
+      // source, so both need the type-aware preset. Omitting `apps/*/app/**` is what produced
+      // "don't have parserOptions set to generate type information for this file" on `app/index.tsx`.
+      "apps/*/src/**/*.ts",
+      "apps/*/src/**/*.tsx",
+      "apps/*/app/**/*.ts",
+      "apps/*/app/**/*.tsx",
+    ],
     languageOptions: {
       // The project service is switched ON here and only here. The typed preset above turns the type-aware
       // rules on for every file, so source needs this to give those rules the type information they call

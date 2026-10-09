@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Marketak",
+    "slug": "marketak-mobile",
+    "scheme": "marketak",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.jaylak.mobile",
+      "supportsTablet": false,
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleDevelopmentRegion": "ar"
+      }
+    },
+    "android": {
+      "package": "com.jaylak.mobile",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#123F35"
+      }
+    },
+    "locales": {
+      "ar": "./assets/ar.json",
+      "en": "./assets/en.json"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-system-ui",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 240,
+          "resizeMode": "cover",
+          "backgroundColor": "#F8F5EE"
+        }
+      ]
+    ]
+  }
+}

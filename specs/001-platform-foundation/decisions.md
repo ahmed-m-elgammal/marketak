@@ -634,6 +634,69 @@ webhook, no external push service.
   a failing probe rolls the fix back with it. Both rules exist because the alternative was discovered
   expensively, and `CHANGELOG.md` records all four failures rather than just the fixes.
 
+## 25. Styling is Uniwind + PanelUI, reversing open question 3.9
+
+**Status:** proposed. Requires human acceptance — it reverses a recorded answer, which is the one kind
+of amendment this document does not let an agent make quietly.
+
+**Context.** Open question 3.9 had already been answered in the spec: *plain `StyleSheet` against a
+`src/theme/` token module*, on two grounds — **one fewer dependency**, and **no Babel step** — with the
+note that a token module satisfies constitution rule 2 ("zero inline styling") on its own. The answer
+was sound when written. Two things changed it.
+
+First, **Arabic is the default, not a locale.** `settings.platform_name_ar` carries the description
+"the default everywhere, because Arabic is the primary market language". That makes RTL the base
+layout and LTR the exception — which is the opposite of what a library treats as an edge case. Of the
+free React Native libraries surveyed, **PanelUI is the only one with first-class RTL**: a `Direction`
+component that scopes reading direction to a subtree, plus `useDirection` and `useDirectionSign` for
+gesture maths. Every other candidate leaves the developer to build it and to test it.
+
+Second, **3.9's stated objection no longer applies.** The objection to NativeWind was its Babel step.
+Uniwind is Tailwind v4 for React Native through a **Metro plugin only, no Babel preset** — so the
+reason the spec gave for not adopting a Tailwind engine is met by the engine that was chosen instead.
+What remains is the dependency count, which is a cost, not a veto.
+
+Two further findings from the screen-and-component audit made this a decision rather than a preference.
+`complete_delivery_v1(p_order_id, p_proof_path, p_lat, p_lng)` requires an **uploaded proof object and
+GPS at the door**, and `delivery_assignments` also carries `signature_path` — a capture surface the
+inventory had no component for. PanelUI ships `Signature`. And `collect_cash_v1` is the one RPC where a
+mistapped confirm becomes a financial discrepancy; PanelUI ships `SlideButton`, a drag-to-confirm
+control. Both were going to be built by hand.
+
+**Decision.** Adopt **Uniwind** as the styling engine and **PanelUI** (`panelui-native`, MIT) as the
+component base. `src/theme/` becomes `global.css` with Tailwind v4 `@theme{}` tokens. `src/components/ui/`
+becomes a **wrapper layer** — the 34 Tier-0 primitives named in `APP-SCREENS-AND-COMPONENTS.md` §6.1 stay
+as the app's naming contract, but each becomes a thin file that composes PanelUI with Marketak's tokens
+rather than an implementation built from scratch.
+
+**Consequences.**
+
+- **Open question 3.9 is reversed**, not deleted. It keeps its original text with a pointer here, so the
+  reasoning that produced it stays readable.
+- **Rule 2 is satisfied differently, not satisfied less.** "All values come from the token module" now
+  means `@theme{}` in one CSS file instead of a TypeScript module. The benefit is a single source of
+  truth that Uniwind compiles to native styles, and that its `panelwind` ESLint plugin can audit — it
+  catches classes that compile and then do nothing on a device, which a TS token module cannot.
+- **`APP-SCREENS-AND-COMPONENTS.md` §6.1 is unchanged in content.** The 34 primitives and their names
+  are still the contract. Only their implementation changes, from authored to composed.
+- **The dependency count goes up, and that is the real cost.** `uniwind` + `panelui-native` plus nine
+  peers (`reanimated`, `worklets`, `gesture-handler`, `safe-area-context`, `svg`, `masked-view`,
+  `linear-gradient`, `tailwindcss`). 3.9's "one fewer dependency" is spent. Accepted because the
+  alternative is building ~34 primitives, RTL, a signature capture and a drag-confirm control by hand.
+- **Exit cost is low by design.** PanelUI distributes through a CLI that copies component *source* into
+  the project, so the dependency can be vendored and dropped without a rewrite. This is the hedge
+  against its youth: 401 stars, first commit 2026-07. It is not the maturity of `react-native-paper`.
+- **Expo SDK 57+ / React Native 0.86 is now a floor.** Non-blocking today — `tasks.md` T0.1 confirms no
+  application code exists — but it is pinned from here.
+- **Metro does not tree-shake the package root.** Importing one name from `panelui-native` evaluates all
+  138 components before the first screen paints, which on a memory-pressured Android device is enough
+  for the OS to kill the process. Every import must use the subpath form
+  (`panelui-native/components/button`), and that is a lint rule, not a convention.
+- **What this does not change:** the fee formula, the money invariants, the order state machine, the
+  `md5(selected_options)` cart-line identity, or any of the database contracts. This ADR is about how a
+  screen is drawn, not what the system is.
+
+
 ## 24. `eta` comes from the rider assignment, not from a quote-time promise
 
 **Status:** proposed.

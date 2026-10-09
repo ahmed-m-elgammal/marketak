@@ -1,0 +1,180 @@
+/*
+ * src/global.css - the token module. Tailwind CSS v4 + Uniwind.
+ *
+ * This file is what satisfies constitution rule 2 ("zero inline styling, all values come from the
+ * token module") AND the six design rules in src/theme/design-rules.md, set by the product owner.
+ * The rules are enforced here wherever they can be, so a violation shows up at build time rather
+ * than in review.
+ *
+ * Tokens are transcribed from `imgs/design.md` §2 (palette), §3 (type), §4 (spacing, radius) and
+ * from design-rules.md. If a value needs to change, design.md and design-rules.md change first and
+ * this file follows.
+ *
+ * Deliberate naming: Marketak tokens use their own names (brand, cream, ink, line) rather than
+ * overwriting PanelUI's (primary, background, foreground). PanelUI's semantic tokens are
+ * runtime-swappable and a `@theme` redefinition is replaced by the active theme's own value at
+ * runtime, so redefining them here would work in dev and silently stop working the moment a theme
+ * switches. Mapping PanelUI's palette onto Marketak's is Tier-0 wrapper work (APP-SCREENS-AND-
+ * COMPONENTS.md §6.1), not scaffold work.
+ */
+
+@import "tailwindcss";
+@import "uniwind";
+@import "panelui-native/theme.css";
+
+/* PanelUI's own class names live in the package. Without this line its classes resolve and its
+   components come out unstyled. The path is relative to THIS file, not to the project root. */
+@source "../node_modules/panelui-native/src";
+
+@theme {
+  /* =================================================================
+   * DESIGN RULE 2 - BORDERS, NOT SHADOWS.
+   *
+   * Every shadow utility is dead. `shadow`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl` and
+   * `shadow-2xl` all resolve to nothing, so depth can only come from `border` + `bg-surface`, never
+   * from elevation. This is deliberate and it is the enforced form of design-rules.md §2: a shadow
+   * that is too strong looks artificial and one that is too soft loses impact, so neither is
+   * available. A real elevation need - a toast above a scrim, a FAB over content - uses
+   * `--color-scrim` and a border, and comments why.
+   * ================================================================= */
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
+  --shadow-inner: none;
+
+  /* =================================================================
+   * DESIGN RULE 5 - TWO FONT FAMILIES, NO OTHERS.
+   *
+   * `font-sans` for Latin and numerals, `font-arabic` for Arabic. Two is the ceiling and the only
+   * justification is that Arabic and Latin need different metrics (design.md §3); if one family
+   * covers both, delete `font-arabic`. Weights are limited below - a heading does not get its own
+   * weight just because it is a heading.
+   * ================================================================= */
+  --font-sans: "Inter";
+  --font-arabic: "Cairo";
+
+  /* =================================================================
+   * DESIGN RULE 3 - PALETTE 60 / 30 / 10.
+   * ================================================================= */
+
+  /* 60% - canvas. The surface everything sits on. */
+  --color-cream: #f8f5ee;
+
+  /* 30% - content. Cards, sheets, inputs, and the ink on them. */
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f4f2ec;
+  --color-ink: #17211e;
+  --color-ink-secondary: #66716c;
+  --color-ink-tertiary: #89928d;
+  --color-line: #e2e5e0;
+  --color-line-strong: #b8c2bb;
+
+  /* 10% - action. The one saturated colour on screen, so a CTA is the only thing that pops. */
+  --color-brand: #123f35;
+  --color-brand-pressed: #0d3029;
+  --color-brand-soft: #e5eee9;
+
+  /* Status - the ONLY exemption from the 10%. These communicate meaning, never decoration.
+     A red error string is information, not brand. */
+  --color-success: #24734e;
+  --color-warning: #946116;
+  --color-danger: #b42318;
+  --color-info: #245c87;
+
+  /* Modal and sheet backdrop. 48% ink, per design.md. */
+  --color-scrim: #17211e80;
+
+  /* =================================================================
+   * DESIGN RULE 1 - SPACING ON A 4-POINT GRID.
+   *
+   * The complete set. There is no 5, 7, 9, 11, 14, so there is no rung to reach for that has not
+   * been chosen deliberately. Which rung to use is design-rules.md §1 - related controls sit at 2-3,
+   * card padding at 4-5, list gaps at 4-6, section gaps at 8-10.
+   * ================================================================= */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* =================================================================
+   * RADIUS - design.md §4. Radius expresses hierarchy, so not every
+   * container rounds the same way: chips 8, inputs and small cards 12,
+   * product cards 16, sheets and panels 24.
+   * ================================================================= */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* =================================================================
+   * DESIGN RULE 5 - TYPE SCALE AND LIMITED WEIGHTS.
+   *
+   * Eight sizes, complete. Weights are limited to regular / medium / semibold / bold, and
+   * `--text-*--weight` pins them so a heading cannot quietly become bold-700 when a semibold-600
+   * was the decision. Prices are bold and display-sized because they are scanned, not read.
+   * ================================================================= */
+  --text-display: 32px;
+  --text-display--line-height: 40px;
+  --text-display--weight: 700;
+
+  --text-h1: 28px;
+  --text-h1--line-height: 34px;
+  --text-h1--weight: 600;
+
+  --text-h2: 22px;
+  --text-h2--line-height: 28px;
+  --text-h2--weight: 600;
+
+  --text-h3: 18px;
+  --text-h3--line-height: 24px;
+  --text-h3--weight: 600;
+
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-body--weight: 400;
+
+  --text-body-medium: 16px;
+  --text-body-medium--line-height: 24px;
+  --text-body-medium--weight: 500;
+
+  --text-body-small: 14px;
+  --text-body-small--line-height: 20px;
+  --text-body-small--weight: 400;
+
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-label--weight: 500;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--weight: 400;
+
+  --text-button: 16px;
+  --text-button--line-height: 22px;
+  --text-button--weight: 600;
+
+  --text-price: 18px;
+  --text-price--line-height: 24px;
+  --text-price--weight: 700;
+
+  --text-price-small: 14px;
+  --text-price-small--line-height: 20px;
+  --text-price-small--weight: 600;
+}
+
+/* DESIGN RULE 4 - NO DECORATIVE BACKGROUND SHAPES.
+ *
+ * Not a token, because it is the absence of tokens. There is no gradient, no blob, no dot-grid and
+ * no shape utility in this file, so there is nothing for a screen to reach for. A shape belongs in
+ * the UI only when it IS the content - a map, a chart, a product photograph. Everything else is
+ * visual noise and design-rules.md §4 says so. */

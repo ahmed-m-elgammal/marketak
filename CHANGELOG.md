@@ -6,6 +6,158 @@ is no released version, and the schema is still pre-review.
 
 ## [Unreleased]
 
+### Added - migration 028 indexes the last three unindexed foreign keys
+
+`data-model.md` §14.2 states all foreign keys are indexed, and `AGENTS.md` repeated it. Neither was true: `scripts/check-policies.mjs` found three FKs with no index on the referencing column, by running the §14.2 query against the live project rather than by trusting the document.
+
+| Table.column | References | On delete |
+|---|---|---|
+| `carts.quote_address_id` | `addresses` | SET NULL |
+| `cart_items.selected_size_id` | `menu_item_sizes` | SET NULL |
+| `order_items.selected_size_id` | `menu_item_sizes` | SET NULL |
+
+**Why it is a delete-cascade problem, not a read problem.** A first draft of this entry led with "every join through the FK is a sequential scan", and that half is wrong for this schema. `order_items` is a frozen snapshot — item_name, unit_price, the options and the size are all copied at placement — so rendering a receipt does not join back to `menu_item_sizes`. The repeat-order flow does, but it reads one order by an indexed `order_id` in a small row set.
+
+The real cost is `ON DELETE SET NULL`: deleting a parent row requires finding every child row that points at it before it can null them, and without an index that is a full scan of the child. A restaurant deleting a size it no longer sells triggers a scan of `order_items` — the one table this schema never prunes, because an order is not deletable — so the cost grows with total orders ever placed. The cascade also row-locks every child it nulls for the duration of the transaction, which is the mechanism by which this is a blocking problem and not only a slow one.
+
+**Plain `CREATE INDEX`, not `CONCURRENTLY`, and that needs reading.** `CONCURRENTLY` cannot run inside a transaction block and migration application wraps DDL in one. Plain `CREATE INDEX` takes an ACCESS EXCLUSIVE lock for the build — safe here only because these tables hold 1–2 rows, so it is held for milliseconds. **If this migration is ever replayed against a populated database it must be CONCURRENTLY and run outside the migration wrapper**, or it blocks writes on `order_items` for the build duration, which is the stall it exists to prevent. Recorded in the file so nobody replays it blind.
+
+**Verified, not assumed.** A before/after comparison against the live project:
+
+| Check | Before | After |
+|---|---|---|
+| FK definitions (name, target, delete rule, columns) | baseline | **identical** |
+| Row counts (carts / cart_items / order_items) | 1 / 2 / 2 | **1 / 2 / 2** |
+| Unindexed FKs in `public` | 3 | **0** |
+| Orphaned references in the three columns | 0 | 0 |
+| `ON DELETE SET NULL` still fires | — | **passes** |
+| FK still rejects an invalid parent | — | **passes** |
+
+The cascade and rejection tests ran inside a rolled-back transaction with a purpose-built address so nothing else referenced it, and the rollback was re-verified afterwards — row counts and null counts returned to baseline exactly.
+
+**On performance, stated honestly: the indexes are correct and the planner is ignoring them.** With two rows in `order_items`, a sequential scan is genuinely cheaper than an index scan, so the plan for `where selected_size_id = $1` is still a Seq Scan and that is the right choice. Only `carts` flipped to an Index Scan. Forcing `enable_seqscan = off` confirms the index is functional and usable — `Index Scan using order_items_selected_size_id, cost=0.13..2.35` — so the plan will flip when the table grows. **Any claim that this migration made anything faster today would be false**: it changes nothing measurable at this size, and what it buys is the shape of the plan at launch volume.
+
+### Fixed - `tsc --build` never emitted `packages/shared/dist`, so the worker could not resolve its contract types
+
+The root tsconfig had **no `references`**. It declared `composite: true` and `noEmit: true`, and its
+`include` pointed straight at `packages/*/src`, `functions/*/src` and `scripts/**` — so the root
+project typechecked every workspace's sources *as one flat project* and, because of `noEmit`, emitted
+nothing. Meanwhile `functions/outbox-dispatcher` declared a project reference to
+`../../packages/shared`, which resolves against `packages/shared/dist/index.d.ts`. Nothing ever built
+`packages/shared` as its own project, so that file never existed, so the reference could not resolve,
+so `SendOutcome` arrived erased.
+
+The result was **`TS6305` ×4 plus 11 cascading `TS2353`/`TS2339` errors** — every one of them a
+"property does not exist on `GroupOutcome`" complaint about `event_ids`, `ok` and `error`, all three
+of which `SendOutcome` declares correctly at
+`packages/shared/src/domain/notifications/claim-contract.ts:151`. Those 11 errors were never real
+defects in `drain-once.ts`; they were the same bug reported eleven times. An earlier draft of this
+entry called them two independent defects and was wrong.
+
+**The fix is one `references` array**, and the root's `include` narrows to `scripts/**` so no source
+file belongs to two projects at once:
+
+```json
+"include": ["scripts/**/*.ts"],
+"references": [
+  { "path": "packages/shared" },
+  { "path": "packages/ui" },
+  { "path": "functions/outbox-dispatcher" }
+]
+```
+
+`tsc --build` now walks the graph in dependency order, each composite project emitting its own
+declarations, and the reference resolves.
+
+**What was hidden, and for how long.** The worker has been failing unglanced because the root
+`typecheck` script read `npm run typecheck --workspace @marketak/admin-web` — a workspace that has
+never been scaffolded. Every run died on the missing workspace before reaching the worker. Replaced
+with `npm run typecheck --workspaces --if-present`, which runs in every workspace that declares the
+script and skips the ones that do not, so a workspace added later is covered without an edit here.
+
+**Worth recording as a class of bug.** A broken build-order reference does not look like a broken
+build. It looks like eleven type errors in application code, in a file whose logic is correct, and the
+natural response — changing `GroupOutcome` until the errors stop — would have corrupted a right type
+to satisfy a wrong build. The `string[]` vs `bigint[]` question raised while diagnosing this is now
+settled empirically and needs no change: `claim_events_v1` returns `event_ids bigint[]` and
+`mark_events_delivered_v1` takes `p_ids bigint[]`, so the shared contract's `readonly bigint[]` is
+correct and `drain-once.ts:54`'s local `readonly string[]` on `NotificationReport` — a different
+interface, not the one at fault — remains the only place that disagrees. Leaving it flagged rather
+than fixing it blind is the honest outcome of this change.
+
+### Fixed - `npm run lint` could not parse `apps/mobile/.dependency-cruiser.cjs`
+
+Two-layer failure, both from the `apps/mobile` scaffold. `**/*.config.js` does not match
+`.dependency-cruiser.cjs`, so the file fell through to the type-checked preset and failed with
+`getParserServices … was not found by the project service` — it is a Node module belonging to no
+tsconfig. Adding `**/*.cjs` to the config-file block fixed that and surfaced the second: `no-undef`
+on `module`, because that block declared only `console`, `process`, `atob` and `btoa`. A `.cjs` file
+is CommonJS by definition, so `module`, `require`, `__dirname`, `__filename` and `exports` are real
+bindings there.
+
+### Added - `scripts/check-policies.mjs`, the missing T0.1c deliverable
+
+Reads the **live database** and fails on the three rules `tasks.md` T0.1c names: a bare `auth.uid()`
+in a policy, a `security definer` function without `search_path = ""`, and an unindexed foreign key.
+
+**It exits 2 when it cannot reach the database, and never 0.** That distinction is the whole point: a
+policy check that could not look must not report green, so a missing `SUPABASE_DB_URL` is a distinct
+outcome from a clean schema rather than a silent pass. Needs `SUPABASE_DB_URL` (or `DATABASE_URL`);
+the repo has neither yet, only HTTP keys in `supabase_keys`.
+
+**First run against `erxxsebcqqcpkipzcdhg` found a real defect.** `bare auth.uid()` returned zero
+violations and all 120 `security definer` functions are pinned to `search_path=""` — both are
+*already* enforced inside the database by migrations 020 and 022, so the Node script is the readable
+report, not the enforcement. But **three foreign keys are unindexed**, in a schema `data-model.md`
+§14.2 and `AGENTS.md` both describe as having zero:
+
+| Table.column | References | On delete |
+|---|---|---|
+| `carts.quote_address_id` | `addresses` | SET NULL |
+| `cart_items.selected_size_id` | `menu_item_sizes` | SET NULL |
+| `order_items.selected_size_id` | `menu_item_sizes` | SET NULL |
+
+The third is the one that matters. `order_items` is the largest table in the schema and is never
+pruned, so deleting one `menu_item_sizes` row forces a full sequential scan of every order line ever
+written, on the parent's `ON DELETE SET NULL`. Not fixed here — it needs a migration, and this repo's
+rule is that a fix and the probe that verifies it must not share one.
+
+
+`tasks.md` T0.1d is closed. The decision is recorded in `decisions.md` §25 and open question 3.9 now
+points at it rather than carrying its own answer.
+
+**Why it reversed.** 3.9 answered "plain `StyleSheet` + a `src/theme/` token module" on two grounds —
+one fewer dependency, and no Babel step. Both held when written. The Babel ground does not hold any
+longer: **Uniwind is Tailwind v4 for React Native through a Metro plugin only, no Babel preset**, so
+the stated reason for avoiding a Tailwind engine is met by the engine chosen instead. And
+`settings.platform_name_ar` is described as "the default everywhere, because Arabic is the primary
+market language", which makes RTL the base layout rather than a locale — PanelUI is the only free React
+Native library surveyed with first-class RTL (`Direction`, `useDirection`, `useDirectionSign`).
+
+**Two gaps it closes rather than builds.** `complete_delivery_v1(p_order_id, p_proof_path, p_lat, p_lng)`
+requires an uploaded proof object and GPS at the door, and `delivery_assignments` also carries
+`signature_path` — a capture surface `APP-SCREENS-AND-COMPONENTS.md` had no component for. PanelUI ships
+`Signature`. And `collect_cash_v1` is the one RPC where a mistapped confirm becomes a financial
+discrepancy; PanelUI ships `SlideButton`. Both were headed for hand-built implementations.
+
+**What it costs, stated plainly.** `uniwind` + `panelui-native` plus nine peers, against 3.9's "one
+fewer dependency" — spent. PanelUI is young: 401 stars, first commit 2026-07, not `react-native-paper`'s
+maturity. The hedge is that it distributes through a CLI that copies component *source* into the project,
+so the dependency can be vendored and dropped without a rewrite. Expo SDK 57+ / React Native 0.86 is now
+a floor.
+
+**Two constraints that follow immediately.** `src/components/ui/` becomes a **wrapper layer** — the 34
+Tier-0 primitives in `APP-SCREENS-AND-COMPONENTS.md` §6.1 keep their names and become thin files
+composing PanelUI with Marketak tokens. And Metro does **not** tree-shake the package root: importing one
+name from `panelui-native` evaluates all 138 components before the first screen paints, which on a
+memory-pressured Android device is enough for the OS to kill the process. Subpath imports only, enforced
+by lint rather than convention.
+
+**Rule 2 is satisfied differently, not satisfied less.** "All values come from the token module" now
+means `@theme{}` in one `global.css` instead of a TypeScript module — a single source that Uniwind
+compiles to native styles, and that its `panelwind` ESLint plugin can audit for classes that compile and
+then do nothing on a device.
+
 ### Added - admin console phase A2: auth, the guard, and the shell
 
 The console now has a way in and a way of keeping people out.

@@ -81,7 +81,7 @@ Account and tooling setup. Nothing here is application code, and none of it appe
 - [ ] **T0.1b** Create `FEATURES.md` ✅ **done in this commit** and `CHANGELOG.md` ✅ **done in
       this commit**. Keep them updated per Checklist A6 / B6 / C6 — a deliverable without a
       `CHANGELOG` line is an undocumented deliverable
-- [ ] **T0.1c** Create the verification toolchain, or **no checklist in `AGENTS.md` can be signed
+- [~] **T0.1c** Create the verification toolchain, or **no checklist in `AGENTS.md` can be signed
       off and an agent must say so instead of claiming verification passed**:
       - [ ] root `package.json` with workspaces
       - [ ] `npm run typecheck` → `tsc --noEmit`, `"strict": true`
@@ -95,12 +95,65 @@ Account and tooling setup. Nothing here is application code, and none of it appe
             `set search_path = public` in a `security definer` function, and on an unindexed
             foreign key (runs the `pg_constraint` query in `data-model.md` §14.2 against the
             database). Enforces `data-model.md` §13.2 and §14.2 mechanically
-- [ ] **T0.1d** Decide the styling approach (open question 3.9): plain `StyleSheet` against a
+
+      **STATUS — 2026-10-08. The toolchain exists and runs; it is not green, and the red is not new.**
+
+      | Check | Exit | Note |
+      |---|---:|---|
+      | `typecheck` | **1** | two pre-existing defects, see below |
+      | `lint` | 0 | green after fixing one break the `apps/mobile` scaffold introduced |
+      | `test` | 0 | 8 files, 130 tests — **Vitest, not Jest** as this line specified |
+      | `test:integrity` | 0 | 8 files, 0 warnings |
+      | `check:secrets` | 0 | superset of T0.1e's filename scan; see that item |
+      | `check:hardcoded-colors` | 0 | |
+      | `check:policies` | **2** | newly written; **2 means unconfigured, not pass** |
+
+      **`check-policies.mjs` did not exist and now does.** Its first run against the live project
+      found `bare auth.uid()` = 0 violations and all 120 `security definer` functions pinned to
+      `search_path=""` — both are *already* enforced inside the database by migrations 020 and 022,
+      so the Node script is the readable report, not the enforcement. **It found 3 unindexed
+      foreign keys** (`carts.quote_address_id`, `cart_items.selected_size_id`,
+      `order_items.selected_size_id`, all `ON DELETE SET NULL`), in a schema `data-model.md` §14.2
+      and `AGENTS.md` both describe as having zero. The `order_items` one is the real hazard: largest
+      table, never pruned, so deleting one size row forces a seq scan over every order line ever
+      written. **Needs a migration.**
+
+      **`typecheck` was red on ONE root cause with eleven cascading symptoms.** The root tsconfig had
+      no `references`, so `tsc --build` never emitted `packages/shared/dist` and the worker's project
+      reference resolved to an erased `SendOutcome` — which surfaced as `TS6305` ×4 plus eleven
+      `TS2353`/`TS2339` "property does not exist on `GroupOutcome`" errors about `event_ids`, `ok`
+      and `error`, all three of which `SendOutcome` declares correctly. They were never defects in
+      `drain-once.ts`. Fixed with one `references` array and an `include` narrowed to `scripts/**`.
+      The `string[]` vs `bigint[]` question raised while diagnosing it is settled empirically and
+      needs no change: `claim_events_v1` returns `event_ids bigint[]` and `mark_events_delivered_v1`
+      takes `p_ids bigint[]`, so the contract's `readonly bigint[]` is right. A first draft of this
+      note called them two independent defects; that was wrong.
+
+      **Not fixed, deliberately.** `verify` was left exiting rather than narrowed to skip any
+      failing check. A gate that is adjusted to pass is not a gate.
+
+      **Current exit codes.** `typecheck` 0, `lint` 0, `test` 0 (130 tests), `test:integrity` 0,
+      `check:secrets` 0, `check:hardcoded-colors` 0, `check:policies` **2** — because nothing has
+      supplied `SUPABASE_DB_URL`. `verify` therefore exits 2 and cannot go green until that variable
+      is set. That is the intended behaviour: a `verify` that reports green while having skipped the
+      only database-reading step is the failure mode this check exists to prevent.
+
+- [x] **T0.1d** Decide the styling approach (open question 3.9): plain `StyleSheet` against a
       `src/theme/` token module, or NativeWind. **Blocks Checklist A4 and C3.** Default to plain
       StyleSheet + tokens unless there is a reason not to
-- [ ] **T0.1e** `scripts/precommit.sh` — refuse a commit that stages a secret, by scanning the
+      → **Decided: Uniwind + PanelUI. ADR 25, reversing 3.9.** `src/theme/` becomes `global.css`
+      `@theme{}`; `src/components/ui/` becomes a wrapper layer over the 34 Tier-0 primitives.
+      Requires Expo SDK 57+ / RN 0.86. Subpath imports only — the package root is not tree-shaken.
+- [x] **T0.1e** `scripts/precommit.sh` — refuse a commit that stages a secret, by scanning the
       index for `*.p8 *.pem *.key *.cer *.p12 *.mobileprovision .env*`. Belt and braces: the
       ignore list already missed an Apple key once
+      → **Covered by `scripts/check-no-secrets.mjs`**, which already does more than the filename
+      scan named here: it reads staged file *contents* for PEM armour (distinguishing real key
+      material from a mention by body length), JWT shapes, `AKIA` ids and inline
+      `SUPABASE_SERVICE_ROLE_KEY` assignments, and it flags untracked secret files that are not
+      gitignored. It is wired into `npm run verify`. The one gap is that nothing invokes it at
+      commit time — it is a `verify` step, not a hook. Add `.git/hooks/pre-commit` when a hook is
+      wanted rather than duplicating the scanner.
 - [x] **T0.2** Migration 001: `pgcrypto`, `pg_trgm`, `btree_gist`, `unaccent`, `pg_partman`.
       **Applied.** `postgis` is available but deliberately not installed — area matching is
       geohash-prefix plus a haversine distance, so nothing depends on it
@@ -116,9 +169,28 @@ Account and tooling setup. Nothing here is application code, and none of it appe
       ceiling versus 45 MB unpartitioned. See T3.3.
       (`data-model.md` §14.1). `pg_partman` 5.3.1 installed. Do **not** partition
       `ledger_entries`
-- [ ] **T0.2d** `scripts/check-policies.mjs` is now the mechanical gate. Run these three queries
+- [x] **T0.2d** `scripts/check-policies.mjs` is now the mechanical gate. Run these three queries
       after migration 014 and require: zero unindexed foreign keys, every `prosecdef` function with
       `search_path=''`, and no bare `auth.uid()` inside a policy body
+      → **Done — `scripts/check-policies.mjs`, wired into `npm run verify`. Exits 2 when it cannot
+      reach the database, never 0** ("unchecked" must not read as "clean"); it needs `SUPABASE_DB_URL`
+      from a gitignored `.env`, per `.env.example`.
+
+      First run against the live project: **`bare auth.uid()` = 0 violations** (migrations 020/022d
+      already enforce this in-DB — the script is the readable report, not the enforcement) and **all
+      120 `prosecdef` functions pinned to `search_path=""`**. But **3 unindexed foreign keys**, which
+      no migration had introduced and no query had caught: `carts.quote_address_id`,
+      `cart_items.selected_size_id`, `order_items.selected_size_id`.
+
+      **The stale claim is worth recording.** T0.1a recorded "44 tables, 164 indexes, **0 unindexed
+      foreign keys**" and that was true at the time. The three FKs in question arrived with later
+      migrations, so a statement that was correct went false without anything contradicting it —
+      exactly the failure a mechanical gate prevents and a hand-run query at one moment does not.
+
+      **Fixed by migration `028`**, verified before and after: FK definitions, row counts and the
+      `ON DELETE SET NULL` cascade all unchanged, orphans still 0, unindexed FKs now 0. Note the
+      honest performance caveat recorded in `CHANGELOG.md` — with 2 rows the planner still chooses a
+      Seq Scan, which is correct; the indexes buy the right plan at volume, not speed today.
 - [ ] **T0.3** Migration 002: `cities`, `areas`, `delivery_zones`, `delivery_fee_tiers`, `settings`.
       Seed the operating city (not hardcoded) plus ~20 areas with real geohash prefixes, and the
       1/2/3-vendor tiers at 10000/11000/12000 bps

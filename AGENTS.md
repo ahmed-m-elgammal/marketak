@@ -18,7 +18,7 @@ If you were asked to build something, read the spec before writing a line of cod
 |---|---|---|---|
 | 1 | `.specify/memory/constitution.md` | 33 non-negotiable rules | **Always. First. Never skip.** |
 | 2 | `specs/001-platform-foundation/spec.md` | Business model, actors, order state machine, fee formula, revenue phasing, retention, risks | Planning or product questions |
-| 3 | `specs/001-platform-foundation/decisions.md` | 22 ADRs — what was decided, what was rejected, why | Before changing anything structural |
+| 3 | `specs/001-platform-foundation/decisions.md` | 25 ADRs — what was decided, what was rejected, why | Before changing anything structural |
 | 4 | `specs/001-platform-foundation/data-model.md` | Full Postgres schema, DDL, RLS matrix, 22 migrations | Writing migrations or RPCs |
 | 5 | `specs/001-platform-foundation/contracts.md` | Every RPC signature, error code, event type, push template | Writing an app or a Worker |
 | 6 | `specs/001-platform-foundation/plan.md` | Architecture, order-placement sequence, payment-at-delivery flow, build order | Implementing anything |
@@ -67,15 +67,26 @@ current plan supersedes with better numbers. **Where they disagree, the current 
   Nothing here is approved until you have read it.
 - Infrastructure: Supabase / Cloudflare / Firebase accounts created and MCP servers connected.
 - **Database: migrations `001`–`014a` written and applied** to the live project. 62 tables and
-  partitions, 229 indexes, 0 unindexed foreign keys, RLS on every table and partition.
+  partitions, 229 indexes, and **3 unindexed foreign keys found on 2026-10-08** — **fixed by
+  migration `028`, now 0`. RLS is on every table and partition.
   See `CHANGELOG.md` for the per-migration record.
-- **Application code: none.** No `apps/`, no `package.json`. `functions/` and `apps/` are still to
-  be scaffolded (tasks.md T0.1).
-- **`npm run typecheck`, `npm run lint`, `npm test` and `npm run verify` do not exist**, so no
-  engineering checklist below can be signed off. Creating them is task **T0.1c**.
+- **Application code: none.** No `package.json`, no compiled app. `apps/mobile/` now holds the
+  **directory architecture only** — 169 folders, zero code files — plus `README.md` (the layer and
+  size contract) and `.dependency-cruiser.cjs` (the boundaries, enforced). The rest of `apps/`,
+  `functions/` and `packages/` are still to be scaffolded (tasks.md T0.1).
+- **Styling is settled: Uniwind + PanelUI** (ADR 25, reversing open question 3.9). `src/theme/` is
+  `global.css` `@theme{}`; `src/components/ui/` is a wrapper layer. Expo SDK 57+ / RN 0.86 is the floor.
+- **`npm run typecheck`, `npm run lint`, `npm test` and `npm run verify` now exist and run.**
+  `typecheck` was red for a single build-order reason — the root tsconfig had no `references`, so
+  `tsc --build` never emitted `packages/shared/dist` and the worker's project reference resolved to
+  an erased `SendOutcome`, producing 11 phantom "property does not exist" errors. Fixed with one
+  `references` array. **`npm test` is Vitest, not Jest** — 130 tests across 8 files.
+  `scripts/check-policies.mjs` exits **2** when it cannot reach the database (no `SUPABASE_DB_URL`),
+  which is "unchecked", never "clean"; because `verify` runs it, **verify requires that variable**.
+  See `.env.example`.
 - **Database behaviour has been verified by direct SQL against the live project.** The SQL
   verification in `CHANGELOG.md` is real — every claim there was executed. That is *not* a substitute
-  for `npm run verify`, which does not exist yet and covers application code that does not exist
+  for `npm run verify`, which now exists and covers application code that does not exist
   yet. Do not report the database as verified by a test suite.
 - **All features are ⬜.** See `FEATURES.md`.
 

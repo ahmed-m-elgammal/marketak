@@ -28,7 +28,11 @@
     "sourceMap": true,
     "composite": true,
     "noEmit": true
-  },
-  "include": ["packages/*/src/**/*.ts", "functions/*/src/**/*.ts", "scripts/**/*.ts"],
+  },  "include": ["scripts/**/*.ts"],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/ui" },
+    { "path": "functions/outbox-dispatcher" }
+  ],
   "exclude": ["**/node_modules", "**/dist", "**/.wrangler"]
 }

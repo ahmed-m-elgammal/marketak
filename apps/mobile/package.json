@@ -1,0 +1,39 @@
+{
+  "name": "@marketak/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@marketak/shared": "*",
+    "@react-native-masked-view/masked-view": "0.3.2",
+    "expo": "~57.0.27",
+    "expo-constants": "~57.0.21",
+    "expo-image": "~57.0.5",
+    "expo-linear-gradient": "~57.0.2",
+    "expo-router": "~57.0.25",
+    "expo-splash-screen": "~57.0.9",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
+    "panelui-native": "^0.107.1",
+    "react": "19.3.0",
+    "react-native": "0.87.1",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-reanimated": "~4.7.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.18.0",
+    "react-native-svg": "~15.15.5",
+    "react-native-worklets": "~0.13.0",
+    "tailwindcss": "^4.3.3",
+    "uniwind": "^1.12.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3"
+  }
+}
