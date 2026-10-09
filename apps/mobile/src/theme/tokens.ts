@@ -52,6 +52,24 @@ export const color = {
   scrim: "#17211E80",
 } as const;
 
+/**
+ * Third-party brand marks.
+ *
+ * These are not Marketak's palette and are exempt from design rule 3's 60/30/10 — a Google sign-in
+ * button with a Marketak-green G is a brand violation, not a design choice. They live here so rule 2
+ * still holds: no component writes a hex literal, it reads a named token.
+ *
+ * Google's red is #EB4335 in the supplied artwork where the specification says #EA4335. Left as
+ * supplied; the difference is invisible at 20px.
+ */
+export const brandMark = {
+  googleBlue: "#4285F4",
+  googleGreen: "#34A853",
+  googleYellow: "#FBBC05",
+  googleRed: "#EB4335",
+  appleBlack: "#000000",
+} as const;
+
 /** 4-point grid. The complete set - there is no 5, 7, 9 or 11 to reach for. */
 export const spacing = {
   "1": 4,

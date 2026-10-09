@@ -1,27 +1,41 @@
-import * as NativeSplash from "expo-splash-screen";
-import { Image } from "expo-image";
-import { useEffect } from "react";
-import { View } from "react-native";
+/**
+ * Where the app is while the stored session is read. Releases the OS splash and replaces itself
+ * with the destination. The ref guards the replace: the state settling and a re-render can both
+ * arrive here, and two replaces race.
+ */
 
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import * as NativeSplash from "expo-splash-screen";
+import { useEffect, useRef } from "react";
+import { View } from "react-native";
+import { useSession } from "@/features/auth";
+// Relative, not `@/assets/...`: the tsconfig alias maps only ./src/*, so assets are not reachable
+// through it. Metro resolves this relative to the importing file.
 import splash from "../assets/splash.png";
 
-/**
- * Boot splash.
- *
- * The artwork is the single asset here - it carries the mark, the Arabic wordmark, the Latin
- * wordmark, the tagline and the category rail, so nothing is composed on top of it. The screen is
- * a full-bleed `cover` fill on the brand cream.
- *
- * This is the ONLY screen in `app/` right now. `apps/mobile/README.md` holds the route map and the
- * rule that a route file never exceeds 20 lines and never fetches, maps or computes - this one does
- * none of the three. Everything from here on is built screen by screen against that contract.
- */
-export default function SplashScreen() {
+export default function SplashRoute() {
+  const router = useRouter();
+  const { state, canOrder } = useSession();
+  const redirected = useRef(false);
+
   useEffect(() => {
-    // The native splash was held open at module scope in `_layout.tsx`. Release it now that React
-    // has mounted, so the transition is artwork-to-artwork with no frame of bare background.
+    // Nothing to decide until AsyncStorage has been read. The artwork below is already painting,
+    // so releasing now is artwork-to-artwork with no bare frame.
+    if (state.status === "loading") return;
+
     void NativeSplash.hideAsync();
-  }, []);
+
+    if (redirected.current) return;
+    redirected.current = true;
+
+    if (state.status === "signed-in") {
+      router.replace(canOrder ? "/(customer)/home" : "/(auth)/complete-profile");
+      return;
+    }
+
+    router.replace("/(auth)/welcome");
+  }, [state, canOrder, router]);
 
   return (
     <View className="flex-1 bg-cream" testID="splash-screen">

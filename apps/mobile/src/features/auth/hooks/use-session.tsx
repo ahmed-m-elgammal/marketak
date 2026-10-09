@@ -15,7 +15,7 @@
  * | `signed-in` | Session exists; `profile` says whether the profile is complete | |
  */
 
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, User } from "@/services/supabase/client";
 import {
   createContext,
   useCallback,

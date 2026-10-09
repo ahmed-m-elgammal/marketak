@@ -22,9 +22,11 @@
 @import "uniwind";
 @import "panelui-native/theme.css";
 
-/* PanelUI's own class names live in the package. Without this line its classes resolve and its
-   components come out unstyled. The path is relative to THIS file, not to the project root. */
-@source "../node_modules/panelui-native/src";
+/* PanelUI's own class names live in the package. Without this line its classes fail to resolve and
+   its components come out unstyled. The path is relative to THIS file (src/theme/), not to the
+   project root, and npm hoists workspace dependencies to the repo root - hence two levels up.
+   Verified: src/theme/../../node_modules/panelui-native/src exists. */
+@source "../../node_modules/panelui-native/src";
 
 @theme {
   /* =================================================================

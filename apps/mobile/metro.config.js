@@ -13,6 +13,9 @@ const { withUniwindConfig } = require("uniwind/metro");
 const config = getDefaultConfig(__dirname);
 
 module.exports = withUniwindConfig(config, {
-  cssEntryFile: "./src/global.css",
+  // The stylesheet moved to src/theme/ during the folder restructure. This path must point at the
+  // real file: Uniwind reads it to compile className, and a wrong path fails SILENTLY — no error,
+  // no warning, just every className compiling to nothing and an unstyled app.
+  cssEntryFile: "./src/theme/global.css",
   dtsFile: "./uniwind-types.d.ts",
 });

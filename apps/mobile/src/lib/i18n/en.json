@@ -1,0 +1,27 @@
+{
+  "welcomeContinue": "Get started",
+  "welcomeLine1": "Groceries, pharmacy and everyday essentials",
+  "welcomeLine2": "Delivered to your door in one basket",
+  "welcomeWordmarkLabel": "Marketak",
+
+  "signInTitle": "Welcome",
+  "signInSubtitle": "Sign in to keep your basket and track your orders",
+  "signInFailed": "We could not sign you in. Please try again.",
+  "signInTerms": "By continuing you agree to the terms and privacy policy",
+
+  "signInGoogle": "Sign in with Google",
+  "signInApple": "Continue with Apple",
+
+  "profileTitle": "Almost there",
+  "profileSubtitle": "We need these to deliver to you. You can browse without them, but not order.",
+  "profileFirstName": "First name",
+  "profileLastName": "Last name",
+  "profilePhone": "Phone number",
+  "profileSubmit": "Save and continue",
+
+  "fieldFirstNameRequired": "Enter your first name",
+  "fieldLastNameRequired": "Enter your last name",
+  "fieldPhoneTooShort": "Enter a valid phone number",
+  "fieldPhoneTooLong": "That number is too long",
+  "profileFailed": "We could not save your details. Please try again."
+}
