@@ -1,229 +1,190 @@
-# apps/mobile — file architecture
+# apps/mobile — architecture map
 
-One Expo app, two roles, 60 routes, 23 sheets, 19 client RPCs. **Nothing here is a god file, and that is enforced, not promised.**
+**Read this file first. It is the map. Everything else is enforced by tooling, not convention.**
 
-**Styling is Uniwind + PanelUI** — see `decisions.md` **ADR 25**, which reverses open question 3.9.
-`src/theme/` is `global.css` with Tailwind v4 `@theme{}` tokens. `src/components/ui/` is a **wrapper
-layer**, not an implementation layer: the 34 Tier-0 primitives named in
-`APP-SCREENS-AND-COMPONENTS.md` §6.1 stay as the naming contract and become thin files that compose
-PanelUI with Marketak tokens.
+One Expo app, two roles (customer and rider), one Supabase project. No god files.
 
-> **Expo SDK 57+ / React Native 0.86 is the floor.** Required by PanelUI.
->
-> **Subpath imports only.** `import { Button } from 'panelui-native/components/button'` — never
-> `from 'panelui-native'`. Metro does not tree-shake the root, so the root form evaluates all 138
-> components before the first screen paints and OOM-kills Android under memory pressure.
+> **The three sentences that explain everything below**
+> `app/` decides **where you are**. `src/core/` decides **what the app can reach**. `src/features/` decides **what happens in one business area**.
 
 ---
 
-## The one rule everything else follows
+## 1. The shape
 
-> **`app/` decides *where you are*. `src/features/` decides *what happens*. `src/` decides *how it's drawn and fetched*.**
->
-> A route file may render a screen. It may not fetch, map, or compute. A feature may not be imported by another feature. A screen may not be imported by anything except its own route file.
+```
+apps/mobile/
+├── app/                          ROUTES. One file = one address.
+│   ├── _layout.tsx               root providers, splash hold
+│   └── index.tsx                 entry redirect
+│
+├── src/
+│   ├── core/                     CROSS-CUTTING. Everything not owned by one feature.
+│   │   ├── config/env.ts         EXPO_PUBLIC_* config, validated at boot
+│   │   ├── theme/                global.css (@theme tokens), tokens.ts, design-rules.md
+│   │   ├── error/                AppError — PG error code -> typed failure
+│   │   ├── network/              THE ONLY NETWORK BOUNDARY
+│   │   │   ├── supabase-client.ts   the single Supabase client
+│   │   │   └── rpc/                 DTOs, call.ts, typed wrappers
+│   │   ├── storage/              device + cache storage (created on first use)
+│   │   ├── device/               push, location, calls (created on first use)
+│   │   ├── utils/                pure helpers (created on first use)
+│   │   └── di/                   composition root (created on first use)
+│   │
+│   ├── features/<name>/          ONE BUSINESS SLICE. Vertical, self-contained.
+│   │   ├── index.ts              THE ONLY PUBLIC SURFACE (barrel)
+│   │   ├── screens/              a screen — composition only, <=150 lines
+│   │   ├── widgets/              slice-local components, <=200 lines
+│   │   ├── hooks/                one concern per file, <=60 lines
+│   │   ├── mappers/              DB shape -> view shape. Created only if one is needed.
+│   │   └── api/                  slice-specific RPC grouping, if core/rpc is not enough
+│   │
+│   ├── components/               SHARED UI, two tiers
+│   │   ├── ui/                   Tier 0: thin wrappers over PanelUI + tokens
+│   │   └── domain/               Tier 1: used by TWO or more features. Never preemptively.
+│   │
+│   └── lib/                      pure maths: geo, bidi, schedule. Zero react.
+│
+└── .dependency-cruiser.cjs       the boundaries above, made executable
+```
 
-If you only remember one thing: **routes are addresses, features are brains, `src/` is the toolbox.**
+**Why `core/` and not `services/`:** the Talabat-style `lib/core/` grouping is genuinely better
+than a flat `services/`, `lib/`, `config/`, `theme/`. Cross-cutting concerns get one home
+instead of four top-level folders. What is **not** copied is their per-feature
+`bloc/` + `event/` + `state/` trio, because React already is the state layer and a
+`feature_event.ts` would duplicate `useState`. Nor `domain/entities/ + repositories/ + usecases/`,
+which for this app would be three files forwarding to Postgres RPCs.
 
 ---
 
-## Layer map
+## 2. Which stubs exist, and why
 
-| Layer | Owns | May import | Must never |
-|---|---|---|---|
-| `app/` | route addresses, navigators, layouts | `features/*` public surface, `components/*` | hook into `src/features/<x>/screens` by path, hold state, fetch |
-| `src/features/<name>/` | one business slice end-to-end | own internals, `src/*` shared | import another feature directly |
-| `src/components/` | shared UI only | `src/` shared | import `features/` |
-| `src/lib/` | pure functions | nothing | import React or React Native |
-| `src/services/` | every supabase / device / network touch | `src/lib/`, `src/types/` | import `features/` or `components/` |
-| `src/stores/` | cross-screen state | `src/types/` | import `features/` |
-| `src/theme/` | `@theme` tokens, typography, spacing, RTL | nothing | import anything |
-| `src/types/` | DTOs mirroring the DB | nothing | import anything |
+Stub folders hold a `.gitkeep` until the file that needs them is written. They are listed here so
+you can see the plan without opening the tree.
 
-`src/lib/` importing nothing and `src/theme/` + `src/types/` importing nothing is what keeps the dependency graph a DAG. `.dependency-cruiser.cjs` enforces all of it in CI.
+| Stub | Slices | Justification |
+|---|---|---|
+| `features/<slice>/` | 14 slices | Each maps to a numbered section of `APP-SCREENS-AND-COMPONENTS.md` |
+| `features/<slice>/screens/` | 14 slices | Every slice has at least one route in the spec |
+| `features/<slice>/widgets/` | 14 slices | Every slice has components (spec §6.2–6.3) |
+| `features/<slice>/hooks/` | 14 slices | 35 hooks are enumerated in spec §9 |
+| `components/ui/` + 8 categories | — | 34 Tier-0 primitives are enumerated in spec §6.1 |
+| `components/domain/` + 4 categories | — | 55 Tier-1 domain components in spec §6.2–6.3 |
+| `core/storage/ device/ utils/ di/` | — | 22 services enumerated in spec §9 |
 
-**`src/theme/design-rules.md` is the aesthetic contract.** Six rules set by the product owner — more
-spacing, borders instead of shadows, a 60/30/10 palette, no decorative background shapes, two font
-families max, less clutter and more clarity. They are enforced by `global.css` wherever they can be:
-`--shadow-*` are set to `none`, the spacing scale is closed, the palette is closed, and there are no
-gradient or shape tokens to reach for. **Read it before building any component.**
+**Deliberately NOT stubbed:**
 
----
-
-## Size limits — the anti-god-file contract
-
-Hard caps. A file over its cap is a review failure, not a style opinion.
-
-| Kind | Cap | Why |
-|---|---:|---|
-| Route file (`app/**`) | **20 lines** | it is an address, not a screen |
-| Screen (`features/x/screens`) | **150 lines** | past 150 it is hiding a component |
-| Component | **200 lines** | past 200 it is two components |
-| Hook | **60 lines** | past 60 it is two hooks |
-| Service module | **120 lines** | past 120 it is two modules |
-| Mapper | **80 lines** | it is a pure shape translation |
-| `index.ts` barrel | re-exports only, **no logic** | |
-
-A screen that needs 400 lines does not get a 400-line screen. It gets a `components/` entry and a `hooks/` entry.
-
----
-
-## `app/` — routes
-
-Expo Router. Five route groups, one file per address:
-
-```
-app/
-├── _layout.tsx              root providers + BootGate           (~40)
-├── index.tsx                redirect by role                    (~10)
-├── (auth)/                  7 routes — guest shell
-├── (customer)/              37 routes
-├── (driver)/                18 routes
-└── (shared)/                5 routes — both roles
-```
-
-A route file looks like this and nothing more:
-
-```tsx
-// app/(customer)/orders/[orderId]/track.tsx
-export { default } from '@/features/orders/screens/OrderTrackScreen';
-```
-
-That is the whole file. No `useQuery`, no `supabase`, no `StyleSheet.create`.
-
-**Group choice is not cosmetic.** `(customer)` and `(driver)` unmount and remount on role switch — deliberately, because the two tab trees hold contradictory caches (customer cart vs active trip). Do not "optimise" this by keeping both mounted.
-
----
-
-## `src/features/<name>/` — 15 vertical slices
-
-Every slice has the same internal shape, so an agent landing in one can navigate all of them:
-
-```
-features/<name>/
-├── screens/      1 file per screen, composition only, <=150 lines
-├── components/   feature-local components, <=200 lines
-├── sheets/       bottom sheets & modals owned by this feature
-├── hooks/        1 concern per file, <=60 lines
-├── api/          RPC + query calls, 1 file per RPC group
-├── mappers/      DB row -> DTO, pure, no side effects
-├── __tests__/    colocated
-└── index.ts      THE ONLY PUBLIC SURFACE
-```
-
-<details>
-<summary>The 15 slices, and what each owns</summary>
-
-| Slice | Routes | Notes |
-|---|---:|---|
-| `auth` | 6 | splash, welcome, sign-in, callback, complete-profile, role switch |
-| `discovery` | 5 | home, promo, search, cuisines, browse |
-| `storefront` | 2 | vendor page, item detail |
-| `cart` | 1 | cart + customization sheets |
-| `checkout` | 6 | quote, address, review, price-changed, placed, voucher |
-| `orders` | 9 | list, detail, track, timeline, cancel, review, receipt, changes, repeat |
-| `account` | 5 | profile, addresses, favorites, settings |
-| `notifications` | 2 | centre, push preferences |
-| `platform` | 2 | support, about |
-| `shell` | 0 | BootGate, tab bars, role switcher, banners |
-| `driver-onboarding` | 1 | phone claim against `riders` |
-| `driver-availability` | 4 | driver home, online/offline, shifts |
-| `trips` | 7 | queue, detail, navigate, contact, cash, complete, failed |
-| `driver-money` | 5 | earnings, ledger, cash float, payout list + detail |
-| `driver-vehicle` | 1 | vehicle details |
-
-</details>
-
-### The barrel is the boundary
-
-`features/orders/index.ts` re-exports. Nothing else is importable from outside:
-
-```ts
-// features/orders/index.ts
-export { OrderListScreen } from './screens/OrderListScreen';
-export { useOrders } from './hooks/useOrders';
-export type { OrderDTO, OrderStatus } from './types';
-```
-
-`import { OrderListScreen } from '@/features/orders'` — correct.
-`import { OrderListScreen } from '@/features/orders/screens/OrderListScreen'` — blocked by dependency-cruiser.
-
-Routes may reach **into** a feature's public surface. Features may never reach into another feature at all. Shared behaviour goes to `src/` first, or a third feature, never a cross-import.
-
----
-
-## `src/` shared layers
-
-```
-src/
-├── components/
-│   ├── ui/          Tier 0 primitives — WRAPPERS over PanelUI, ~5-15 lines each
-│   │   ├── text/ buttons/ inputs/ overlays/ feedback/ layout/ media/ charts/
-│   └── domain/      cross-feature domain parts, used by >= 2 features
-│       ├── vendor/ money/ order/ rider/
-├── hooks/           shared hooks only — a hook used by one feature lives in that feature
-├── lib/             pure functions, ZERO react / react-native imports
-│   ├── money/       piastres <-> EGP, bps, rounding, diff arithmetic
-│   ├── format/      numbers, dates, ETA, distance
-│   ├── bidi/        mixed ar/en runs, LTR-locked numerals
-│   ├── geo/         geohash encode/decode, area resolve, haversine
-│   ├── time/        quote TTL, schedule windows, holiday merge
-│   └── validation/  voucher, phone, checkout input
-├── services/        the ONLY layer that touches supabase, R2, device APIs
-│   ├── supabase/    client, auth, session
-│   ├── rpc/         19 client-callable RPCs, 1 file per RPC group
-│   ├── storage/     R2 signer round trip (proof, signature, avatar)
-│   ├── device/      push, location, calls
-│   └── errors/      PG code -> copy -> CTA map
-├── stores/          9 zustand slices
-├── theme/           global.css (@theme), typography, spacing, RTL direction
-├── types/           17 modules mirroring schema/*.sql
-├── config/          env, constants, flag defaults
-└── test/            utils, fixtures, builders
-```
-
-**`src/lib/` imports nothing.** That is what makes money arithmetic, geohash and schedule maths unit-testable without a renderer. If a function in `lib/` needs `View`, it is in the wrong file.
-
-**`src/components/ui/` is a wrapper layer.** A Tier-0 file composes PanelUI and applies Marketak tokens; it does not implement. That is what keeps 34 primitives maintainable by one person, and it is why the §6.1 names can stay stable while the underlying library is swapped.
-
-**`src/services/` is the only network boundary.** No feature calls `supabase` directly; every feature calls a `services/rpc/*` function. That is how a missing RPC becomes a type error instead of a runtime blank screen — which matters here, because the screen audit found **eight table groups with no write RPC at all**.
-
----
-
-## What "no god files" buys you, concretely
-
-| Symptom of a god file | What the structure does instead |
+| Not created | Why |
 |---|---|
-| A 900-line `OrderDetailScreen` | `orders/screens/` holds the shell; `orders/components/` holds the vendor cards, rails and lines; `orders/hooks/` holds `useOrderDetail`, `useCancelOrder`, `useReview` |
-| One `utils.ts` everyone appends to | `lib/` is split by concern and imports nothing |
-| `api.ts` with 40 supabase calls | `services/rpc/` one module per RPC group, typed against `types/rpc` |
-| Every screen re-implementing the money format | one `lib/money` + one `PriceText` in `components/ui/text` |
-| Feature A reaching into Feature B | barrel boundary, enforced in CI |
-| A component that is "sort of shared" | it lives in its feature until a *second* feature needs it, then it moves to `components/domain/` — never before |
+| `features/*/mappers/` | Every RPC already returns a typed DTO from `core/network/rpc/dto.ts`. There is no raw row left to map. Create one only when a real mapping appears. |
+| `features/*/sheets/` | Bottom sheets are screen-level, not slice-level. They live in `widgets/`. |
+| `features/*/domain/` | Business logic is in Postgres. A `domain/` here would forward, not decide. |
+| `features/*/api/` | `core/network/rpc/api.ts` already owns the RPC wrappers. |
+| `stores/` | No zustand installed, no cross-screen state that needs it yet. |
+
+If a stub survives with no file and no scheduled work in `tasks.md`, it is deleted. That is
+AGENTS.md rule 11.
 
 ---
 
-## Conventions an agent must follow
+## 3. How to find things
 
-1. **Named exports only.** No default exports except route files.
-2. **Import order is enforced:** react → react-native → panelui → `@/components` → `@/features` → `@/lib` → relative.
-3. **No `any`.** Generated Supabase types are wrapped at the `services/` edge into hand-written DTOs; nothing downstream sees the raw row.
-4. **PanelUI imports use subpaths only.** `panelui-native/components/button`, never the root. Lint-enforced — see the header.
-5. **A component file is a composition.** If a `ui/` file exceeds ~15 lines it is implementing instead of wrapping, and belongs in `domain/` or the feature.
-6. **Colocate the test.** `features/x/hooks/useQuote.test.ts` sits next to `useQuote.ts`.
-7. **A new feature gets all seven folders**, even the empty ones. An empty folder is a slot waiting for its file; a missing one is where the next god file gets born.
-8. **Route files never exceed 20 lines.** If it does, the screen is doing navigation's job.
+| I need to… | Look in | Never |
+|---|---|---|
+| Add a screen | `features/<name>/screens/` | add logic to `app/*.tsx` |
+| Change what an RPC sends/receives | `core/network/rpc/dto.ts` | re-declare the shape in a feature |
+| Add an RPC call | `core/network/rpc/api.ts` | call `supabase.rpc()` anywhere else |
+| Understand a DB failure | `core/error/app-error.ts` → `BEHAVIOUR_CODES` | write a new copy of the code |
+| Format money, dates, rates | `@marketak/shared` | create `lib/money/` — it would duplicate tested helpers |
+| Add a colour / spacing | `core/theme/global.css` | write a literal in a component |
+| Add a shared button | `components/ui/` | rebuild one PanelUI already provides |
+| Add env config | `core/config/env.ts` | read `process.env` anywhere else |
+
+**Money lives in `@marketak/shared`.** `formatMoney`, `formatCount`, `formatRateBps`, `formatWhen`
+already exist and are tested. Two money formatters is how one screen shows `29.50` and another
+shows `٢٩٫٥٠`.
 
 ---
 
-## Verification
-
-These do not exist yet — they are repo task **T0.1c**. Until they do, the architecture above is a convention, not a guarantee.
+## 4. Import direction — enforced, not promised
 
 ```
-npm run typecheck     # blocks: raw any, boundary violations
-npm run lint          # blocks: import order, inline styling
-npm run test          # blocks: behaviour regressions
-npm run verify        # all of the above + dependency-cruiser
+app/        -> features/* (barrel only), components/*
+features/x/ -> its own internals, src/* shared.   NEVER features/y.
+components/ -> src/* shared.                       NEVER features/.
+core/       -> theme, config, shared.             NEVER features/ or components/.
+lib/        -> nothing.                            NEVER react, react-native, expo.
+theme/      -> nothing.
 ```
 
-`.dependency-cruiser.cjs` already encodes the layer rules above. Run `npx depcruise src app --config .dependency-cruiser.cjs` once T0.1 scaffolds `package.json`.
+`.dependency-cruiser.cjs` fails the build on all of it:
+
+```bash
+npx depcruise src app --config .dependency-cruiser.cjs
+```
+
+| Rule | Fails when |
+|---|---|
+| `no-circular` | anything imports itself back |
+| `no-cross-slice-<name>` | a feature reaches into a *different* feature's internals — one rule generated per slice, so a new slice is covered automatically |
+| `no-deep-feature-import-from-outside` | a route or a service imports `features/x/screens` by path instead of the barrel |
+| `lib-is-pure` | `lib/` imports react / react-native / expo |
+| `theme-is-a-leaf` | `theme/` imports anything from `src/` |
+| `no-supabase-outside-services` | anything outside `core/network/` imports `@supabase/supabase-js` — this is what guarantees **one** auth subscription |
+| `shared-never-imports-features` | `components/ lib/ theme/` depends on a feature |
+| `no-orphans` | a file nothing imports (dead code, repo rule 10) |
+
+---
+
+## 5. Size limits
+
+| Kind | Cap |
+|---|---:|
+| Route file `app/**` | **20 lines** |
+| Screen | **150 lines** |
+| Widget / component | **200 lines** |
+| Hook | **60 lines** |
+| Core module | **120 lines** |
+| `index.ts` barrel | re-exports only, zero logic |
+
+---
+
+## 6. Conventions
+
+1. **Named exports only.** Default exports are for route files.
+2. **No `any`.** Supabase's generated types are wrapped at the `core/network/` edge into
+   hand-written DTOs. Nothing downstream sees a raw row.
+3. **PanelUI subpath imports only:** `panelui-native/components/button`. Never the root — Metro
+   does not tree-shake it, and the root form evaluates all 138 components before first paint,
+   which OOM-kills Android under memory pressure.
+4. **`components/ui/` wraps, it does not implement.** Over ~15 lines means it belongs in
+   `domain/` or the feature.
+5. **Colocate the test:** `features/x/hooks/useQuote.test.ts` beside `useQuote.ts`.
+6. **Money is `Piastres` (integer) from `@marketak/shared`,** never a float.
+7. **The client is never trusted with money.** `upsertCartItem` sends intent (item id, options,
+   quantity) and the server returns the price. Never cache a price and send it.
+
+---
+
+## 7. Before you commit
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npx depcruise src app --config .dependency-cruiser.cjs
+```
+
+---
+
+## 8. Current state
+
+| | |
+|---|---|
+| Routes | 2 (`_layout`, `index` — splash shell) |
+| Features | 1 with code (`auth` — Google/Apple, session, profile gate) |
+| Core | `config`, `theme`, `error`, `network` |
+| Screens | none yet. Built one at a time, deliberately. |
+
+Read `core/theme/design-rules.md` before building any component. Six rules set by the product
+owner: more spacing, borders instead of shadows, 60/30/10 palette, no decorative background
+shapes, two font families max, less clutter.

@@ -124,6 +124,50 @@ govern *how* work gets done here.
 | 8 | **NO TRIVIAL COMMENTS** | Comment only complex algorithms, subtle business invariants, and edge cases that look wrong until you know why |
 | 9 | **ZERO ASSUMPTIONS** | When a requirement is ambiguous, stop and ask a structured question with recommended options. Do not pick silently |
 | 10 | **NO DEAD CODE** | Any change: study the impact first, then leave nothing unused behind. Unused exports, obsolete imports and commented-out blocks are deleted, not commented |
+| 11 | **REUSE BEFORE CREATE** | Do not create a new folder, module, type, helper or table until you have searched for something that already does the job. A second implementation of money formatting, a DTO shape, an RPC wrapper or a shared component is a defect, not a convenience. Adjust and extend the existing one; if none fits, say so in the commit message |
+
+### Rule 11 in practice — reuse before create
+
+This exists because duplication is the most expensive mistake in this repo and the least visible.
+Two money formatters produce `29.50` on one screen and `٢٩٫٥٠` on another. Two DTOs for one RPC
+drift, and the drift is a silent runtime `null`. Two Supabase clients means two token refreshers
+racing, and the loser's write wins.
+
+Before adding anything, run the search:
+
+```bash
+# Does a helper already exist?
+git grep -n "formatMoney\|Piastres" -- packages/shared/src
+
+# Does a DTO for this RPC already exist?
+git grep -n "quote_order_v1" -- apps/mobile/src
+
+# Does the component exist, in PanelUI or here?
+git grep -rn "PriceText\|OrderCard" -- apps/mobile/src
+```
+
+| You want to add | Search first | If it exists |
+|---|---|---|
+| money / date / rate formatting | `@marketak/shared` — `formatMoney`, `formatCount`, `formatRateBps`, `formatWhen` | **Never** add `lib/money`. Import from `@marketak/shared` |
+| a DB column shape | `src/services/rpc/dto.ts`, then `pg_proc` | Extend the existing DTO. One shape per RPC, one place |
+| an RPC call | `src/services/rpc/api.ts` | Add a wrapper there. Never `supabase.rpc()` elsewhere |
+| a screen or component | `src/components/ui/`, then PanelUI | Wrap PanelUI with tokens; do not rebuild it |
+| a folder | the tree in `apps/mobile/README.md` | The map is authoritative. A new folder needs a reason in the commit message |
+| a config value | `src/config/env.ts` | Add the variable there, validated at boot |
+
+**Two rules about folders, which are easy to get wrong in both directions:**
+
+1. **A folder is created by the file that needs it.** Do not pre-create `screens/ hooks/ components/`
+   for a slice that does not exist yet. A repo once carried 90 such placeholder slots; 88 were
+   empty, and every reader who opened one was misled.
+2. **A planned slot may exist and be committed**, holding a `.gitkeep` — but only when the slice
+   is genuinely scheduled in `tasks.md`. `.gitkeep` is exempt from the `no-orphans` depcruise rule
+   for that reason. If a slot survives with no file and no scheduled work, it is deleted by the
+   sweep, not defended.
+
+The architecture lives in `apps/mobile/README.md` §1–§3 and in `.dependency-cruiser.cjs`, not in a
+tree of empty directories. If the map and the tree disagree, the map is right until proven
+otherwise and the tree is the bug.
 
 ### Checklist A — adding a feature or sub-feature
 
