@@ -419,8 +419,36 @@ The database writes an `events` row. A Cloudflare Worker polls, renders, and sen
 Note `order.status_changed` routes on `v_payload_to` — the same event produces different templates
 per target status. **A new status needs a new routing row or the shopper gets nothing.**
 
-`claim_events_v1(p_limit)` is the Worker's side, returning `template_key`, `variables`,
-`language` and `recipient`. Idempotent by event id — constitution 32.
+`claim_events_v1(p_limit)` is the Worker's side. It is **not the app's** — see §15. It returns eight
+columns: `event_ids bigint[]`, `template_key`, `recipient` (`customer|vendor|rider`), `recipient_id`,
+`order_id`, `order_number`, `variables jsonb`, `language`, `oldest_event`. `p_limit` defaults to 50
+and is clamped to 1–200. It collapses many event rows into one push per (recipient, template, order)
+and locks the rows with `for update … skip locked`, so two Worker instances cannot both send the same
+notification. Idempotent by event id — constitution 32.
+
+`variables` is built with `jsonb_strip_nulls`, so an absent key is simply absent — never `null`.
+These keys appear when they apply:
+
+| Key | Present when |
+|---|---|
+| `order_number`, `vendor_count`, `total`, `item_count`, `payment_method`, `currency` | always, except a null `vendor_count` |
+| `vendor_name` | the vendor's name, resolved for a vendor recipient or a rejection |
+| `reason` | a cancellation or rejection reason, from the event payload or `sub_orders.rejection_reason` |
+| `refund_amount` | a cancellation |
+| `rider_pay_total` | an assignment |
+| `affected_items` | `order.vendor_rejected` only |
+| `rider_name` | an assigned rider — trimmed, and absent when blank |
+| `stops` | an assigned rider with a route — the length of `stop_sequence` |
+| `eta` | an ETA could be computed, from the assignment or the promised time, in the city's timezone as `HH24:MI` |
+
+`currency` is read from the **order row**, never from `settings`, because `cities.currency` is
+per-row and an admin can change it. It is `btrim`'d because the column is `bpchar` and SQLite-style
+padding turns `'EGP'` into `'EGP '`, which `Intl.NumberFormat` rejects. Render the currency from this
+string; do not hardcode `EGP`.
+
+Separately, `notification_templates.variables` (§8b) is the list of placeholders a **template**
+declares. The two lists overlap but are not the same thing, and neither one is the `data` column a
+`notifications` row would carry.
 
 ### 8b. Notification centre — a `notifications` table the app reads directly
 
