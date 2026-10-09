@@ -13,6 +13,7 @@
  * instead of letting each feature invent its own check.
  */
 
+import { reportError } from "@/services/analytics";
 import { parseServerError } from "@/services/errors/app-error";
 import { supabase } from "@/services/supabase/client";
 
@@ -29,7 +30,12 @@ async function invoke<Row>(fn: string, params: RpcParams): Promise<Row[]> {
     if (response.error !== null) throw parseServerError(response.error);
     return (response.data ?? []) as Row[];
   } catch (error) {
-    throw parseServerError(error);
+    // Report before rethrowing, and report the parsed error so the RPC name is the only context
+    // needed to locate the failure. The parsed form carries no payload, so nothing personal is
+    // attached.
+    const parsed = parseServerError(error);
+    reportError(`rpc:${fn}`, parsed);
+    throw parsed;
   }
 }
 

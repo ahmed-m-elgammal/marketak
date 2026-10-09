@@ -1,3 +1,5 @@
+import { AnalyticsProvider } from "@/services/analytics/analytics-provider";
+import { SessionProvider } from "@/features/auth";
 import { color } from "@/theme/tokens";
 import * as NativeSplash from "expo-splash-screen";
 import * as SystemUI from "expo-system-ui";
@@ -57,12 +59,18 @@ function ThemedShell() {
 }
 
 export default function RootLayout() {
-  // One provider at the root, and only one: it owns the gesture root, the themed page background,
-  // the portal host overlays render into, and the toast viewport. Nesting a second is a bug.
+  // One provider at the root, and only one of each: PanelUI owns the gesture root, the themed page
+  // background, the portal host overlays render into, and the toast viewport. Nesting a second is
+  // a bug. Analytics wraps the tree so every screen inherits one client; Session wraps it so there
+  // is exactly one onAuthStateChange subscription.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PanelUIProvider>
-        <ThemedShell />
+        <AnalyticsProvider>
+          <SessionProvider>
+            <ThemedShell />
+          </SessionProvider>
+        </AnalyticsProvider>
       </PanelUIProvider>
     </GestureHandlerRootView>
   );

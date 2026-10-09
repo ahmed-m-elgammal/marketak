@@ -28,6 +28,7 @@ import {
 } from "react";
 import * as Linking from "expo-linking";
 import { applyAuthCallback, signOut as signOutRequest } from "@/features/auth/api/sign-in";
+import { identify, resetIdentity } from "@/services/analytics";
 import { isAppError } from "@/services/errors/app-error";
 import { completeProfile, fetchProfileStatus } from "@/services/rpc/api";
 import type { ProfileStatus } from "@/services/rpc/dto";
@@ -113,11 +114,16 @@ export function SessionProvider({ children }: { readonly children: ReactNode }):
       if (session === null) {
         activeUserId.current = null;
         setProfile(null);
+        // Without this the next shopper's events attach to the previous shopper's identity on a
+        // shared device, which is both wrong data and a privacy leak.
+        resetIdentity();
         setSessionState({ status: "signed-out" });
         return;
       }
 
       activeUserId.current = session.user.id;
+      // Analytics identity is the Supabase user id and nothing else - no email, no phone, no name.
+      identify(session.user.id);
       setSessionState({ status: "signed-in", user: session.user, session });
       void loadProfile(session.user.id);
     });
