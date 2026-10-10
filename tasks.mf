@@ -1,0 +1,1342 @@
+# tasks.mf — Marketak remaining-v1 work plan
+
+Machine-readable project plan. Markdown per the owner-agreed format (phase
+headers, stable T-ids, `Status:` fields instead of checkboxes).
+
+## 0. Authority and constraints
+
+The executing agent has **no database access**. Every data fact below was
+verified live against project `erxxsebcqqcpkipzcdhg` (`marketak`,
+`eu-central-1`, Postgres 17.11, `ACTIVE_HEALTHY`) during planning, or is
+quoted from one of exactly three files. Nothing else is a source:
+
+- Live database (verified 2026-10-10, read-only `SELECT`s): full `*_v1`
+  RPC catalogue read — every RPC this plan calls exists with the
+  documented args (`quote_order_v1`, `place_order_v1`, `cancel_order_v1`,
+  cart ×2, addresses ×4, profile ×3, discovery ×2, full rider set, device
+  token, flags, earnings); CHECK vocabularies match §4 exactly (orders 9,
+  sub_orders 9, assignments 10, payment 4, settlement 4, rider 4, vehicle
+  4, channels, methods, `is_online` CHECK, totals formula); 13 `settings`
+  keys exactly as listed; `authenticated`: riders SELECT=false, orders
+  SELECT=true, addresses INSERT=false, notifications UPDATE=false; zero
+  tables without RLS; `claim/mark_events_v1` are service_role-only while
+  app RPCs grant `authenticated`; push routing returns exactly the 7
+  documented rows; 19 template keys × ar/en. (`normalize_text_v1` also
+  exists; no task uses it — observed, out of scope.)
+- `specs-mobile/README.md` — the database contract. Wins every dispute
+  about data. It is a transcription: the agent **never edits it**.
+- `apps/mobile/README.md` — the mobile architecture contract (8 layers,
+  7 rules, folder tree). Map over tree.
+- `AGENTS.md` — the 11 standing rules, checklists A/B/C, commit protocol.
+- `DESIGN.md` v2.0 ("Telemetry Dispatch Terminal", dark-only) — the
+  interface contract AND the sole styling authority: frontmatter tokens
+  are canonical and win over prose; feature code references tokens only,
+  never raw hex or numbers, never an invented value; layout follows the
+  measured window, never the device; courier terminal highest density
+  56/48, customer medium 48; theme layer before screens (§15 RN overrides
+  first); every screen exits through the §17 pre-ship checklist with
+  unverified items listed. §18 defaults assumed + flagged (text wordmark
+  icon; 30 s dispatch window; 8 km/h + 150 m; Western digits in telemetry,
+  locale digits in prose). DESIGN.md merchant-console and live-map
+  sections are out of scope / out of v1 — never build from them.
+- Owner directions (explicit, not repo-derived): the Tamagui + NativeWind
+  + expo-image UI stack (§2, F-01/F-06); the agent never opens `supabase/migrations/`; no git
+  history is consulted — files absent from the working tree are never
+  authority.
+
+Not sources: git history, `CHANGELOG.md` (removed by owner direction),
+`decisions.md`, migration internals. Where this plan names a prior record,
+it does so only to flag a required human sync — never as build authority.
+
+- Living-record rule: with `CHANGELOG.md` removed, AGENTS.md rule 6
+  (same-commit docs sync) still holds — each task's record goes to the
+  repo's current living-docs location; if none exists, the task notes the
+  record in its commit message and flags it under §5 Q3 instead of
+  inventing a file.
+- `specs-mobile/README.md` §14 queries, P4 implementation, real-push
+  observation, store-console actions, anything needing `SUPABASE_DB_URL`
+  are **reviewer-side** (human with access), cited under `Verify (human)`.
+  `check:policies` exits **2** without DB access: "unchecked", never "clean".
+
+Out of scope: `apps/admin-web`, `apps/vendor-web`, `packages/ui`
+(absent from the working tree — verified by directory read); live rider
+tracking / map (§13, out of v1); any screen in §13's no-build list.
+
+## 1. Task schema
+
+Every task is a `### <ID>` block with exactly these fields:
+
+- `Status:` — one of `pending | in_progress | blocked | in_review | done`.
+  All start `pending`. `in_review` = agent work complete, needs human/DB
+  verification. Only `done` unblocks dependents.
+- `Depends on:` — stable IDs, `none`, or `P<n> exit` (whole phase gate).
+- `Inputs:` — files/sections the agent must read first. DESIGN.md cites
+  are section-precise (`DESIGN §9.2`, not "the design").
+- `Outputs:` — deliverables (contract paths from `apps/mobile/README.md` §1).
+- `Acceptance:` — verifiable, evidence-based criteria. UI tasks cite the
+  quality bar (§1.1) plus task-specific points. No vague verbs.
+- `Verify:` — repo commands. Never edited tests, never `.skip`/`.only`.
+- `Risks:` — optional; known traps from the contracts.
+
+Rules: IDs unique and stable. Every `Depends on` target exists. Graph is
+acyclic. Priority never overrides a dependency. Tasks appending to the same
+barrel file (`services/rpc/index.ts`, `packages/shared/src/index.ts`) are
+explicitly sequenced, never parallel. `.gitkeep` is deleted the moment the
+first real file lands in its folder (AGENTS.md rule 11).
+
+### 1.1 UI quality bar (every task that ships a screen)
+
+Derived from DESIGN.md §§2–9, 11–15 and AGENTS.md A4. A screen is not done
+until all applicable lines hold; the §17 checklist is run per screen and
+unverifiable items are listed, never silently passed.
+
+- States: loading = square loader only (3×8px squares, 160 ms sequence;
+  control width frozen, taps ignored, busy announced; reduced motion =
+  static `LOADING` text — never a round spinner); error = server copy
+  verbatim for business failures, input errors per DESIGN §9.6 (crimson
+  border + glyph + `body-sm` row); empty = 32 glyph + heading stating what
+  is empty + `body-md` next step + one action (§9.9); disabled primary
+  always carries a one-line reason caption.
+- Component states: default, pressed (feedback at 0 ms, ≥100 ms visible,
+  rectangular — native ripples/highlights replaced per §15), focus-visible
+  (2 px `focus-ring` + 2 px offset, never removed), disabled, loading,
+  error, selected (4 px leading `cobalt-high-beam` bar + `surface-raster-2`).
+- Type: tabular numerals everywhere (`fontVariant: tabular-nums`);
+  amounts/codes/coords never truncated, never count-up animated; Arabic:
+  no uppercase transform, `letterSpacing` 0, bundled fallback font (Space
+  Grotesk / JetBrains Mono cover no Arabic — §3.2/§13.5), line heights
+  rounded up to 4 px grid; bidi isolates (U+2066–U+2069) around IDs, codes,
+  coords, amounts inside RTL text; OS scale to 150 % (`label-*` cap 130 %),
+  rows/buttons `min-height` so text growth reflows.
+- Layout from the live window (§4.1: verify at 360/600/840/1200 widths and
+  375/900 heights): 56 primary / 48 secondary targets, 48 hit areas, 8 px
+  gaps; primary action ≤480 wide, in-thumb-reach; resize/rotation preserves
+  sheet snap, scroll, selection, form drafts; keyboard snaps sheet to full
+  + action above IME; edge-to-edge with insets respected (bottom action
+  padding = `max(inset,16)+8`); compact-height landscape goes side-by-side.
+- Contrast from the §2.5 table, not judgment: no cobalt `#1D4ED8` as text/
+  border/icon on dark; no text on high-beam fill; white text only on
+  cobalt-electric; crimson text only on raster-0/1; control boundaries
+  `wire-border-control` 0.40 (mid/dim are dividers, never control bounds);
+  every state pairs color + glyph + text label (§2.3).
+- Icons: Material Symbols Sharp only (never Rounded), courier `wght` 600 /
+  customer 400, FILL 1 when active, 20/24 (32 empty states only); RTL
+  mirrors arrows/chevrons/`keyboard_double_arrow_right`, never `navigation`,
+  clocks, checks, barcodes; shipped in-binary, never fetched (§7).
+- Motion tokens only (§8 durations + linear/standard easing); reduced
+  motion removes pulses/sweeps, swaps slides for instant changes; no
+  springs, no parallax, no auto-carousels.
+- Accessibility (§12): accessible name matches visible text; reading order
+  = visual order; live ETAs `polite`, throttled (≤ every 30 s or ≥1 min
+  change); offers/emergency/breach `assertive`; every drag/long-press/swipe
+  has a tap alternative (slide rail → button + confirm dialog, §9.2);
+  haptics/sound never the only feedback; focus order verified on tablets.
+- Voice (§13.1–13.2): terse imperative, sentence-case body/labels,
+  glossary (courier, customer, merchant, dispatch, order, pickup,
+  drop-off, handoff, vertical) — "driver" never appears. Formats (§13.3):
+  countdowns `MM:SS`, locale clock for arrival, one unit per screen,
+  merchant currency tabular, trailing-aligned in tables.
+- Imagery (§13.4): 4:3 menu / 1:1 grocery, `wire-border-dim`, unfiltered;
+  missing photo = raster-1 block + `image` glyph; parcel = glyph, no photo.
+- System states (§11): offline = cached content + age + writes disabled
+  with reason; stale data shows `UPDATED xx AGO`, never stale ETA as live;
+  unknown telemetry = `--`, never `0`.
+- Privacy/safety (§14): pharmacy item names never in notifications, lock
+  screens, switcher snapshots, or courier manifests (sealed-package copy);
+  camera/location denied = manual path + settings-action empty state;
+  permissions requested in context with a one-line why.
+- Tests (AGENTS.md rule 4): every behaviour ships edge-case **and**
+  failure-path tests — loading, error, empty, offline, denied-permission,
+  RTL, 150 % scale, reduced motion, screen-reader labels. Suites are never
+  weakened to pass.
+
+### 1.2 Data quality bar (every task that touches the boundary)
+
+Money fails closed (nonnegative ints, parse failure throws — never renders
+`0`); unknown keys `.passthrough()`; first schema mismatch per RPC
+recorded; error code parsed from the message head (PostgREST `code` is
+always `P0001` per §9); client never prices, never judges eligibility,
+never runs the state machine — it sends intent, renders the server's
+answer, branches on codes (§1 of the db contract).
+
+Verification commands (from root `package.json`, all verified present):
+
+```
+npm run typecheck   # tsc --build (+ workspaces)
+npm run lint        # eslint .
+npm test            # vitest run (packages/*, apps/* — NOT functions/*, see W-01)
+npm run test:integrity                        # scripts/check-test-integrity.mjs
+npm run check:secrets  npm run check:hardcoded-colors
+npm run check:policies # needs SUPABASE_DB_URL; exit 2 = unchecked
+npm run check:status-types
+npm run verify      # all of the above in order
+npm run deps:check  # from apps/mobile — the architecture gate
+npm run align       # from apps/mobile — expo install --check (SDK 57 floor)
+```
+
+Coverage floors (`vitest.config.ts`, verified present): lines/functions/
+statements 80, branches 70, over `packages/shared/src/**` +
+`apps/mobile/src/services/**`.
+
+## 2. Phases
+
+| Phase | Objective | Entry | Exit |
+|---|---|---|---|
+| P0 Foundation | Toolchain, boundary layers, theme, session/role, icon+font delivery — nothing shippable, everything later depends on it | Contracts read (§0) | `deps:check` green with fixture proof recorded; `verify` green except documented `check:policies` exit-2 |
+| P1 Customer slice | Specs-mobile §20 steps 1–9: browse → cart → address → quote → place → track → cancel | P0 exit | Full customer flow; P1-09 green; §17 checklists per screen recorded |
+| P2 Rider slice | Specs-mobile §20 step 10: read-and-claim only; stop at §13 gaps | P1 exit (`apps/mobile/README.md` §11: one customer slice before any rider slice) | Claim → collect → deliver path green; missing-RPC screens absent, not stubbed |
+| P3 Worker hardening | Suite integrity + worker notes evidenced in-tree | None (parallel-safe; touches only `functions/`, root config, living record) | Worker tests run in `npm test`; type note closed; manual-only validations documented as human |
+| P4 Backend gaps | The 6 ranked §13 gaps that need new RPCs. Agent writes backend **requirements** to the living record for a human DB engineer; builds nothing against them; never touches migrations | P1 exit (gap surfaces are defined by slices) | Requirements recorded per §15 conventions; app surfaces stay absent by rule |
+| P5 Launch gates | Evidenced device/infra gates (storage signer, APNs, Android SHA) | None (parallel-safe) | Each gate closed with evidence or recorded `blocked` with owner |
+| P6 Store submission | App Store + Google Play readiness: build profiles, assets, listings, review prep | P1 exit; S-03 needs P5 closed | `eas.json` + assets + metadata in-tree and consistent; human console steps named with owners |
+
+---
+
+## P0 — Foundation
+
+### F-01
+
+- Status: in_review
+- Title: Install Tamagui + NativeWind + expo-image + push/auth/icon dependencies
+- Depends on: none
+- Inputs: `DESIGN.md` §§3.2/7/9/15 (bundled fonts + Sharp icons
+  in-binary; §9 component specs; RN override table),
+  `apps/mobile/package.json` (installed 2026-10-10, all SDK-57-agreeing
+  per `align`: `tamagui ^2.7.7`, `nativewind ^4.2.7` + `tailwindcss
+  ^3.4.19`, `expo-image ~57.0.5`, `expo-notifications ~57.0.22`,
+  `expo-auth-session ~57.0.14`, `expo-apple-authentication ~57.0.2`,
+  `@react-native-firebase/{app,analytics,crashlytics} ^26.4.0`;
+  pre-existing Expo pins confirmed SDK-current by `expo install --fix`,
+  unchanged), `apps/mobile/app.json` (config plugins auto-added for
+  expo-image + firebase at install — verify at implementation),
+  metro/babel configs (compiler + utility wiring per the installers'
+  documented Expo procedure)
+- Outputs: `apps/mobile/package.json` (+ lockfile) with Tamagui
+  (+ compiler config), NativeWind + tailwind config, `expo-image` +
+  `src/theme/` (Tamagui dark theme from DESIGN tokens: radius 0 all
+  sizes, colors/fonts; tailwind config mapped from the same frontmatter;
+  ONE token source with a documented boundary — Tamagui theme owns kit
+  components, utilities own layout/custom, no value lives in both;
+  rectangular press states, square switch/checkbox/radio per §9.5, 2 px
+  focus treatment); Space Grotesk 600/700 + JetBrains Mono 400/500/600/700
+  + Arabic fallback font + Sharp icon set bundled (expo-font config);
+  auth via system-mediated OAuth only (Google + Apple, no embedded
+  credential entry — `npm run align` must pass); push-token module
+  present for F-08. Custom-build boundary recorded: rail, signature,
+  square loader, scanner overlay exist in no kit and are built per §9
+  (F-06/R-04/R-05) — everything else comes   from the kit + utilities. Baseline recorded 2026-10-10: shared
+  toolchain aligned to root (TS ~6.0.3, vitest ^5; duplicate installs
+  pruned); root `dependency-cruiser` removed (no root consumer — mobile
+  keeps its own); one TS6-surfaced lint fixed (`errors.ts` no-op
+  assertion, rule-proven). Session record 2026-10-10: display-name
+  locales (`assets/locales/ar|en.json`) restored so export works;
+  `babel-preset-expo@~57.0.14` added as devDep (Metro could never resolve
+  it — every prior bundle attempt was broken); Sharp icons resolved via
+  `@expo-google-fonts/material-symbols-sharp@0.4.61` (8/8 fonts bundled,
+  magic-verified); Metro `expo export` proof passed (2009 modules);
+  token↔tailwind parity spot-checked identical; `react-native-web`
+  correctly refused (ERESOLVE vs react 19.2.3; native Tamagui chain
+  verified clean of it). Session record 2026-10-10 (boot proofs): live
+  `expo start` runs caught two runtime-only Tamagui validations no gate
+  can see — `space` gained `true: spacing.md`, `zIndex` became numeric
+  slots 0–6 over token values (full dev-validation list read from
+  Tamagui's bundle: size/space `true`, radius/zIndex overlap — all four
+  now satisfied). Firebase loads behind a guarded `require` (Expo Go
+  has no native modules; silent + one warn there, real in dev builds).
+  Remaining: human dev-build render both platforms + airplane-mode icon
+  check — unperformable until screens exist (C-01/R-01), so this task
+  closes on first rendered screens, not before.
+- Acceptance: `npm run align` passes (green at install 2026-10-10;
+  re-verify after wiring); a planted rounded-default component fails the theme assertion —
+  radius 0 proven, not assumed; compiler output verified on a dev build
+  (human: both platforms render); theme and utilities never disagree
+  (spot-check the same token through both paths); icon font renders the
+  §7 courier glyph set offline (airplane-mode render check, human);
+  Arabic glyphs render from the fallback, digits from JetBrains Mono
+  (§13.5); no version hand-pinned against the SDK manifest
+- Verify: `npm run align`, `npm run lint`, `npm test`
+- Risks: two styling engines — the boundary doc is load-bearing, and any
+  value living in both configs is a defect. Installed versions are listed
+  in Inputs; re-verify with `align` after any bump; a version breaking
+  SDK 57 agreement is rejected, not forced. The compiler adds build time
+  — acceptable, recorded.
+
+### F-02
+
+- Status: done
+- Title: Prove the dependency-cruiser rules fail for the right reasons
+- Depends on: none
+- Inputs: `apps/mobile/README.md` §4 (six fixtures),
+  `apps/mobile/.dependency-cruiser.cjs` (verified present on disk)
+- Outputs: Observed evidence 2026-10-10 (fixtures created, run, removed;
+  tree green after). Of the six README-named violations exactly ONE fired:
+  fixture 5 → `no-second-money-module`. Fixtures 1/4/6 (cross-zone,
+  deep-rpc, shared-zone) produced nothing: their rules use `path.join`
+  constants, which compile to backslash regexes that never match
+  forward-slash cruised paths — the rules are inert on Windows (they work
+  on POSIX, where `path.join` yields slashes). Fixtures 2/3 produced
+  nothing: `only-model-is-public`, `no-circular` and
+  `rpc-entry-is-the-barrel-only` do not exist in the config. A barrel
+  probe (feature → `services/rpc/index.ts`) also produced nothing —
+  inconclusive, same inert rule. README fixture relative paths were all
+  corrected (off by depth as written; intent preserved). Orphan rule:
+  only fully isolated files fire it; files with outgoing edges do not.
+  Config comment + eslint message reference a non-existent
+  `services/rpc/api.ts` (the barrel is `index.ts`). See §5 Q8.
+- Outputs note (owner decision implemented 2026-10-10, "fix the config
+  to match the map", zero package changes): forward-slash literals
+  throughout; the 3 missing rules installed (`only-model-is-public`
+  transcribed verbatim incl. back-refs, `no-circular`,
+  `rpc-entry-is-the-barrel-only` — which REPLACES
+  `no-rpc-call-outside-the-wrapper`, whose literal meaning banned the
+  barrel itself); `no-supabase-outside-the-client` rescoped to
+  `src/services` + direct-only (`reachable` flagged the sanctioned
+  barrel chain itself); `state/ui.ts` carved out of the store rule
+  (Q12); `api.ts` refs fixed. Proof re-run: exactly the 6 named
+  violations, one per fixture, zero on the 91-module legit tree
+  (push→barrel, session→client all silent); fixtures removed, green.
+  README §4 synced same-commit (rpc row, all six fixture depths, F1
+  rule name). Fixtures stay uncommitted by design — Q2 still open.
+- Acceptance: Proof recorded with actual violation sets above (the six
+  named violations as written are unachievable — three rules absent, five
+  inert on this platform); final `npm run deps:check` is green
+- Verify: `npm run deps:check` from `apps/mobile`, before and after
+- Risks: `apps/mobile/README.md` §4 says "commit the config and the
+  fixtures together" — permanent violation fixtures would keep every gate
+  red, so proof is recorded, not committed. Unresolved tension, see §5 Q2.
+
+### F-03
+
+- Status: done
+- Title: Create the single Supabase client layer
+- Depends on: none
+- Inputs: `apps/mobile/README.md` §§2–4 (R4), `specs-mobile/README.md` §2
+  (publishable key, Google + Apple only)
+- Outputs: `src/services/supabase/` (`client.ts`, `env.ts`); first real
+  files replace their `.gitkeep`s. Boot-validated env; a service-role key
+  is refused, never used (a renamed variable must not silently escalate
+  past all RLS policies — live-verified: zero tables without RLS, and
+  `authenticated` holds SELECT-only throughout §3); offline reachability
+  observable for the §11 offline banner
+- Acceptance: Exactly one module imports `@supabase/supabase-js`; any
+  second client import fails `deps:check` (R4); no `service_role` string
+  anywhere under `apps/mobile/src`; network failure surfaces as a typed
+  transport error (not a business code), tested with fakes
+- Verify: `npm run deps:check`, `npm run check:secrets`, `npm test`
+
+### F-04
+
+- Status: done
+- Title: Build the typed RPC boundary over `packages/shared` DTOs
+- Depends on: F-03
+- Inputs: `specs-mobile/README.md` §15 (transcribed signatures —
+  cross-checked live: every RPC below verified present with these args),
+  `packages/shared/src/` (`dto.ts`, `commands.ts`, `errors.ts`,
+  `status.ts` — verified present on disk), `apps/mobile/README.md` §8
+  (Zod rules: money fails closed, `.passthrough()`, record first mismatch)
+- Outputs: `src/services/rpc/` (`index.ts` barrel — the only importable
+  entry, `call.ts`, `reads.ts`, `dto/`, `schemas/`); Zod schemas validate
+  into the shared DTO shapes. `specs-mobile/README.md` §15's
+  `src/services/rpc/dto.ts` / `api.ts` paths do not exist in the working
+  tree (`services/rpc/` holds only stubs) — shared package is the home per
+  AGENTS.md rule 11
+- Acceptance: bar §1.2 holds; `supabase.rpc()` occurs only in `call.ts`;
+  one shape per RPC; RPCs never executed against the live DB
+  (`get_vendor_feed_v1`, `cancel_order_v1`, `search_catalog_v1` per mobile
+  README §8) decode as `z.unknown()` with a TODO, not a guessed schema;
+  transport errors (timeout, offline, 5xx) map distinctly from business
+  codes and are covered by failure-path tests; retry policy: idempotent
+  reads may retry, writes retry only with the same idempotency key
+- Verify: `npm run typecheck`, `npm run lint`, `npm run deps:check`,
+  `npm test`
+
+### F-05
+
+- Status: done
+- Title: Implement the error behaviour layer
+- Depends on: F-04
+- Inputs: `apps/mobile/README.md` §7 (behaviour table + per-call
+  overrides), `specs-mobile/README.md` §9 (code lists, both raise styles),
+  `packages/shared/src/errors.ts` (`AppError`, `BEHAVIOUR_CODES` —
+  verified present on disk), `DESIGN.md` §13.1 (voice: server copy
+  verbatim, terse, no "Oops")
+- Outputs: `src/services/errors/` (`parse.ts`, `behaviour.ts`,
+  `toBehaviour()`, `overrides.ts`); extends shared `AppError`, never a
+  second parser
+- Acceptance: `PRICE_CHANGED` re-quotes, shows the new total, waits for
+  consent — never silent re-place; `cancel`/`claim` `NOT_AUTHORIZED`
+  surfaces "not your order", not a sign-in loop; `ITEM_PRICE_CHANGED` /
+  `DELIVERY_FEE_CHANGED` have no branches (no live function raises them —
+  verified: absent from the §9 code lists); `GROUPING_INVALID` /
+  `TIP_INVALID` / `VOUCHER_*` mapped (raised inside the quote path per
+  §9); every §9 `conflict` code has a re-read path, every `invalid-input`
+  code maps to its field; Arabic server messages render verbatim with bidi
+  isolates where embedded in layout
+- Verify: `npm test` (behaviour + override unit tests, incl. failure
+  paths for every mapped code), `npm run typecheck`
+
+### F-06
+
+- Status: in_review
+- Title: Establish theme tokens, UI wrapper inventory, i18n, and platform overrides
+- Depends on: F-01
+- Inputs: `DESIGN.md` frontmatter (canonical tokens) + §§2–9, 12–13, 15
+  (RN override table), 17 (checklist), `apps/mobile/README.md` §§1–2
+  (L4/L5), `specs-mobile/README.md` §§8b/11/18 (jsonb language objects,
+  Arabic default, `preferred_language ar|en`)
+- Outputs: `src/theme/` (tokens + Tamagui theme + tailwind config +
+  design rules + RN override notes: no `borderRadius`, rectangular press
+  states, sibling-rectangle hard shadows on Android, `tabular-nums`),
+  `src/ui/` wrapper inventory mapping each wrapper to its Tamagui source
+  — or marking it custom-built where Tamagui has no equivalent (slide
+  rail §9.2, square loader §9.9, signature/scanner §9.10), or
+  `expo-image`-backed for menu/vendor photography (cached, skeleton while
+  loading §9.9, missing-photo glyph block §13.4), `src/i18n/` (`index.ts`,
+  `useT.ts`, `ar.json`, `en.json`, `pickLang.ts`) with full Arabic plural
+  categories, RTL via RN `I18nManager` + layout-direction-aware
+  components,   bidi-isolate helper for IDs/codes/coords/amounts, Arabic
+  label-treatment helper (no uppercase transform, `letterSpacing` 0).
+  Session record 2026-10-10, two deviations: (1) `photo-image` rendering
+  proof deferred to C-02 — no screen exists to host it and the node test
+  env has no RN renderer; the inventory binding (expo-image, 4:3/1:1,
+  skeleton, glyph block, unfiltered) is done and tested. (2) Tamagui
+  `fonts` block added (heading/body/arabic, derived slot-by-slot from
+  tokens; arabic weights collapse to the two shipped files, tracking 0
+  per §13.5) and radius scale derived from `radius.none`; `trackingPx`
+  converts token em to the px Tamagui requires (native-only derivation).
+  Font boot (`useAppFonts` + splash gating + RTL policy) wired in
+  `app/_layout.tsx`.
+- Acceptance: Zero hardcoded colours/spacing in components
+  (`check:hardcoded-colors` green — values from tokens/theme/utilities,
+  never literals); radius 0 asserted (no rounded kit default survives);
+  §2.5 contrast pairs asserted where feasible (no cobalt-on-dark, no
+  text-on-high-beam); wrapper inventory complete per the mapping (Tamagui
+  source, custom-build, or expo-image named — there is no in-tree target
+  list, so completeness is judged against DESIGN §9 + the installed set);
+  expo-image renders fixed-aspect (4:3/1:1) with placeholder → photo and
+  no layout shift, unfiltered; Arabic counts render all CLDR forms; time
+  assertions use zone-derived invariants, never literal hours (literals
+  bake in DST assumptions — Egypt observes daylight saving); §17 checklist
+  procedure documented for reuse by every screen task
+- Verify: `npm run lint`, `npm run check:hardcoded-colors`, `npm test`,
+  `npm run typecheck`
+
+### F-07
+
+- Status: done
+- Title: Implement session, role probe, and query-cache discipline
+- Depends on: F-03, F-04
+- Inputs: `apps/mobile/README.md` §6 (session as TanStack Query, role via
+  `get_my_rider_profile_v1`/`NOT_A_RIDER`, user-id-scoped keys,
+  union-trap filters — RPC verified live with zero args),
+  `specs-mobile/README.md` §§7/12, `DESIGN.md` §11 (stale ages, offline
+  banner)
+- Outputs: `src/services/auth/session.ts`, `src/services/cache/`
+  (`queryClient.ts`, `query-keys.ts`), `src/features/shared/auth/`
+  (`use-session.ts`, `use-role.ts`, `provider.tsx` — one session
+  subscriber), `app/_layout.tsx` consuming (not computing) gates
+- Outputs note (session record 2026-10-10): rider half added —
+  `RiderAssignment` DTO (shared, operational subset), `schemas/rider.ts`
+  (`riderProfileSchema` + `assignmentSchema`), barrel `riderProfile()`
+  (`NOT_A_RIDER`→null, rest rethrow), `reads.riderAssignments` scoped on
+  `rider_id`. `state/ui.ts` is a `useSyncExternalStore` cell (no store
+  dependency). Stale age renders via shared `formatRelativeInZone` —
+  no second formatter.
+- Acceptance: Role switch → scoped `removeQueries` (session kept);
+  sign-out → `queryClient.clear()` + `state/ui.ts` reset; customer
+  history filters `user_id = auth.uid()` server-side in `reads.ts`;
+  rider reads go through `delivery_assignments.rider_id`; no `orders`
+  rows leak across roles (union trap covered by tests with fakes —
+  live-verified: `owned_or_assigned`/`visible` resolvers back the
+  relationship-scoped policies per §12); session-expired mid-flow routes
+  to sign-in without looping (guard distinguishes signed-out / non-role /
+  pending); stale cache shows age, never pretends live
+- Verify: `npm test`, `npm run typecheck`, `npm run deps:check`
+
+### F-08
+
+- Status: done
+- Title: Implement analytics slot and push-registration wiring
+- Depends on: F-03, F-04, F-07
+- Inputs: `apps/mobile/README.md` §1 (`services/analytics/provider.ts`,
+  `services/push/fcm.ts|register.ts|routing.ts`),
+  `specs-mobile/README.md` §8d (call on launch **and** every sign-in;
+  response is server state, never echoed — RPC verified live with
+  `p_token, p_platform, p_app_role, p_app_version`) + §8a routing table
+  (live-verified: exactly 7 rows — which templates reach which role),
+  `DESIGN.md` §§9.11/14 (dispatch alert surfacing: time-sensitive /
+  full-screen intent channels; pharmacy payloads sealed); owner decision:
+  Firebase Analytics + Crash Reporting (this task); `google-services.json`
+  present at root (Android), iOS plist absent (verified)
+- Outputs: `src/services/analytics/provider.ts` wired to Firebase
+  Analytics + Crashlytics (SDK versions verified vs SDK 57 at install;
+  the provider module stays the single import point),
+  `src/services/push/` modules, `src/features/shared/device/`
+  (permissions + prompt with one-line why + manual path); re-register on
+  sign-in **and** language change (`device_tokens.language` is per
+  registration); notification channels created per DESIGN §9.11
+  (courier dispatch = interruptive; pharmacy = sealed copy)
+- Outputs note (session record 2026-10-10): token source is
+  `expo-notifications` `getDevicePushTokenAsync` — installed typings
+  verify it returns the NATIVE FCM/APNs token on bare workflow, so no new
+  messaging dependency and the Worker path (§8a) is preserved. Language
+  flows account-side (see Q10); `syncLanguageAndRegister` is the explicit
+  path. `GoogleService-Info.plist` still absent — iOS Crashlytics +
+  Analytics recorded `blocked` (Android ships on `google-services.json`,
+  project `jaylak-a080-4836e`, package `com.jaylak.mobile`). Console
+  observables (Analytics DebugView, crash console) and true device
+  delivery stay human-side per Risks. Boot proof 2026-10-10: Expo Go is
+  UI-only by platform policy — remote push removed from Go in SDK 53
+  and Firebase native modules absent, so registration skips gracefully
+  there; device validation needs a dev build (`expo run:android`/EAS).
+- Acceptance: Registration carries the device's real `language` +
+  `app_version`; `TOKEN_ALREADY_REGISTERED` handled, not crashed on;
+  permission denied = degraded mode with rationale + settings path, never
+  a dead end; no fabricated tokens in tests (fakes only); analytics
+  events flow through the provider (console debug-view observable,
+  human); fatal + non-fatal crash reports reach the console (human);
+  no pharmacy item names or patient details in analytics or crash
+  payloads (DESIGN §14 — asserted with fixture payloads in test)
+- Verify: `npm test` (denied/allowed/changed-language matrix + payload
+  scrubbing), `npm run typecheck`, `npm run lint`
+- Risks: iOS analytics/crash reporting needs `GoogleService-Info.plist`
+  (absent — human prerequisite; record `blocked` if still missing at
+  implementation); SDK versions from the installers, align-gated; true
+  push delivery validation needs a device + APNs key — human-side
+  (P5 L-02/L-03, P3 W-03).
+
+---
+
+## P1 — Customer slice (specs-mobile §20 steps 1–9)
+
+### C-01
+
+- Status: pending
+- Title: Build auth screens + profile-gate onboarding
+- Depends on: P0 exit
+- Inputs: `specs-mobile/README.md` §§10/15 (gate semantics, `missing[]`
+  order, `PHONE_IN_USE_BY_RIDER` → support not retry — both profile RPCs
+  live-verified with the documented args),
+  `apps/mobile/README.md` §1 (`app/(auth)/`, `features/customer/account/`),
+  `DESIGN.md` §§9.6/9.9/13.5 (56/48 input beds, focus/error styles,
+  helper text, label-above 8-gap; Arabic no-uppercase labels)
+- Outputs: `app/(auth)/` routes, account `screens/` + `model/`; address
+  requirement routes to C-05's RPC (no profile RPC clears it); phone input
+  validated to `^\+[1-9][0-9]{7,14}$` client-side before sending
+  (server re-validates — client check is UX, not authority)
+- Acceptance: bar §1.1 applied, §17 checklist run per screen; no-profile
+  user browses but `place_order_v1` path is unreachable in UI (server
+  enforces; UI reflects); Google + Apple only — no email/password/
+  phone-OTP surface; `PROFILE_ALREADY_COMPLETE` routes to update, not
+  retry; field errors (`NAME_INVALID`, `PHONE_INVALID`, `PHONE_IN_USE`)
+  attach to their fields, `PHONE_IN_USE_BY_RIDER` routes to support;
+  sign-in failure (cancelled, network, provider error) leaves a
+  recoverable state with retry, never a dead end; loading/error states on
+  every async control; `missing[]` renders as a checklist in contract order
+- Verify: `npm test` (gate matrix incl. failure paths + RTL + scale),
+  `npm run typecheck`, `npm run lint`
+
+### C-02
+
+- Status: pending
+- Title: Build discovery (feed + search)
+- Depends on: F-04, F-06
+- Inputs: `specs-mobile/README.md` §15 (`get_vendor_feed_v1`,
+  `search_catalog_v1` — both live-verified with the documented args),
+  §19 (trigram 3+ chars, debounce; partial-index predicates),
+  `DESIGN.md` §§4.5/9.4/13.4 (catalog grid 2-col ≥160 cards; 48-min rows;
+  4:3/1:1 imagery + missing-photo block; vertical color+glyph coding §2.2)
+- Outputs: `features/customer/discovery/` (`screens/`, `widgets/`,
+  `model/`); `p_limit`/`p_offset` clamped client-side to contract ranges
+  (1–40/0–2000 feed, 1–50 search) before sending
+- Acceptance: bar §1.1 applied; `availability` rendered as one string
+  (`open|paused|closed`) with glyph + label (never color alone §2.3);
+  search discriminates on `kind` before reading `item_*`; empty query =
+  ranked vendor list, not an error; unknown sort falls back to `rating`
+  (mirrored, not fought); search fires debounced at 3+ chars with empty +
+  no-result states; vendor rows multiply-safe (`vendor_areas` EXISTS
+  semantics respected — no join fan-out in counts)
+- Verify: `npm test` (kind discrimination, empty states, clamp edges),
+  `npm run typecheck`, `npm run deps:check`
+
+### C-03
+
+- Status: pending
+- Title: Build vendor detail + menu
+- Depends on: C-02
+- Inputs: `specs-mobile/README.md` §17.2 (sized `pricing_mode` ⇒ price
+  from `menu_item_sizes`, size mandatory; negative `price_modifier` is a
+  discount), §19 (`menu_version` cache-buster, `display_order` indexes),
+  `DESIGN.md` §§9.4/9.7 (manifest rows; product cards; quantity stepper
+  `[-] 02 [+]` 48-buttons + long-press repeat; monospaced tabular prices)
+- Outputs: Vendor route + menu rendering from direct reads; menu cached
+  against `vendors.menu_version`; option stepper + size selector widgets
+- Acceptance: bar §1.1 applied; sized item without a size cannot reach the
+  cart (`SIZE_REQUIRED` surfaced at selection, confirm disabled with
+  reason); renamed items in an open cart still render (cart snapshot, not
+  a re-join); out-of-stock / retired items render unavailable with reason,
+  never silently dropped from the menu; `deleted_at` rows filtered in
+  every query (§17 preamble); stepper long-press + tap alternative for
+  switch control (tap = single step)
+- Verify: `npm test` (size gating, snapshot rendering, filter edges),
+  `npm run typecheck`
+
+### C-04
+
+- Status: pending
+- Title: Build cart
+- Depends on: F-04, F-05, C-03
+- Inputs: `specs-mobile/README.md` §§6/15 (`upsert_cart_item_v1`,
+  `remove_cart_item_v1` — both live-verified with the documented args;
+  line-identity merge rule, `is_new`), `DESIGN.md` §§9.4/9.7/13.3
+  (manifest rows; steppers; tabular currency, trailing-aligned)
+- Outputs: `features/customer/cart/` (`screens/`, `widgets/`, `model/`)
+- Acceptance: bar §1.1 applied; no price ever sent; identical lines merge,
+  sizes stay separate; `remaining === 0` renders empty-cart, not no-cart;
+  lines render from `display_snapshot`/`cached_price`; quantity 1–99
+  enforced with `INVALID_QUANTITY` at the boundary + stepper limits;
+  remove-failure rolls back optimistically with server copy; totals shown
+  are labelled estimates until quote (never presented as the charge)
+- Verify: `npm test` (merge/size matrix, rollback path, boundary
+  quantities), `npm run typecheck`, `npm run deps:check`
+
+### C-05
+
+- Status: pending
+- Title: Build address book with client-side area resolution
+- Depends on: F-04, C-01
+- Inputs: `specs-mobile/README.md` §6 (map-is-a-picker: intersect live
+  `areas` with zone-covered `area_id`s, nearest-centre pick + user
+  override; `UNKNOWN_KEY`, `AREA_UNAVAILABLE`, `NO_DELIVERY_ZONE`),
+  §17.3 (one-default invariant, soft-delete promotion), address RPCs
+  live-verified (`upsert`/`list`/`set_default`/`delete` with the
+  documented args), `DESIGN.md` §§9.6 (address form beds + labels +
+  helpers), 10 (map needs a vector-style provider + always a text
+  alternative — never map-only), 4.5 (forms 1-col compact, 640-max
+  medium+)
+- Outputs: `features/customer/address/` (`screens/`, `widgets/`,
+  `model/`); area chooser beside the pin (pin alone is insufficient —
+  the server never radius-checks); location permission denied = typed
+  entry + area list, never a dead end (§14 manual path)
+- Acceptance: bar §1.1 applied; areas failing the intersection are
+  unselectable with the server code surfaced; first address becomes
+  default; deleting the default promotes a survivor; `geohash` never
+  computed/sent client-side; `PATCH_EMPTY` / `UNKNOWN_KEY` attach to
+  their fields; address labels constrained to `home|work|other`
+  server vocabulary
+- Verify: `npm test` (intersection + default/promotion matrix,
+  denied-permission path), `npm run typecheck`
+
+### C-06
+
+- Status: pending
+- Title: Build checkout (quote → confirm → place)
+- Depends on: C-04, C-05, F-05
+- Inputs: `specs-mobile/README.md` §§6/15/16 (5-minute `expires_at`
+  countdown, required `p_idempotency_key` generated once per attempt,
+  `PRICE_CHANGED` re-price, `rejections[]` per-vendor with Arabic-only
+  `message_ar`, `meets_minimum`/`in_delivery_range` always true — never
+  bannered on, placeability = `rejections.length === 0` — both RPCs
+  live-verified with the documented args), one-order + N-`sub_orders`
+  invariant, `DESIGN.md` §§9.9/11/13.3 (dialogs stack primary-first
+  compact; countdown `MM:SS` + `dispatch-amber` + `timer` glyph; tabular
+  totals)
+- Outputs: `features/customer/checkout/` (`screens/`, `widgets/`,
+  `model/`); `rejections` as a real screen, not a toast; English
+  strings resolved from `code` client-side; quote-restore from the
+  server's `quote_*` cart memo when `quote_expires_at` is future
+  (re-quote when past — never write those columns)
+- Acceptance: bar §1.1 applied; expired quote re-quotes, never places;
+  price move shows the new total and waits for consent; reused idempotency
+  key surfaces `IDEMPOTENCY_KEY_TAKEN`, never a duplicate order (double-
+  tap places once); voucher failures render per-code with the shopper's
+  next action (never auto-dropped lines); `cash` only in v1 (no
+  wallet/top-up surface — live-verified `payment_method` CHECK admits
+  `cash|wallet` but §5/`place` contract prices v1 as cash: the app offers
+  only what the v1 flow prices — no wallet/top-up surface); totals
+  arithmetic matches the §16 formula (live-verified as
+  `orders_total_consistent`) or the client is wrong (assert in tests)
+- Verify: `npm test` (expiry, price-change consent, double-tap,
+  idempotency, every rejection code rendering), `npm run typecheck`,
+  `npm run deps:check`
+
+### C-07
+
+- Status: pending
+- Title: Build order history, status-timeline tracking, and cancellation
+- Depends on: C-06, F-07
+- Inputs: `specs-mobile/README.md` §§15/17.4 (`order_status_history` is
+  the spine; `address_snapshot` is the receipt; names from
+  `order_items`; rider name/phone from `riders_public`; poll — realtime
+  publication is empty §18), `cancel_order_v1` live-verified with the
+  documented args + `CANCEL_WINDOW_CLOSED`, `DESIGN.md` §§9.12/11 (route
+  stepper nodes carry meaning, rows tappable 48-min; stale ages, `--`
+  for unknown, never stale ETA as live)
+- Outputs: `features/customer/orders/` (`screens/`, `widgets/`, `model/`)
+  with a sane poll interval; destructive cancel behind a confirm dialog
+  (critical dialogs: no outside-tap dismiss §9.9)
+- Acceptance: bar §1.1 applied; timeline queried, never synthesised from
+  `orders.status` (live-verified: parent status is trigger-derived);
+  `order_modifications` ("your order changed") rendered where present; no
+  map/marker (out of v1); whole vs sub-order cancel distinguished via
+  `outcome`; `CANCEL_WINDOW_CLOSED` / `NOTHING_TO_CANCEL` handled with
+  server copy; offline = last timeline + age, actions disabled with reason
+- Verify: `npm test` (spine-vs-status, cancel matrix, offline/poll
+  edges), `npm run typecheck`
+
+### C-08
+
+- Status: pending
+- Title: Wire feature flags, promo shelf, and voucher history reads
+- Depends on: F-04
+- Inputs: `specs-mobile/README.md` §§15/17.7 (`get_flags_v1` with role +
+  semver — live-verified with the documented args — even though zero rows
+  today; `promo_slots` title/subtitle are jsonb language objects;
+  `voucher_redemptions` is own-rows history), `DESIGN.md` §13.4 (promo
+  imagery unfiltered rectangular; no mascots)
+- Outputs: Flag evaluation at boot/role-change, promo shelf, "my
+  vouchers" history
+- Acceptance: bar §1.1 applied (promo/empty states included); empty flag
+  set disables nothing and breaks nothing (data property, not API); raw
+  `select` on `feature_flags` never used (targeting only applies in the
+  RPC); voucher discount renders one of
+  `discount_amount`/`voucher_discount`, never both (§16, live-verified as
+  `orders_voucher_within_discount`); promo rows respect
+  `starts_at`/`ends_at` + `is_active` as display filters only (server
+  remains authority)
+- Verify: `npm test`, `npm run typecheck`
+
+### C-09
+
+- Status: pending
+- Title: Verify the customer slice end to end
+- Depends on: C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08
+- Inputs: AGENTS.md checklists A + commit protocol,
+  `DESIGN.md` §17 (per-screen checklists collected, gaps listed)
+- Outputs: Green gates; living-record entry per §0; living-record
+  location confirmed (if none exists, flagged per §0 rule instead of a
+  new file); contract sync if behaviour changed (same commit, never
+  "docs follow" — note: the contract transcription itself is never
+  edited by the agent)
+- Acceptance: `typecheck`, `lint`, `test`, `test:integrity`,
+  `check:secrets`, `check:hardcoded-colors`, `check:status-types` green;
+  `check:policies` green **or** documented exit-2 (unchecked, with
+  `SUPABASE_DB_URL` named); `deps:check` green; coverage floors hold;
+  no `.gitkeep` beside source; named-path staging, no `git add -A`;
+  every screen's §17 checklist on file with unverified items named
+- Verify: `npm run verify` + `npm run deps:check` from `apps/mobile`
+
+---
+
+## P2 — Rider slice (specs-mobile §20 step 10; read-and-claim only)
+
+Role note (DESIGN §0.4): the rider is the **courier terminal** — highest
+density, 56 primary / 48 secondary targets, glanceable ≤2 s screens,
+`wght` 600 icons. Speed-based §14 rules (moving lockout, stop-precondition
+timers) are inapplicable without a ping RPC (out of v1, §13) — enforced
+preconditions are geofence + explicit `I AM ON FOOT` where the contract
+provides coordinates; the limitation is recorded, not worked around.
+
+### R-01
+
+- Status: pending
+- Title: Build rider shell + role probe
+- Depends on: P1 exit
+- Inputs: `specs-mobile/README.md` §7 (full profile column list,
+  `effective_cash_limit` never re-derived, `is_online` derived single
+  control — RPC verified live with zero args; rider rows are
+  admin-created: live catalogue verified `admin_upsert_rider_v1(p_patch
+  jsonb, p_id uuid)` and no self-registration RPC exists),
+  `apps/mobile/README.md` §6, `DESIGN.md` §§9.3/9.5 (status badges
+  glyph+label), owner decision: client role switch driven by held roles
+- Outputs: `app/(rider)/` routes, `features/rider/profile/` (read
+  screen), role-switched shell with a customer ⇄ courier switch shown
+  only to dual-role holders; customer-only users get the customer shell,
+  and no context offers an application form
+- Acceptance: bar §1.1 applied; `NOT_A_RIDER` → customer-only shell, no
+  switch rendered; dual-role holder (customer row + rider row) gets the
+  switch; switching keeps the session and runs scoped `removeQueries`
+  per F-07; switch labels follow the DESIGN §13.2 glossary
+  (Customer/Courier — "driver" never in UI strings; owner said "driver",
+  confirm the label before release); `0` limit renders cash-disabled with
+  reason; no separate online/status toggles; cash-at-80 % warning
+  threshold surfaced from `rider_cash_limit_warning_pct`
+  (live-verified settings key — read at runtime, never a literal)
+- Verify: `npm test`, `npm run typecheck`, `npm run deps:check`
+
+### R-02
+
+- Status: pending
+- Title: Build the offer pool
+- Depends on: R-01
+- Inputs: `specs-mobile/README.md` §15 (caller GPS wins; null radius ⇒
+  25 km; gate order; backfill INSERT on every poll; `assigned_at` never
+  set by backfill; empty pool is normal; returns limit 10 by pickup
+  distance — RPC live-verified with `p_lat, p_lng, p_radius_km`),
+  `DESIGN.md` §§9.11/12 (assertive dispatch surfacing; 30 s default
+  window §18 — offer expiry auto-declines with a record; route stepper
+  rendering as returned)
+- Outputs: `features/rider/offers/` (`screens/`, `widgets/`, `model/`)
+  with a sane poll interval; `stop_sequence` rendered as returned, never
+  recomputed; payout figures rendered as returned (zero + no pay rule =
+  config gap, not a bug — labelled)
+- Acceptance: bar §1.1 applied; permission-less first run prompts, not
+  errors (`RIDER_LOCATION_REQUIRED` only when null GPS + no stored
+  location); empty pool renders "no orders near you", never an error;
+  pool never sorted by `assigned_at`; poll interval accounts for the
+  per-poll write (no forgotten timer); dispatch render includes vertical
+  badge + distances + payout + countdown, never color alone
+- Verify: `npm test` (gate order, empty-state, poll-write awareness),
+  `npm run typecheck`
+
+### R-03
+
+- Status: pending
+- Title: Build claim + trip transitions
+- Depends on: R-02
+- Inputs: `specs-mobile/README.md` §15 (`claim_order_v1` with own rider
+  id from R-01; `transition_order_v1` whole-or-sub; re-derived
+  `order_status` — no re-read; both RPCs live-verified), §4 (assignment
+  statuses live-verified: 10 values incl. assignment-only
+  `at_first_vendor`/`picking_up`/`arrived`), `DESIGN.md` §§9.4/9.12/14
+  (manifest rows: mono count + title + trailing validation icon in 48 hit
+  area; route stepper nodes; pharmacy rows never show item names to
+  couriers — sealed-package copy)
+- Outputs: Claim action + `features/rider/trip/` progression UI; trip
+  manifest renders `stop_sequence` + assignment status; pharmacy-vertical
+  stops render sealed copy (vertical from the vendor row), never drug names
+- Acceptance: bar §1.1 applied; foreign `p_rider_id` rejected path tested
+  (`NOT_AUTHORIZED`); `ORDER_ALREADY_CLAIMED` / `ORDER_NOT_CLAIMABLE` /
+  `RIDER_NOT_ELIGIBLE` / `INVALID_TRANSITION` surfaced with server copy;
+  claim writes `status`+`is_online` together (live-verified single CHECK
+  `riders_is_online_consistent`); emergency control present on active-job
+  screens per §9.1/§14, UI-only per §18 (behaviour undefined — flagged,
+  not invented)
+- Verify: `npm test`, `npm run typecheck`, `npm run deps:check`
+
+### R-04
+
+- Status: pending
+- Title: Build money collection (pre-flight + cash + wallet)
+- Depends on: R-03
+- Inputs: `specs-mobile/README.md` §15 (all three RPCs live-verified:
+  `begin_collection_v1` before collecting; `CASH_LIMIT_EXCEEDED` fires at
+  the door; channels live-verified as `cod|vodafone_cash|instapay`),
+  custom slide rail per `DESIGN.md` §9.2 (no kit provides it — 90 % +
+  250 ms commit, 160 ms linear snap-back, pocket-trigger safety, haptics,
+  16 px edge clearance, iOS back-swipe off + Android gesture exclusion
+  rect, screen-reader button + confirm-dialog alternative, disabled
+  caption names the unmet precondition)
+- Outputs: Collection flow with `begin_collection_v1` pre-flight screen
+  (`can_collect_cash/wallet`, `cash_held`, `effective_cash_limit`,
+  `already_collected`) and spec-exact slide rail
+- Acceptance: bar §1.1 applied; collection never attempted when
+  pre-flight denies it (rail disabled with the caption, e.g. limit);
+  a mistap cannot confirm; gesture-conflict handling on both platforms;
+  `AMOUNT_MISMATCH` / `ALREADY_COLLECTED` / `CASH_LIMIT_EXCEEDED` handled
+  as business states with server copy; amounts tabular Western digits
+  (§13.3/§13.5); collection record (`ledger_entry_id`, reference)
+  rendered from the response, never reconstructed
+- Verify: `npm test` (pre-flight matrix incl. 80 % warning edge,
+  rail-commit threshold unit tests, screen-reader alternative),
+  `npm run typecheck`
+
+### R-05
+
+- Status: pending
+- Title: Build delivery close with proof capture
+- Depends on: R-04
+- Inputs: `specs-mobile/README.md` §15 (`complete_delivery_v1`
+  live-verified with proof **path** + GPS args; same-transaction
+  settlement figures are the ledger), §18 (no storage buckets/signer —
+  paths opaque, placeholders until P5 L-01), custom signature pad per
+  `DESIGN.md` §§9.2/9.10 (no kit provides it — rail preconditions incl.
+  geofence caption; signature canvas 160-min, CLEAR/CONFIRM, disabled
+  until min stroke, white-bg/black-ink export; proof photo shutter spec,
+  RETAKE/USE PHOTO, timestamp+coords `label-md` metadata; camera-denied
+  empty state + manual path)
+- Outputs: Close-trip flow passing live GPS; proof/signature captured
+  as paths, rendered as placeholders; rail precondition caption reflects
+  the drop-off geofence state (150 m default §18 — config, flagged)
+- Acceptance: bar §1.1 applied; speed-based §14 preconditions recorded
+  inapplicable (no ping RPC — geofence + `I AM ON FOOT` only, limitation
+  listed); no base-URL concatenation onto a path; no
+  `supabase.storage.from()` against an invented bucket;
+  `SUB_ORDERS_INCOMPLETE` / `ALREADY_DELIVERED` / `ORDER_NOT_ASSIGNED`
+  handled; returned `rider_pay_total`/`vendor_payable`/`tips` rendered as
+  returned, never recomputed client-side (live-verified sum CHECK
+  `delivery_assignments_rider_pay_sums` — the server owns the arithmetic)
+- Verify: `npm test` (precondition captions, denial paths, proof
+  metadata), `npm run typecheck`
+
+### R-06
+
+- Status: pending
+- Title: Build rider earnings + profile reads; explicitly omit missing-RPC screens
+- Depends on: R-01
+- Inputs: `specs-mobile/README.md` §§13/15/17.6 (`get_rider_earnings_v1`
+  live-verified with `p_from, p_to`; single JSON + `range_clamped`, never
+  `.map()`ed; `rider_earnings_daily` grouped client-side; §13 no-build
+  list), `DESIGN.md` §13.3 (currency tabular trailing-aligned; one
+  unit/screen)
+- Outputs: Earnings + profile screens; **no** availability toggle,
+  shifts, vehicle-edit, or live-map screens (live-verified catalogue has
+  no write RPCs for them — building them is a defect, not a gap)
+- Acceptance: bar §1.1 applied; clamped ranges labelled as clamped;
+  zero-pay-rule days labelled config gap, not zero earnings; screens from
+  §13's no-build list are absent from routes (absence asserted in test,
+  not assumed)
+- Verify: `npm test`, `npm run typecheck`, `npm run deps:check`
+
+---
+
+## P3 — Worker hardening & suite integrity
+
+### W-01
+
+- Status: pending
+- Title: Include the outbox-dispatcher tests in the suite
+- Depends on: none
+- Inputs: `vitest.config.ts` (verified present: includes
+  `packages/*/src`, `apps/*/src` — excludes `functions/`),
+  `functions/outbox-dispatcher/src/tests/` (verified present: 6
+  `*.test.ts` + `fakes.ts`), `scripts/check-test-integrity.mjs`
+  (verified present), AGENTS.md ("do not run" claim)
+- Outputs: Config covering the worker tests; AGENTS.md "do not run"
+  claim updated in the same commit (rule 6) + living-record entry per §0
+- Acceptance: `npm test` executes shared + mobile + worker suites;
+  integrity guard counts agree with the runner; coverage floors
+  unchanged in scope (worker thresholds only added with evidence, never
+  lowered to pass)
+- Verify: `npm test`, `npm run test:integrity`
+
+### W-02
+
+- Status: pending
+- Title: Reconcile the report id-array type with the shared claim contract
+- Depends on: none
+- Inputs: `packages/shared/src/worker.ts:63-93` (verified on disk:
+  `ClaimedNotification.event_ids` + `SendOutcome.event_ids` are
+  `readonly bigint[]`, with the PostgREST bigint-serialisation comment),
+  `functions/outbox-dispatcher/src/drain/drain-once.ts:50-64` (verified
+  on disk: `NotificationReport.event_ids` is `readonly string[]`,
+  converted at lines 228-229), root `tsconfig.json` (verified present:
+  `references` to shared, mobile, outbox-dispatcher),
+  specs-mobile §8a (live-verified: `event_ids bigint[]`,
+  `mark_events_delivered_v1(p_ids bigint[], p_result jsonb)`)
+- Outputs: One consistent representation + regression tests proving the
+  bigint→string→mark round-trip loses nothing (build on the
+  safe-integer-refusal rule already documented in `worker.ts`)
+- Acceptance: No interface disagreeing with the contract; the report/mark
+  separation stays intact (`drain-once.ts:84-90` documents `GroupOutcome`
+  extends `SendOutcome` deliberately — a logging concern must not leak
+  into the DB contract); `tsc --build` graph still resolves
+  `packages/shared/dist`
+- Verify: `npm run typecheck`, `npm test`
+
+### W-03
+
+- Status: pending
+- Title: Document the real-push validation bounds (no code claiming delivery)
+- Depends on: none
+- Inputs: `functions/outbox-dispatcher/src/config/env.ts:168`
+  (verified on disk: `DRY_RUN` defaults to `"log"`, misspellings throw
+  instead of defaulting), `drain-once.ts:304-323` (verified on disk:
+  `log` mode walks the send loop with zero HTTP leaving the isolate),
+  FCM client + `ErrorCode` taxonomy in-tree
+- Outputs: Validation-bounds note in the living record (see §0):
+  invalid-token rejection proves the send path reaches Google; true
+  delivery needs a Firebase-SDK token + device (+ APNs key for iOS);
+  staged validation protocol for the human in P5
+- Acceptance: No test or comment claims delivery without a device; the
+  staged protocol names its prerequisites (device, token source, APNs
+  key) and its observable (FCM rejection vs `DELIVERED`)
+- Verify: `npm test` (existing drain/error-code suites stay green)
+
+### W-04
+
+- Status: pending
+- Title: Record the drain concurrency posture (claim → send → single mark)
+- Depends on: none
+- Inputs: `drain-once.ts:6-15,417-433` (verified on disk: claim a batch,
+  per-notification send loop, exactly one mark call at the end; a failed
+  mark retries the whole batch next tick), specs-mobile §8a
+  (live-verified routing + `for update … skip locked` semantics: two
+  Worker instances cannot both hold the same rows *while the claim
+  transaction is open*)
+- Outputs: Living-record note (see §0): the claim transaction closes
+  before sends go out, so a second concurrent consumer could act on the
+  same rows — trigger recorded as "a lease becomes mandatory at the first
+  second concurrent consumer"; no lease code while there is one consumer
+- Acceptance: Trigger condition is a named, greppable string; adding a
+  second consumer without a lease fails review by reference to it
+- Verify: `npm test` (suite green, no behaviour change)
+
+---
+
+## P4 — Backend gaps (agent specifies; human DB engineer implements)
+
+The agent never reads or writes `supabase/migrations/`. For each §13 gap
+the agent delivers a **backend requirement** to the living record (see
+§0): proposed RPC name following live conventions (`*_v1`, named `p_*`
+params — both verified across the live catalogue), parameters, return
+shape, error codes (SCREAMING_SNAKE, message-headed per §9), and grant
+expectations (`SECURITY DEFINER`, least-privilege `authenticated` EXECUTE,
+no direct table writes — mirroring the live-verified grant pattern:
+drain RPCs service_role-only, app RPCs `authenticated`). Requirements are
+explicitly **proposed, not contract** — they enter `specs-mobile/README.md`
+only when a human implements, applies, probes, and retranscribes them. App
+surfaces for missing write paths stay unbuilt (R-06/C rules). Each B-task
+can reach `done` on a recorded, convention-checked requirement; the human
+implement + apply + runtime-probe step is named in `Verify (human)` and
+gates any future app task in a plan revision.
+
+### B-01
+
+- Status: pending
+- Title: Specify the rider online/offline setter requirement
+- Depends on: R-01
+- Inputs: `specs-mobile/README.md` §§4/7/13-gap-1 (live-verified CHECK
+  `riders_is_online_consistent`: one control, never two; `riders.status`
+  vocabulary live-verified: 4 values), §15 grant patterns,
+  `DESIGN.md` §9.5 (switch spec: 56×32 rectangular track, 24 square
+  thumb, always-visible ON/OFF text)
+- Outputs: Living-record requirement (see §0): setter signature incl.
+  status + verified-gate behavior, codes, grants; human acceptance probe:
+  atomic status/`is_online` change, CHECK-violation attempt,
+  unverified-rider gate
+- Acceptance: Requirement keeps the single-control invariant (no two-
+  toggle design possible); names the human probe steps; no migration
+  file touched, no contract file edited
+- Verify: review (convention check against the live catalogue); human —
+  implement, apply, probe, retranscribe
+
+### B-02
+
+- Status: pending
+- Title: Specify the notification-centre requirements (3 RPCs + realtime + partition indexes)
+- Depends on: C-07
+- Inputs: `specs-mobile/README.md` §8b/8c (title/body are `{ar,en}`
+  jsonb — never rendered raw; create-or-append, mark-read, mark-all-read;
+  realtime publication currently zero tables), §19 (month partitions start
+  without secondary indexes; `notifications_user_created (user_id,
+  created_at DESC)`), `DESIGN.md` §14 (pharmacy rows render sealed copy —
+  requirement must state it)
+- Outputs: Living-record requirement (see §0): 3 RPC signatures +
+  publication + partition-index follow-up + human probes: read-at
+  settable, badge derivable, new-month partition indexed, realtime
+  received vs polling fallback
+- Acceptance: Requirement states the sealed-pharmacy-copy rule and the
+  jsonb-language-object rendering rule; no migration touched, no contract
+  edited; list UI stays unbuilt until retranscribed
+- Verify: review; human — implement, apply, probes, publication check,
+  retranscribe
+
+### B-03
+
+- Status: pending
+- Title: Specify the shift-write + vehicle-update requirements
+- Depends on: R-01
+- Inputs: `specs-mobile/README.md` §§13-gaps-3/4, 17.5 (GiST EXCLUDE
+  blocks overlapping active shifts; `ends_at > starts_at`), §15 patterns
+- Outputs: Living-record requirement (see §0): shift-write +
+  vehicle-update signatures, codes, grants; human probes:
+  EXCLUDE-violation attempt, vocabulary enforcement on `vehicle_type`
+  (live-verified: 4 values)
+- Acceptance: Requirement preserves the EXCLUDE invariant server-side
+  (no client-side overlap logic proposed); no migration touched
+- Verify: review; human — implement, apply, probes, retranscribe
+
+### B-04
+
+- Status: pending
+- Title: Specify the review-write requirement
+- Depends on: C-07
+- Inputs: `specs-mobile/README.md` §§13-gap-5, 17.7 (unique
+  `(order_id, vendor_id)`; `rider_rating` requires a rider;
+  `is_hidden` scoping on read), §15 patterns
+- Outputs: Living-record requirement (see §0): review-write signature,
+  codes incl. duplicate-rejection, grants; human probes: second-review
+  rejection, rider-less `rider_rating` rejection, hidden-review scoping
+- Acceptance: No migration touched; rate-my-order screen stays unbuilt
+  until retranscribed (building it now is a defect, not progress)
+- Verify: review; human — implement, apply, probes, retranscribe
+
+### B-05
+
+- Status: pending
+- Title: Specify the favourites-write requirements
+- Depends on: C-02
+- Inputs: `specs-mobile/README.md` §§13-gap-6, 17.7 (`favorites` PK
+  `(user_id, vendor_id)`; `favorite_items` PK `(user_id, menu_item_id)`),
+  §15 patterns
+- Outputs: Living-record requirement (see §0): save/unsave signatures,
+  idempotency, owner-scoped grants; human probes: idempotent save/unsave,
+  unauthenticated rejection with §9 code
+- Acceptance: No migration touched; saved-lists UI stays unbuilt until
+  retranscribed
+- Verify: review; human — implement, apply, probes, retranscribe
+
+---
+
+## P5 — Launch gates (evidenced items only)
+
+### L-01
+
+- Status: pending
+- Title: Ship the storage signing worker + buckets for images and proofs
+- Depends on: none
+- Inputs: `specs-mobile/README.md` §18 (`storage.buckets` empty; paths
+  opaque; no file-access Worker — only `outbox-dispatcher`);
+  `functions/outbox-dispatcher` (influenced pattern, not a template),
+  `functions/outbox-dispatcher/wrangler.toml` (verified present on disk —
+  extend its pattern, verify at implementation)
+- Outputs: Buckets + signing worker resolving
+  `logo_path`/`image_path`/`avatar_path`/`proof_path`/`signature_path`
+  to signed URLs; app renders real images where a URL exists,
+  placeholders elsewhere (R-05/C-03 placeholder logic flips per-URL,
+  not globally)
+- Acceptance: No screen concatenates a base URL onto a path; proof
+  capture (R-05) stores a path the worker can sign; `service_role`
+  never leaves the worker; signing failures render the placeholder +
+  retry, never a broken-image box or a crash
+- Verify: `npm run typecheck`, `npm test`; human — bucket + URL probe
+- Risks: Until this lands, every image surface stays a placeholder by
+  contract — that is correct, not a stub.
+
+### L-02
+
+- Status: pending
+- Title: Close the iOS push gate (APNs key upload)
+- Depends on: none
+- Inputs: specs-mobile §8a (push leaves the Worker toward FCM/APNs);
+  iOS has no `GoogleService-Info.plist` in-tree (verified absent by
+  filename search) and no APNs key state is visible from the repo —
+  both live in the Firebase/Apple consoles, human-side
+- Outputs: APNs key uploaded to Firebase; W-03 staged protocol executed
+  through first rejection/delivery observation; living-record entry
+  per §0
+- Acceptance: Android token registration observed end to end; iOS
+  delivery observed **or** this task recorded `blocked` with the named
+  owner (Apple Developer account holder)
+- Verify: human — device observation (agent-verifiable part: registration
+  call sites from F-08 unchanged and green under `npm test`)
+
+### L-03
+
+- Status: pending
+- Title: Register Android SHA-1/SHA-256 for Google sign-in
+- Depends on: none
+- Inputs: `google-services.json` (verified present at repo root);
+  package `com.jaylak.mobile` (verified in `app.json`); Android Google
+  sign-in (in scope per specs-mobile §2 + C-01) requires the app's SHA
+  fingerprints registered — fingerprints are unverifiable from the repo,
+  human confirms in console
+- Outputs: SHA fingerprints registered; `google-services.json`
+  refreshed if changed; root secret-file posture reviewed under
+  `check:secrets` (root directory read holds `google-services.json`,
+  `client_secret_*.json`, a Firebase admin-sdk key file, `supabase_keys`
+  — verify each is required in-tree, not merely present)
+- Acceptance: `npm run check:secrets` green; fingerprints confirmed in
+  the Firebase console (human); no secret committed by the process
+  (named-path staging, protocol step 2–3)
+- Verify: `npm run check:secrets`; human — console confirmation
+
+---
+
+## P6 — Store submission (App Store + Google Play)
+
+Repo-side readiness the agent can evidence; console submissions and review
+interactions are human with named owners. `app.json` (verified on disk:
+slug `marketak`, `com.jaylak.mobile` both platforms, `ar`/`en` locales,
+`typedRoutes`, SDK-aligned plugins) is the base. Verified absent and
+therefore built here: `eas.json` (verified: no file by that name in
+tree), `apps/mobile/assets/` (verified: no directory — icon, splash,
+adaptive-icon paths referenced by `app.json` resolve to nothing), iOS
+`GoogleService-Info.plist` (verified absent; Android
+`google-services.json` present at root only).
+
+### S-01
+
+- Status: pending
+- Title: Add EAS build profiles + versioning discipline
+- Depends on: F-01
+- Inputs: `apps/mobile/app.json` (version `0.1.0`, `versionCode` 1,
+  `newArchEnabled`, `edgeToEdgeEnabled`), `apps/mobile/package.json`
+  (`npm run align` = SDK agreement gate)
+- Outputs: `apps/mobile/eas.json` (development/preview/production
+  profiles; production = versioned, non-debuggable); version-bump
+  discipline recorded (app version + `versionCode`/`buildNumber` move
+  together, one commit); credentials fields documented, values never
+  committed (`check:secrets` stays green)
+- Acceptance: `eas.json` parses (config check via eas CLI or documented
+  human equivalent where CLI auth is required — no invented "green"
+  without running it); `npm run align` green after any native-config
+  change; no keystore / provisioning profile / `.p8` in-tree
+  (commit-protocol forbidden patterns asserted by `git status` review)
+- Verify: `npm run align`, `npm run check:secrets`; human — first
+  preview build on EAS
+
+### S-02
+
+- Status: pending
+- Title: Restore app icons, splash, and adaptive icon per DESIGN §18
+- Depends on: F-01, F-06
+- Inputs: `DESIGN.md` §18 (product icon undefined → default: full-bleed
+  square, `cobalt-electric` fill, `void-base` glyph, OS mask applies;
+  text wordmark Space Grotesk 700 uppercase `0.04em`), `app.json`
+  (adaptive-icon + splash-screen + localization plugin paths),
+  `DESIGN.md` §§2/6 (zero radius — icon is square, no rounding baked in)
+- Outputs: `apps/mobile/assets/` (icon, adaptive-icon foreground,
+  splash) + `app.json` paths consistent; splash background aligned to a
+  DESIGN surface token (current `#F6F1E7` is a light cream that
+  contradicts dark-only §1 — change recorded, not silently kept)
+- Acceptance: Referenced asset paths all resolve (no missing-file
+  build break); icon has no baked rounding/mask (OS applies it);
+  wordmark path (text vs asset) decided and recorded; splash respects
+  insets and matches first-paint theme (no white flash on dark)
+- Verify: `npm run align`, preview build renders icon + splash (human)
+
+### S-03
+
+- Status: pending
+- Title: Prepare store listings + review packet (human submits)
+- Depends on: P5 exit, S-01, S-02
+- Inputs: `app.json` locales (`ar` default per `CFBundleDevelopmentRegion`
+  + `platform_name_ar` — the latter live-verified as a settings key;
+  listings needed in both), `DESIGN.md` §13 (screenshots must show the
+  size-class truth: 360/600/840/1200; terse imperative copy, glossary
+  terms), specs-mobile §18 (cash-at-door model — reviewers need the
+  business explanation, not code)
+- Outputs: Listings checklist + review packet in the living record
+  (see §0): per-store copy in ar/en, screenshot set per size class, auth
+  path for reviewers against Google/Apple-only sign-in, cash-on-delivery
+  business note, privacy-declaration inputs; no invented console state —
+  every submitted item cites its evidence or names its human owner
+- Acceptance: Packet names owners for Apple Developer + Play Console
+  actions; reviewer auth path works without a password (exercised on a
+  preview build or recorded `blocked`); cash model disclosed to review
+  (no surprise payment flow); submission results recorded back into the
+  living record (version, store URLs, review notes)
+- Verify: human — console submissions + review outcomes; agent part:
+  copy/metadata files consistent with in-app strings (spot-checked)
+
+---
+
+## 3. Dependency graph (summary; `Depends on` fields are normative)
+
+```
+F-01 ─┬─▶ F-06 ──▶ C-02 ──▶ C-03 ──▶ C-04 ──┬─▶ C-06 ──▶ C-07 ──┬─▶ C-09 ──▶ P1 exit ─┬─▶ R-01 ─┬─▶ R-02 ─▶ R-03 ─▶ R-04 ─▶ R-05
+      │                                     │                  │                     │                      └─▶ R-06
+F-03 ─┼─▶ F-04 ─┴─▶ F-05 ──▶ C-06 ──────────┘                  │                     ├─▶ B-01 (needs R-01)
+      ├─▶ F-07 ──▶ C-01 ──▶ C-05 ──▶ C-06                     │                     ├─▶ B-02 (needs C-07)
+      │            └─▶ C-07 ──▶ B-04/B-02                      │                     ├─▶ B-03 (needs R-01)
+      └─▶ F-08 (needs F-03,F-04,F-07)                         │                     ├─▶ B-04/B-05 (needs C-07/C-02)
+                                                              │                     └─▶ S-01/S-02 (need F-01/F-06) ─▶ S-03 (needs P5 exit)
+F-02: independent.  C-08: needs F-04 only.  W-01..W-04, L-01..L-03: independent (conflict note below).
+```
+
+Parallel-conflict notes: F-04/C-tasks all append to
+`src/services/rpc/index.ts` + `schemas/` — sequence within P0/P1 by
+dependency order, never two agents on the barrel at once. W-01 touches
+`vitest.config.ts` alone (no other task edits it). S-01/S-02 both touch
+`app.json` + assets — sequence S-01 before S-02. `packages/shared/src/index.ts`
+is append-only via W-02; no other task edits shared. No task reads or
+writes `supabase/migrations/` — ever.
+
+## 4. Validation performed on this file
+
+- Live database verification (read-only `SELECT`s, 2026-10-10, project
+  `ACTIVE_HEALTHY`, Postgres 17): full `*_v1` catalogue read — every RPC
+  this plan calls verified present with the documented args; CHECK
+  vocabularies and money/total constraints match §4; 13 `settings` keys
+  match §18; privilege spot-checks match §3 (`riders` SELECT=false,
+  `orders` SELECT=true, addresses INSERT=false, notifications UPDATE=false;
+  zero tables without RLS); drain RPCs verified service_role-only, app
+  RPCs verified `authenticated`-granted; push routing returns exactly the
+  7 documented rows; 19 template keys × ar/en.
+- Structural check via inline Node parse (no tooling added): 38 task IDs
+  unique; every `Depends on` target resolves to an existing ID or a named
+  phase exit; no self-edges; graph acyclic; every task carries
+  `Status/Depends/Inputs/Outputs/Acceptance/Verify`.
+- Source discipline: every data claim above traces to the live checks or
+  the three files. Working tree only — no git history consulted. Files
+  absent from the working tree are never authority.
+- Result: all checks passed at authorship. Statuses at F-02-resolution:
+  F-01 `in_review` (closes on first rendered screens), F-02 `done`,
+  F-03 `done`, F-04 `done`, F-05 `done`, F-06 `in_review` (photo-image
+  render proof deferred to C-02, recorded in its Outputs), F-07 `done`,
+  F-08 `done` (iOS plist absent — Crashlytics/Analytics on iOS recorded
+  `blocked` in its Outputs; device-delivery validation stays human-side
+  per its Risks); all else `pending` — no test claimed green that is
+  not. Q2 (fixtures uncommitted by design) still open; Q8/Q12 resolved.
+
+## 5. Unresolved questions (not guessed; need a human)
+
+- Q1 Inventory target list: no in-tree file lists the intended UI
+  inventory — completeness is judged against DESIGN.md §9 + the installed
+  Tamagui set (F-06). Not a number, not a guess.
+- Q2 Fixture proof vs green gates: `apps/mobile/README.md` §4 says commit
+  the six fixtures; F-02 records proof and removes them so gates stay
+  green. Confirm the deviation or amend the README (same-commit sync).
+- Q3 Human-only items: §14 DB queries; P4 implement + apply + probes +
+  retranscription; device observations (push, icons, splash, review
+  auth); living-record location (with `CHANGELOG.md` removed, confirm
+  where the record lives or designate one — no new file without asking).
+- Q4 DESIGN.md scope guard: merchant-console (§1) and live-map (§10)
+  sections are fully specified yet out of scope/v1 — reaffirm before any
+  task cites them as build authority (this plan cites them only for
+  constraints: privacy §14, sealed copy, text alternatives).
+- Q5 Speed-based safety: DESIGN §14 moving lockout + stop-precondition
+  timers need speed, which needs the ping RPC (out of v1). R-05 enforces
+  geofence + `I AM ON FOOT` only. Confirm the reduced enforcement or
+  re-scope.
+- Q6 Orientation lock: `app.json` pins `"orientation": "portrait"` while
+  DESIGN §§4.1/4.5 designs landscape side-by-side, tablets, and rotation
+  state-preservation. Confirm portrait-lock is intentional or open it up.
+- Q7 Contract-vs-live: `OPTION_SELECTION_INVALID` is listed in §15 upsert
+  errors but absent from the live per-RPC census (verified); the boundary
+  does not branch on it. Needs a human retranscription decision — do not
+  re-add without a live re-check.
+- Q8 Gate-config findings, RESOLVED 2026-10-10 per owner decision ("fix
+  the config to match the map", no package changes): forward-slash
+  literals throughout; `only-model-is-public`/`no-circular`/
+  `rpc-entry-is-the-barrel-only` installed (back-refs proven working by
+  fixture 2); `no-rpc-call-outside-the-wrapper` removed — its literal
+  meaning banned the barrel §5 mandates, so the barrel-only rule carries
+  its intent and the README row was replaced same-commit; supabase rule
+  rescoped to `src/services` + direct-only (`reachable` flagged the
+  sanctioned barrel chain); stale `api.ts` refs fixed in config + eslint
+  message. The `no-orphans`-only-on-isolated-files behaviour stands as
+  observed.
+- Q9 Voucher failures are data, not exceptions (F-05 census 2026-10-10):
+  no `VOUCHER_*` exception is raised live anywhere; voucher failures
+  arrive as quote `rejections[]` rows (`QUOTE_REJECTION` vocabulary:
+  `VOUCHER_UNKNOWN/EXPIRED/EXHAUSTED/MINIMUM_NOT_MET/FIRST_ORDER_ONLY/
+  NOT_APPLICABLE`), handled at checkout (C-06). The behaviour layer takes
+  no `VOUCHER_*` branches by intent. Specs §9 says "so are every
+  `VOUCHER_*` rejection" (as raised) — needs a human retranscription
+  decision, same class as Q7. Likewise `OUT_OF_STOCK` is a rejection
+  code only; the mobile README §7 quote row was corrected to say so in
+  the F-05 commit.
+- Q10 Push language is account-side (F-08 body-read 2026-10-10):
+  `register_device_token_v1` takes no language argument — it reads
+  `users.preferred_language` (default `'ar'`, live-verified). "Carries the
+  device's real language" is therefore a two-step path: the account
+  language syncs via `update_profile_v1` (explicit user action through
+  `syncLanguageAndRegister`), and registration re-reads it on upsert.
+  Silent boot-time syncing was rejected (it would override an explicit
+  choice). `TOKEN_ALREADY_REGISTERED` means another device holds this
+  (user, role) — surfaced, never retried.
+- Q11 Import style vs Metro (F-07/F-08 proof 2026-10-10): Metro resolves
+  no `.js`→`.ts` substitution, so all 53 `apps/mobile` files moved to
+  extensionless relative imports (recorded in `design-rules.md`);
+  `packages/shared` keeps NodeNext `.js` source for its dist emit.
+  Metro also honours the mobile tsconfig `@marketak/shared`→source path
+  mapping (probed: default resolution lands on `src/index.ts`), so the
+  mapping was removed — the app consumes `dist` like Node, tsc and
+  vitest, with root `tsc --build` keeping it fresh. `expo export` passes.
+- Q12 Gate-config, further, RESOLVED with Q8: `no-server-tables-in-a-store`
+  carved out for `src/state/ui.ts` only (anchored path) — the map
+  mandates the sign-out reset and role-switch reads there, and the rule's
+  intent (no server rows in stores) is preserved for everything else.
