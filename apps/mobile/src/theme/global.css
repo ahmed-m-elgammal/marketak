@@ -1,0 +1,9 @@
+/**
+ * Global stylesheet, compiled by NativeWind v4 (`withNativeWind` in
+ * metro.config.js, input path here). Imported once, from `app/_layout.tsx`.
+ * Design values never live here - they live in `src/theme/tokens.ts` and the
+ * tailwind config mirrors them (procedure in `design-rules.md`).
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

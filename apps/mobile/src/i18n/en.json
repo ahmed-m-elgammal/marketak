@@ -1,0 +1,19 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Cancel",
+  "common.retry": "Retry",
+  "common.close": "Close",
+  "common.loading": "Loading",
+  "errors.transport": "No connection. Retry.",
+  "errors.unknown": "Something failed. Retry.",
+  "cart.lines.zero": "No items",
+  "cart.lines.one": "1 item",
+  "cart.lines.two": "2 items",
+  "cart.lines.few": "{count} items",
+  "cart.lines.many": "{count} items",
+  "cart.lines.other": "{count} items",
+  "device.push.title": "Enable notifications",
+  "device.push.why": "Get order and dispatch updates as they happen.",
+  "device.push.allow": "Enable",
+  "device.push.later": "Later"
+}

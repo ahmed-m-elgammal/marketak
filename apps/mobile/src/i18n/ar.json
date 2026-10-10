@@ -1,0 +1,19 @@
+{
+  "common.ok": "موافق",
+  "common.cancel": "إلغاء",
+  "common.retry": "إعادة المحاولة",
+  "common.close": "إغلاق",
+  "common.loading": "جارٍ التحميل",
+  "errors.transport": "لا يوجد اتصال. أعد المحاولة.",
+  "errors.unknown": "حدث خطأ. أعد المحاولة.",
+  "cart.lines.zero": "لا أصناف",
+  "cart.lines.one": "صنف واحد",
+  "cart.lines.two": "صنفان",
+  "cart.lines.few": "{count} أصناف",
+  "cart.lines.many": "{count} صنفًا",
+  "cart.lines.other": "{count} صنف",
+  "device.push.title": "تفعيل الإشعارات",
+  "device.push.why": "استلم تحديثات الطلبات والعروض لحظة بلحظة.",
+  "device.push.allow": "تفعيل",
+  "device.push.later": "لاحقًا"
+}
