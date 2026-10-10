@@ -20,6 +20,10 @@
 import type { Language, Piastres } from "./money.js";
 import type {
   AppRole,
+  AssignedBy,
+  AssignmentStatus,
+  CancellationActor,
+  CollectionMethod,
   DeliveryGrouping,
   DeliveryType,
   OrderStatus,
@@ -27,9 +31,13 @@ import type {
   PaymentMethod,
   PaymentStatus,
   Platform,
+  PricingMode,
   QuoteRejectionCode,
+  SettlementStatus,
+  SubOrderStatus,
   VerticalType,
   VendorAvailability,
+  VoucherDiscountType,
 } from "./status.js";
 
 export type Uuid = string;
@@ -340,6 +348,45 @@ export interface RiderProfile {
   readonly created_at: string;
 }
 
+/**
+ * `delivery_assignments` row, read directly with `rider_id = <own id>` in the
+ * `where` — never a bare select. The policy resolves the customer ∪ vendor ∪
+ * rider union, so reading without the rider predicate leaks other roles'
+ * rows onto rider screens (mobile README §6, union trap).
+ *
+ * Operational subset for the trip: identity, progression timestamps, pay
+ * figures (rendered as returned, never recomputed) and proof pointers
+ * (opaque paths until the signing worker lands).
+ */
+export interface RiderAssignment {
+  readonly id: Uuid;
+  readonly order_id: Uuid;
+  readonly sub_order_id: Uuid | null;
+  readonly rider_id: Uuid;
+  readonly status: AssignmentStatus;
+  readonly stop_sequence: unknown;
+  readonly assigned_by: AssignedBy;
+  readonly assigned_at: string;
+  readonly claimed_at: string | null;
+  readonly arrived_vendor_at: string | null;
+  readonly picked_up_at: string | null;
+  readonly arrived_at: string | null;
+  readonly delivered_at: string | null;
+  readonly distance_km: number | null;
+  readonly eta_minutes: number | null;
+  readonly rider_pay_base: Piastres;
+  readonly rider_pay_distance: Piastres;
+  readonly rider_pay_bonus: Piastres;
+  readonly rider_pay_total: Piastres;
+  readonly platform_revenue: Piastres;
+  readonly collected_amount: Piastres;
+  readonly collection_method: CollectionMethod;
+  readonly collection_channel: PaymentChannel | null;
+  readonly collection_reference: string | null;
+  readonly proof_path: string | null;
+  readonly signature_path: string | null;
+}
+
 /** `get_available_orders_v1` return row. */
 export interface AvailableOrder {
   readonly assignment_id: Uuid;
@@ -467,4 +514,286 @@ export interface DeviceToken {
   readonly language: Language;
   readonly last_seen_at: string;
   readonly created_at: string;
+}
+
+/* ── catalogue reads ──────────────────────────────────────────────────────── */
+
+/**
+ * `vendors` as the app reads it. Column presence and nullability transcribed
+ * from `information_schema.columns` against the live project. Reads filter
+ * `is_active AND is_approved AND deleted_at IS NULL` — the RLS policy will
+ * not do the soft-delete filtering for you.
+ */
+export interface Vendor {
+  readonly id: Uuid;
+  readonly slug: string;
+  readonly name: string;
+  readonly name_ar: string;
+  readonly legal_name: string | null;
+  readonly brand_id: Uuid | null;
+  readonly vertical_type: VerticalType;
+  readonly city_id: Uuid;
+  readonly area_id: Uuid;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly geohash_prefix: string;
+  readonly delivery_radius_km: number;
+  readonly is_open: boolean;
+  readonly is_busy: boolean;
+  readonly auto_open: boolean;
+  readonly is_approved: boolean;
+  readonly is_active: boolean;
+  readonly capacity_per_slot: number | null;
+  readonly reject_rate: number;
+  readonly delivery_fee_override: Piastres | null;
+  readonly minimum_order_value: Piastres;
+  readonly prep_time_minutes: number;
+  readonly prep_time_max_minutes: number;
+  readonly rating_avg: number;
+  readonly rating_count: number;
+  readonly menu_version: number;
+  readonly logo_path: string | null;
+  readonly description: string | null;
+  readonly description_ar: string | null;
+  readonly contact_phone: string | null;
+  readonly contact_landline: string | null;
+}
+
+/** `menu_categories` as the app reads it. */
+export interface MenuCategory {
+  readonly id: Uuid;
+  readonly vendor_id: Uuid;
+  readonly name: string;
+  readonly name_ar: string | null;
+  readonly description: string | null;
+  readonly display_order: number;
+  readonly is_available: boolean;
+}
+
+/** `menu_items` as the app reads it. */
+export interface MenuItem {
+  readonly id: Uuid;
+  readonly category_id: Uuid;
+  readonly vendor_id: Uuid;
+  readonly name: string;
+  readonly name_ar: string | null;
+  readonly description: string | null;
+  readonly description_ar: string | null;
+  readonly pricing_mode: PricingMode;
+  readonly base_price: Piastres | null;
+  readonly is_available: boolean;
+  readonly stock_count: number | null;
+  readonly preparation_time_minutes: number | null;
+  readonly image_path: string | null;
+  readonly display_order: number;
+  readonly nutritional_info: unknown;
+  readonly allergens: unknown;
+  readonly ingredients: unknown;
+  readonly tags: readonly string[];
+  readonly calories: number | null;
+  readonly is_spicy: boolean;
+  readonly is_vegetarian: boolean;
+  readonly is_featured: boolean;
+  readonly is_new: boolean;
+}
+
+/** `menu_item_sizes` as the app reads it. */
+export interface MenuItemSize {
+  readonly id: Uuid;
+  readonly item_id: Uuid;
+  readonly name: string;
+  readonly name_ar: string | null;
+  readonly price: Piastres;
+  readonly is_default: boolean;
+  readonly is_available: boolean;
+  readonly calories: number | null;
+  readonly display_order: number;
+}
+
+/** `item_options` as the app reads it. */
+export interface ItemOption {
+  readonly id: Uuid;
+  readonly item_id: Uuid;
+  readonly name: string;
+  readonly name_ar: string | null;
+  readonly is_required: boolean;
+  readonly min_selections: number;
+  readonly max_selections: number;
+  readonly display_order: number;
+  readonly is_available: boolean;
+}
+
+/**
+ * `option_choices` as the app reads it. `price_modifier` is a plain integer,
+ * not `Piastres`: it can be negative (a discount), so it is not an amount held.
+ */
+export interface OptionChoice {
+  readonly id: Uuid;
+  readonly option_id: Uuid;
+  readonly name: string;
+  readonly name_ar: string | null;
+  readonly price_modifier: number;
+  readonly is_default: boolean;
+  readonly is_available: boolean;
+  readonly stock_count: number | null;
+  readonly calories: number | null;
+  readonly display_order: number;
+}
+
+/* ── geography reads ──────────────────────────────────────────────────────── */
+
+/** `areas` as the app reads it. The client resolves pins against these rows (§6). */
+export interface Area {
+  readonly id: Uuid;
+  readonly city_id: Uuid;
+  readonly slug: string;
+  readonly name: string;
+  readonly name_ar: string;
+  readonly geohash_prefix: string;
+  readonly center_lat: number;
+  readonly center_lng: number;
+  readonly radius_km: number;
+  readonly is_active: boolean;
+}
+
+/**
+ * `delivery_zones` as the app reads it. `peak_hours` is an `int4range` on the
+ * wire, which PostgREST renders as text (`[9,12)`), so it is a string here.
+ */
+export interface DeliveryZone {
+  readonly id: Uuid;
+  readonly city_id: Uuid;
+  readonly area_id: Uuid;
+  readonly name: string;
+  readonly name_ar: string;
+  readonly currency: string;
+  readonly delivery_base_fee: Piastres;
+  readonly free_radius_km: number;
+  readonly per_km_fee: Piastres;
+  readonly max_vendors_per_order: number;
+  readonly min_order_value: Piastres;
+  readonly max_distance_km: number;
+  readonly peak_hours: string | null;
+  readonly is_active: boolean;
+}
+
+/** `cuisines` as the app reads it. Filter chips. */
+export interface Cuisine {
+  readonly id: Uuid;
+  readonly code: string;
+  readonly name: string;
+  readonly name_ar: string;
+  readonly sort_order: number;
+}
+
+/* ── cart memo + sub-orders ───────────────────────────────────────────────── */
+
+/**
+ * `carts` as the app reads it. The `quote_*` columns are the server's memo of
+ * the last quote: readable to restore a checkout screen, never writable.
+ */
+export interface Cart {
+  readonly id: Uuid;
+  readonly user_id: Uuid;
+  readonly is_active: boolean;
+  readonly last_seen_at: string;
+  readonly quote_id: Uuid | null;
+  readonly quote_fingerprint: string | null;
+  readonly quote_expires_at: string | null;
+  readonly quote_address_id: Uuid | null;
+  readonly quote_voucher_code: string | null;
+  readonly quote_rider_tip: number | null;
+  readonly quote_delivery_type: string | null;
+  readonly quote_grouping: string | null;
+  readonly quote_snapshot: unknown;
+}
+
+/** `sub_orders` as the app reads it. One per vendor per order. */
+export interface SubOrder {
+  readonly id: Uuid;
+  readonly order_id: Uuid;
+  readonly vendor_id: Uuid;
+  readonly sequence: number;
+  readonly status: SubOrderStatus;
+  readonly subtotal: Piastres;
+  readonly delivery_fee_share: Piastres;
+  readonly service_fee_share: Piastres;
+  readonly discount_share: Piastres;
+  readonly commission_amount: Piastres;
+  readonly platform_fee_amount: Piastres;
+  readonly vendor_net_payout: Piastres;
+  readonly menu_version_snapshot: number | null;
+  readonly prep_estimate_minutes: number;
+  readonly prep_actual_minutes: number | null;
+  readonly ready_at: string | null;
+  readonly accepted_at: string | null;
+  readonly preparing_at: string | null;
+  readonly picked_up_at: string | null;
+  readonly delivered_at: string | null;
+  readonly cancelled_at: string | null;
+  readonly cancellation_reason: string | null;
+  readonly cancellation_actor: CancellationActor | null;
+  readonly rejection_reason: string | null;
+  readonly settlement_status: SettlementStatus;
+  readonly payout_id: Uuid | null;
+}
+
+/* ── growth reads ─────────────────────────────────────────────────────────── */
+
+/** `vouchers` as the app reads it. Active, in-window rows only. */
+export interface Voucher {
+  readonly id: Uuid;
+  readonly code: string;
+  readonly name: string | null;
+  readonly discount_type: VoucherDiscountType;
+  readonly discount_value: number;
+  readonly min_order_value: Piastres;
+  readonly max_discount_cap: Piastres | null;
+  readonly usage_limit_total: number | null;
+  readonly usage_limit_per_user: number | null;
+  readonly usage_count: number;
+  readonly applies_to_vendor_ids: readonly Uuid[];
+  readonly vertical_type: VerticalType | null;
+  readonly first_order_only: boolean;
+  readonly valid_from: string;
+  readonly valid_until: string | null;
+  readonly is_active: boolean;
+}
+
+/** `promo_slots` as the app reads it. `title`/`subtitle` are language objects. */
+export interface PromoSlot {
+  readonly id: Uuid;
+  readonly city_id: Uuid;
+  readonly slot_key: string;
+  readonly title: unknown;
+  readonly subtitle: unknown;
+  readonly image_path: string | null;
+  readonly target_type: string | null;
+  readonly target_id: string | null;
+  readonly starts_at: string | null;
+  readonly ends_at: string | null;
+  readonly sort_order: number;
+  readonly is_active: boolean;
+}
+
+/** `get_flags_v1` row. `value` shape varies per flag — decode per use. */
+export interface FlagRow {
+  readonly flag_key: string;
+  readonly value: unknown;
+}
+
+/**
+ * `riders_public` view: the only readable rider surface (what a customer sees
+ * on tracking). Every column is nullable on the wire (LEFT JOINs) — verified
+ * live via `information_schema`. Never assume a name is present.
+ */
+export interface RiderPublic {
+  readonly id: Uuid | null;
+  readonly first_name: string | null;
+  readonly last_name: string | null;
+  readonly phone_number: string | null;
+  readonly vehicle_type: string | null;
+  readonly vehicle_plate: string | null;
+  readonly rating_avg: number | null;
+  readonly rating_count: number | null;
 }

@@ -250,6 +250,15 @@ export interface EffectiveCashLimitArgs {
 /* ── device ───────────────────────────────────────────────────────────────── */
 
 /**
+ * `get_flags_v1`. Both arguments are nullable with server-side targeting
+ * resolution — pass the device's real role and semver.
+ */
+export interface GetFlagsArgs {
+  readonly p_app_role?: AppRole | null;
+  readonly p_app_version?: string | null;
+}
+
+/**
  * `register_device_token_v1`. Call on launch **and on every sign-in**: `language`
  * and `app_version` are per-registration, and a stale one makes a live device
  * look dead to the dispatcher.

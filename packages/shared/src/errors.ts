@@ -30,6 +30,12 @@ export const APP_ERROR_CODES = [
 
   // ── profile ──
   "NOT_A_RIDER",
+  "NAME_INVALID",
+  "PHONE_INVALID",
+  "PHONE_IN_USE",
+  "PHONE_IN_USE_BY_RIDER",
+  "PROFILE_ALREADY_COMPLETE",
+  "INVALID_PATCH",
 
   // ── cart ──
   "ITEM_REQUIRED",
@@ -43,6 +49,10 @@ export const APP_ERROR_CODES = [
   "INVALID_QUANTITY",
   "CART_ITEM_REQUIRED",
   "CART_ITEM_NOT_FOUND",
+  "CART_ITEM_RETIRED",
+  "CART_ITEM_UNAVAILABLE",
+  "CART_ITEM_UNKNOWN_MENU_ITEM",
+  "ITEM_SIZED_BUT_NO_SIZES",
 
   // ── quote ──
   "CART_NOT_FOUND",
@@ -81,6 +91,8 @@ export const APP_ERROR_CODES = [
   "ORDER_NOT_CANCELLABLE",
   "NOTHING_TO_CANCEL",
   "CANCEL_WINDOW_CLOSED",
+  "HISTORY_UNKNOWN_SUB_ORDER",
+  "ORDER_ITEM_UNKNOWN_SUB_ORDER",
 
   // ── rider ──
   "RIDER_REQUIRED",
@@ -94,6 +106,7 @@ export const APP_ERROR_CODES = [
   "ORDER_NOT_CLAIMABLE",
   "SUB_ORDER_NOT_FOUND",
   "INVALID_TRANSITION",
+  "FORBIDDEN",
 
   // ── collection and delivery ──
   "ORDER_NOT_ASSIGNED",
@@ -120,16 +133,23 @@ export function isAppErrorCode(value: string): value is AppErrorCode {
 
 /**
  * Codes that were listed in an earlier draft of the app's error mapper and that
- * **do not exist in any function body**. They are recorded here so a reader can
- * see they were checked and rejected, rather than wondering whether they were
+ * **do not exist in any function body** (verified live via a `pg_proc` census
+ * across `public` and `private`). They are recorded here so a reader can see
+ * they were checked and rejected, rather than wondering whether they were
  * forgotten:
  *
- * - `ITEM_PRICE_CHANGED`, `DELIVERY_FEE_CHANGED` - `place_order_v1` raises the
- *   single `PRICE_CHANGED` instead. There is no per-field variant.
- * - `OPTION_SELECTION_INVALID` - `upsert_cart_item_v1` raises `INVALID_OPTIONS`.
- * - `PHONE_INVALID`, `PHONE_IN_USE`, `NAME_INVALID` - no public function
- *   validates a phone or a name. `complete_profile_v1` takes three `text`
- *   arguments and raises nothing but `AUTH_REQUIRED`.
+ * - `ITEM_PRICE_CHANGED`, `DELIVERY_FEE_CHANGED` - payload discriminators
+ *   inside `place_order_v1`'s event JSON (`'type', 'ITEM_PRICE_CHANGED'`),
+ *   never raised codes (verified in the live function body).
+ * - `OPTION_SELECTION_INVALID` - absent from the live census; `upsert_...`
+ *   raises `INVALID_OPTIONS`. Note the contract §15 lists it — recorded as
+ *   tasks.mf Q7, do not re-add without a live re-check.
+ *
+ * Corrected in the other direction: `NAME_INVALID`, `PHONE_INVALID`,
+ * `PHONE_IN_USE`, `PHONE_IN_USE_BY_RIDER`, `PROFILE_ALREADY_COMPLETE` and
+ * `INVALID_PATCH` were claimed here as non-existent; the live bodies of
+ * `complete_profile_v1` / `update_profile_v1` raise all of them, so they
+ * moved into the union above.
  */
 export const RETIRED_ERROR_CODES = [
   "ITEM_PRICE_CHANGED",
@@ -154,19 +174,38 @@ export const BEHAVIOUR_CODES = {
     "INVALID_QUANTITY",
     "INVALID_OPTIONS",
     "SIZE_REQUIRED",
+    "SIZE_UNAVAILABLE",
+    "SIZE_NOT_APPLICABLE",
+    "OPTION_UNAVAILABLE",
     "TIP_INVALID",
     "DELIVERY_TYPE_INVALID",
     "GROUPING_INVALID",
     "PAYMENT_METHOD_INVALID",
     "PAYMENT_CHANNEL_INVALID",
+    "PAYMENT_CHANNEL_REQUIRED",
+    "PAYMENT_CHANNEL_MISMATCH",
     "RADIUS_INVALID",
     "PLATFORM_INVALID",
     "APP_ROLE_INVALID",
+    "ADDRESS_REQUIRED",
+    "ADDRESS_COORDS_REQUIRED",
+    "ADDRESS_COORDS_INVALID",
     "ADDRESS_LABEL_INVALID",
+    "AREA_REQUIRED",
+    "AREA_UNAVAILABLE",
+    "AMOUNT_INVALID",
     "UNKNOWN_KEY",
     "PATCH_EMPTY",
     "TOKEN_REQUIRED",
     "TOKEN_TOO_LONG",
+    "NAME_INVALID",
+    "PHONE_INVALID",
+    "PHONE_IN_USE",
+    "PHONE_IN_USE_BY_RIDER",
+    "INVALID_PATCH",
+    "CART_ITEM_RETIRED",
+    "CART_ITEM_UNAVAILABLE",
+    "ITEM_SIZED_BUT_NO_SIZES",
   ],
   /** Re-read from the server and retry silently. Never surface these as errors. */
   conflict: [
@@ -264,7 +303,7 @@ export function parseAppError(error: unknown): AppError {
 
   const message =
     typeof error === "object" && error !== null && "message" in error
-      ? (error as { message: unknown }).message
+      ? error.message
       : undefined;
 
   if (typeof message !== "string" || message === "") {

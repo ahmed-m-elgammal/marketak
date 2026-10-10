@@ -156,6 +156,7 @@ export type {
   OrderItem,
   CancelOrderResult,
   RiderProfile,
+  RiderAssignment,
   AvailableOrder,
   ClaimOrderResult,
   BeginCollectionResult,
@@ -165,6 +166,21 @@ export type {
   VendorFeed,
   CatalogSearchHit,
   DeviceToken,
+  Vendor,
+  MenuCategory,
+  MenuItem,
+  MenuItemSize,
+  ItemOption,
+  OptionChoice,
+  Area,
+  DeliveryZone,
+  Cuisine,
+  Cart,
+  SubOrder,
+  Voucher,
+  PromoSlot,
+  FlagRow,
+  RiderPublic,
 } from "./dto.js";
 
 export type {
@@ -190,6 +206,7 @@ export type {
   CompleteDeliveryArgs,
   EffectiveCashLimitArgs,
   RegisterDeviceTokenArgs,
+  GetFlagsArgs,
   DateWindowArgs,
 } from "./commands.js";
 
@@ -202,3 +219,5 @@ export type {
   SendOutcome,
   DeviceTokenRow,
 } from "./worker.js";
+
+export type { Database } from "./database.js";
