@@ -8,14 +8,37 @@
     "moduleResolution": "bundler",
     "module": "ESNext",
     "target": "ESNext",
-    "lib": ["ESNext", "DOM"],
-    "types": ["react", "react-native"],
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "types": [
+      "react",
+      "react-native"
+    ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@marketak/shared": ["../../packages/shared/src/index.ts"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx", "expo-env.d.ts"],
-  "exclude": ["node_modules", "dist", ".expo"],
-  "references": [{ "path": "../../packages/shared" }]
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts",
+    ".expo/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".expo"
+  ],
+  "references": [
+    {
+      "path": "../../packages/shared"
+    }
+  ]
 }

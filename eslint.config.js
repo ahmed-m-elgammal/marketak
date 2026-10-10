@@ -12,6 +12,9 @@ export default tseslint.config(
       // business reading generated bundles.
       "**/.expo/**",
       "**/expo-env.d.ts",
+      // Generated Supabase types. Linting generated code is noise; tsc still
+      // checks the file through its workspace tsconfig.
+      "packages/shared/src/database.ts",
       // Secrets. `supabase_keys` holds a service-role key that bypasses RLS on
       // every table, and the Firebase file holds a private key. Both are gitignored
       // for the same reason: NEVER `git add -f` either one.
@@ -217,7 +220,7 @@ export default tseslint.config(
             {
               group: ["**/services/rpc/call", "**/services/rpc/dto"],
               message:
-                "Call through services/rpc/api.ts. The call/dto modules are internals of the data layer (rule 3).",
+                "Call through services/rpc/index.ts. The call/dto modules are internals of the data layer (rule 3).",
             },
             {
               group: ["@supabase/supabase-js"],

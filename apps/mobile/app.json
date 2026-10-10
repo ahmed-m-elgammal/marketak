@@ -5,10 +5,12 @@
     "version": "0.1.0",
     "scheme": "marketak",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "backgroundColor": "#F6F1E7",
-    "assetBundlePatterns": ["**/*"],
+    "backgroundColor": "#080C14",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "bundleIdentifier": "com.jaylak.mobile",
       "supportsTablet": true,
@@ -24,7 +26,7 @@
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F6F1E7"
+        "backgroundColor": "#1D4ED8"
       }
     },
     "plugins": [
@@ -33,15 +35,22 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F6F1E7"
+          "backgroundColor": "#080C14"
         }
       ],
       [
         "expo-localization",
         {
-          "locales": ["ar", "en"]
+          "locales": [
+            "ar",
+            "en"
+          ]
         }
-      ]
+      ],
+      "expo-image",
+      "@react-native-firebase/app",
+      "@react-native-firebase/analytics",
+      "@react-native-firebase/crashlytics"
     ],
     "locales": {
       "ar": "./assets/locales/ar.json",

@@ -1,5 +1,6 @@
 /**
- * `scripts/check-no-hardcoded-colors.mjs` - enforces architecture rule 8 mechanically.
+ * `scripts/check-no-hardcoded-colors.mjs` - enforces AGENTS.md rule 2 (zero
+ * inline styling) mechanically.
  *
  * ## Why this script exists
  *
@@ -20,16 +21,22 @@
  *
  * - `apps/mobile/src/theme/tokens.ts` - the token definitions themselves
  * - `apps/mobile/src/theme/typography.ts` - the type scale, which carries no colour
+ * - `apps/mobile/tailwind.config.js` - a hand-maintained mirror of the token
+ *   file (Tailwind v3 config cannot import TypeScript). Governed by the
+ *   procedure in `apps/mobile/src/theme/design-rules.md`: values are added
+ *   to `tokens.ts` first, mirrored here second, and the two are spot-checked
+ *   against each other. A value that exists only here is still a defect.
  * - **native configuration**, which has no other way to express a colour:
  *   - `app.json` - the splash background and the adaptive icon background are read by the
  *     native build, which cannot `import` a TypeScript token
  *   - any `Info.plist`, `AndroidManifest.xml`, `google-services.json`, build gradle
  * - test files, which assert on specific hexes by necessity
  *
- * The design is warm paper `#F6F1E7`, so the native splash colour MUST match the token or the
- * splash flashes a different colour from the screen behind it. That is why app.json is exempt
- * rather than wrong - but it is also why the splash token is the one colour an agent must change
- * in two places, and the comment in `tokens.ts` says so.
+ * The design is dark-only, so the native splash colour MUST match the
+ * `surface-raster-0` token or the splash flashes a different colour from the
+ * screen behind it. That is why app.json is exempt rather than wrong - but it
+ * is also why the splash colour is a value an agent changes in two places
+ * (app.json + the token) and verifies by eye on a cold start.
  *
  * ## What changed from the first version of this file
  *
@@ -51,6 +58,29 @@ const NATIVE_COLOUR_FILES = new Set([
   "apps/mobile/android/app/src/main/AndroidManifest.xml",
 ]);
 
+/** Tailwind v3 config cannot import TypeScript, so it mirrors the tokens (see doc above). */
+const MIRROR_FILES = new Set(["apps/mobile/tailwind.config.js"]);
+
+/** Binary and asset files: byte sequences are not colour literals. */
+const BINARY_EXTENSIONS = new Set([
+  "ttf",
+  "otf",
+  "woff",
+  "woff2",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "avif",
+  "ico",
+  "bmp",
+  "mp3",
+  "mp4",
+  "pdf",
+  "zip",
+]);
+
 /** Path prefixes that are configuration or generated, not source. */
 const CONFIG_PREFIXES = [
   "node_modules/",
@@ -70,6 +100,17 @@ function isTestFile(path) {
 /** The theme directory owns every colour definition in the project. */
 function isThemeFile(path) {
   return path === TOKEN_FILE || path.startsWith("apps/mobile/src/theme/");
+}
+
+/** True for the sanctioned token mirror. */
+function isMirror(path) {
+  return MIRROR_FILES.has(path.replaceAll("\\", "/"));
+}
+
+/** True for binary/asset files, whose bytes are not source text. */
+function isBinary(path) {
+  const dot = path.lastIndexOf(".");
+  return dot !== -1 && BINARY_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
 }
 
 /** True when the path matches one of the allowed native configuration files. */
@@ -113,6 +154,7 @@ const violations = [];
 for (const path of stagedFiles()) {
   if (!ROOTS.some((root) => path.startsWith(`${root}/`))) continue;
   if (isTestFile(path) || isThemeFile(path) || isNativeConfig(path) || isConfig(path)) continue;
+  if (isMirror(path) || isBinary(path)) continue;
 
   const { readFileSync } = await import("node:fs");
   let content;
